@@ -51,6 +51,8 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminOrgs from "./pages/admin/AdminOrgs";
+import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
+import AdminFraudAlerts from "./pages/admin/AdminFraudAlerts";
 
 export default function App() {
   return (
@@ -114,6 +116,8 @@ export default function App() {
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="organizations" element={<AdminOrgs />} />
+            <Route path="subscriptions" element={<AdminSubscriptions />} />
+            <Route path="fraud-alerts" element={<AdminFraudAlerts />} />
           </Route>
 
           <Route path="*" element={<Landing />} />

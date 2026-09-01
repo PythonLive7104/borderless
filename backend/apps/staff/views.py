@@ -67,3 +67,48 @@ class AdminOrgsView(views.APIView):
                 "created_at": o.created_at,
             })
         return Response(out)
+
+
+class AdminSubscriptionsView(views.APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        subs = (Subscription.objects
+                .select_related("plan", "organization", "organization__owner")
+                .order_by("-created_at")[:300])
+        out = []
+        for s in subs:
+            access = s.access_state()
+            out.append({
+                "id": s.id,
+                "organization": s.organization.name,
+                "owner": s.organization.owner.email if s.organization.owner else "—",
+                "plan": s.plan.name, "price": s.plan.price,
+                "status": s.status,
+                "locked": access["locked"], "reason": access["reason"],
+                "trial_end": s.trial_end,
+                "created_at": s.created_at,
+            })
+        return Response(out)
+
+
+class AdminFraudAlertsView(views.APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        qs = (TrafficEvent.objects.filter(classification__in=["bot", "fraud"])
+              .select_related("website", "website__organization", "visitor")
+              .order_by("-created_at")[:200])
+        out = []
+        for e in qs:
+            out.append({
+                "id": e.id,
+                "organization": e.website.organization.name,
+                "website": e.website.name,
+                "visitor": e.visitor.visitor_id,
+                "ip": e.ip or "", "country": e.country or "",
+                "classification": e.classification, "risk_score": e.risk_score,
+                "action": e.action, "signals": e.signals,
+                "created_at": e.created_at,
+            })
+        return Response(out)

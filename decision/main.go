@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"borderless/decision/internal/fingerprint"
+	"borderless/decision/internal/geo"
 	"borderless/decision/internal/ipfilter"
 	"borderless/decision/internal/risk"
 	"borderless/decision/internal/rules"
@@ -61,6 +62,8 @@ func main() {
 	if err := st.Ping(ctx); err != nil {
 		log.Printf("warning: redis ping failed: %v", err)
 	}
+
+	go geo.Init(env("GEOIP_DB", ""))  // real-time IP->country (free DB-IP lite)
 
 	h := &handler{st: st}
 	mux := http.NewServeMux()
@@ -120,6 +123,9 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fp := fingerprint.Extract(r)
+	if fp.Country == "" {
+		fp.Country = geo.Country(fp.IP)  // engine-side GeoIP when no edge header
+	}
 
 	// TLS/JA3 fingerprint is supplied by a TLS-terminating upstream (Cloudflare,
 	// or an Nginx/HAProxy JA3 module). Empty in plain-HTTP dev unless injected.

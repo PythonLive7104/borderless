@@ -342,10 +342,20 @@ export interface AdminOverview {
 }
 export interface AdminUser { id: number; email: string; name: string; is_verified: boolean; is_staff: boolean; orgs: number; date_joined: string; }
 export interface AdminOrg { id: number; name: string; owner: string; members: number; websites: number; plan: string; status: string; created_at: string; }
+export interface AdminSub {
+  id: number; organization: string; owner: string; plan: string; price: number;
+  status: string; locked: boolean; reason: string; trial_end: string | null; created_at: string;
+}
+export interface AdminFraudAlert {
+  id: number; organization: string; website: string; visitor: string; ip: string; country: string;
+  classification: string; risk_score: number | null; action: string; signals: string[]; created_at: string;
+}
 export const adminApi = {
   overview: () => http.get<AdminOverview>("/admin/overview/"),
   users: () => http.get<AdminUser[]>("/admin/users/"),
   organizations: () => http.get<AdminOrg[]>("/admin/organizations/"),
+  subscriptions: () => http.get<AdminSub[]>("/admin/subscriptions/"),
+  fraudAlerts: () => http.get<AdminFraudAlert[]>("/admin/fraud-alerts/"),
 };
 
 
