@@ -34,7 +34,7 @@ services:
 
   backend:
     build: ./backend
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi -b 0.0.0.0:8000 --workers 3 --timeout 60 --access-logfile - --error-logfile -"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi -b 0.0.0.0:8000 --workers 2 --timeout 60 --access-logfile - --error-logfile -"
     env_file: .env
     depends_on:
       postgres: { condition: service_healthy }
@@ -57,23 +57,12 @@ services:
       redis: { condition: service_healthy }
     restart: unless-stopped
 
-  celery-worker:
-    build: ./backend
-    command: sh -c "sleep 10 && celery -A config worker --loglevel=info --concurrency=2"
-    env_file: .env
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    restart: unless-stopped
-
-  celery-beat:
-    build: ./backend
-    command: sh -c "sleep 12 && python manage.py sync_ja3 && celery -A config beat --loglevel=info"
-    env_file: .env
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    restart: unless-stopped
+  # NOTE: Celery worker + beat were removed to save ~130 MB of RAM on this
+  # 1.6 GB VPS. Their only jobs were two maintenance tasks, now run from host
+  # cron via management commands (see deploy/README.md):
+  #   0 3 * * *  enforce_retention   (daily data cleanup)
+  #   0 * * * *  sync_ja3            (hourly JA3 blocklist refresh)
+  # To restore Celery, re-add the celery-worker/celery-beat services here.
 
   web:
     build:

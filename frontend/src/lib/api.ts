@@ -28,19 +28,43 @@ async function raw(path: string, opts: RequestInit & { auth?: boolean } = {}): P
   return fetch(`/api${path}`, { ...opts, headers });
 }
 
+// Single-flight refresh: many requests can 401 at once (e.g. on a hard
+// refresh that fires several calls in parallel). We coalesce them into ONE
+// refresh call and share its result, so we never stampede the endpoint.
+let refreshInFlight: Promise<boolean> | null = null;
+function refreshAccess(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const r = await raw("/auth/token/refresh/", {
+          method: "POST", auth: false, body: JSON.stringify({ refresh: tokens.refresh }),
+        });
+        if (r.ok) {
+          const { access } = await r.json();
+          tokens.set({ access });
+          return true;
+        }
+        // Only a definitive auth rejection means the session is truly gone.
+        // A 5xx / timeout / network blip (common on a busy server) must NOT
+        // wipe the tokens, or a transient error logs the user out.
+        if (r.status === 401) tokens.clear();
+        return false;
+      } catch {
+        return false; // network error — keep tokens, let the caller fail/retry
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
 async function request<T = any>(path: string, opts: RequestInit & { auth?: boolean } = {}): Promise<T> {
   let res = await raw(path, opts);
   // transparent refresh on 401
   if (res.status === 401 && tokens.refresh && opts.auth !== false) {
-    const r = await raw("/auth/token/refresh/", {
-      method: "POST", auth: false, body: JSON.stringify({ refresh: tokens.refresh }),
-    });
-    if (r.ok) {
-      const { access } = await r.json();
-      tokens.set({ access });
+    if (await refreshAccess()) {
       res = await raw(path, opts);
-    } else {
-      tokens.clear();
     }
   }
   const text = await res.text();

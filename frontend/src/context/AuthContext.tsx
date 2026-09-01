@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { authApi, tokens, type User } from "../lib/api";
+import { authApi, tokens, ApiError, type User } from "../lib/api";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface AuthCtx {
   user: User | null;
@@ -19,7 +21,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function refreshUser() {
     if (!tokens.access) { setUser(null); return; }
-    try { setUser(await authApi.me()); } catch { setUser(null); tokens.clear(); }
+    // A hard refresh on a slow/overloaded server can make me() fail transiently
+    // (timeout, 5xx). Only a definitive 401 (invalid session) should log the
+    // user out — everything else is retried so a blip doesn't sign them out.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        setUser(await authApi.me());
+        return;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          setUser(null); tokens.clear(); return;
+        }
+        if (attempt < 2) { await sleep(600 * (attempt + 1)); continue; }
+        // Out of retries on a transient error: keep the tokens so the next
+        // navigation can recover, but we can't confirm the user right now.
+        setUser(null); return;
+      }
+    }
   }
 
   useEffect(() => { refreshUser().finally(() => setLoading(false)); }, []);
