@@ -70,7 +70,14 @@ class MeView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
 
     def get_object(self):
-        return self.request.user
+        user = self.request.user
+        # Safety net: guarantee every account has a workspace (superusers created
+        # via createsuperuser, or edge cases, would otherwise have none and the
+        # dashboard would spin forever).
+        from apps.organizations.models import OrganizationMember, create_workspace
+        if not OrganizationMember.objects.filter(user=user).exists():
+            create_workspace(user, (user.first_name or "My") + " Workspace")
+        return user
 
 
 class ChangePasswordView(views.APIView):
