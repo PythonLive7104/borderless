@@ -153,13 +153,16 @@ class CheckoutView(views.APIView):
             return Response({"detail": "Unknown plan."}, status=400)
         sub = _get_subscription(org_id)
 
-        if plan.price == 0 or not bachs.is_enabled() or not plan.bachs_product_id:
+        # product id comes from the DB field, falling back to the env mapping
+        product_id = plan.bachs_product_id or settings.BACHS_PRODUCTS.get(plan.slug, "")
+
+        if plan.price == 0 or not bachs.is_enabled() or not product_id:
             _activate(sub, plan)  # dev stub / free plan
             return Response({"activated": True, **SubscriptionSerializer(sub).data})
 
         front = settings.FRONTEND_URL.rstrip("/")
         data, err = bachs.create_checkout_session(
-            product_id=plan.bachs_product_id,
+            product_id=product_id,
             email=request.user.email,
             return_url=f"{front}/dashboard/billing?checkout=success",
             cancel_url=f"{front}/dashboard/billing?checkout=cancelled",

@@ -179,6 +179,12 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # key prefix (sk_sandbox_ / sk_live_).
 BACHS_API_KEY = os.getenv("BACHS_API_KEY", "")
 BACHS_WEBHOOK_SECRET = os.getenv("BACHS_WEBHOOK_SECRET", "")
+# Map each plan slug to its Bachs product id (used by checkout).
+BACHS_PRODUCTS = {
+    "starter": os.getenv("BACHS_PRODUCT_STARTER", ""),
+    "growth": os.getenv("BACHS_PRODUCT_GROWTH", ""),
+    "business": os.getenv("BACHS_PRODUCT_BUSINESS", ""),
+}
 
 # Threat scanning (destination-URL safety). Optional; scan no-ops when unset.
 GOOGLE_SAFE_BROWSING_KEY = os.getenv("GOOGLE_SAFE_BROWSING_KEY", "")
