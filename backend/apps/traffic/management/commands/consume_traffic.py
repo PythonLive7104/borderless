@@ -104,7 +104,7 @@ class Command(BaseCommand):
         # IP intelligence enrichment (populates shared sets + adjusts this event)
         intel = enrich(f.get("ip") or "")
         if intel:
-            delta, added = 0, []
+            delta, added, fields = 0, [], []
             if intel.get("datacenter"):
                 delta += 25; added.append("datacenter_ip")
             if intel.get("proxy") or intel.get("vpn"):
@@ -117,7 +117,13 @@ class Command(BaseCommand):
                         sigs.append(a)
                 event.signals = sigs
                 event.classification = _classify(event.risk_score)
-                event.save(update_fields=["risk_score", "signals", "classification"])
+                fields += ["risk_score", "signals", "classification"]
+            # backfill country from IP intelligence when the edge didn't supply one
+            if intel.get("country") and not event.country:
+                event.country = intel["country"]
+                fields.append("country")
+            if fields:
+                event.save(update_fields=fields)
 
         if f.get("type") == "conversion":
             try:
