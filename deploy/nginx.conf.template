@@ -35,5 +35,5 @@ server {
     location /v1/     { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
 
     location /assets/ { root /usr/share/nginx/html; expires 1y; add_header Cache-Control "public, immutable"; }
-    location / { root /usr/share/nginx/html; try_files $uri /index.html; }
+    location / { root /usr/share/nginx/html; try_files $uri $uri/ /index.html; }
 }

@@ -16,7 +16,9 @@ export const useWorkspace = () => useContext(Ctx);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [currentId, setCurrentId] = useState<number | null>(Number(localStorage.getItem(KEY)) || null);
+  const [currentId, setCurrentId] = useState<number | null>(() => {
+    try { return Number(localStorage.getItem(KEY)) || null; } catch { return null; }
+  });
   const [loading, setLoading] = useState(true);
 
   async function reload() {
