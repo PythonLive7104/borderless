@@ -214,16 +214,19 @@ class BachsWebhookView(views.APIView):
         except Exception:
             return Response({"detail": "Bad payload."}, status=400)
 
-        etype = event.get("type") or event.get("event") or ""
+        etype = (event.get("type") or event.get("event") or "").lower()
         meta = _find_metadata(event)
         org_id = meta.get("organization_id")
         plan_slug = meta.get("plan_slug")
 
-        if etype == "collection.succeeded" and org_id and plan_slug:
+        # A successful payment can arrive as collection.succeeded or as the
+        # checkout-completed event, depending on Bachs — activate on either.
+        PAID = {"collection.succeeded", "checkout.completed", "checkout_session.completed"}
+        if etype in PAID and org_id and plan_slug:
             plan = Plan.objects.filter(slug=plan_slug).first()
             sub = _get_subscription(org_id)
             if plan and sub:
                 _activate(sub, plan)
-        # collection.failed / abandoned: leave the current plan untouched.
+        # collection.failed / abandoned / refund: leave the current plan untouched.
         # refund.paid: could downgrade; we log it by no-op for the MVP.
         return Response({"received": True})
