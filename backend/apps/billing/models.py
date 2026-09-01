@@ -3,7 +3,7 @@ from django.db import models
 from django.utils import timezone
 from apps.organizations.models import Organization
 
-TRIAL_DAYS = 14
+TRIAL_DAYS = 7
 
 
 class Plan(models.Model):
@@ -65,3 +65,14 @@ class Subscription(models.Model):
         while end < now:
             start, end = end, end + timedelta(days=30)
         return start, end
+
+
+# Trial caps: while a workspace is on the free trial it may protect only a
+# limited number of sites/campaigns. Paid (active) plans are uncapped here.
+TRIAL_MAX_WEBSITES = 1
+TRIAL_MAX_CAMPAIGNS = 1
+
+
+def is_on_trial(organization_id) -> bool:
+    sub = Subscription.objects.filter(organization_id=organization_id).first()
+    return bool(sub and sub.status == Subscription.Status.TRIALING)

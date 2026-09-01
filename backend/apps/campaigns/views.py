@@ -30,6 +30,16 @@ class CampaignViewSet(viewsets.ModelViewSet):
         if not m or not m.can_manage:
             raise PermissionDenied("Only Owners and Admins can modify campaigns.")
 
+    def perform_create(self, serializer):
+        org_id = serializer.validated_data["website"].organization_id
+        from apps.billing.models import is_on_trial, TRIAL_MAX_CAMPAIGNS
+        from rest_framework.exceptions import ValidationError
+        if is_on_trial(org_id) and Campaign.objects.filter(website__organization_id=org_id).count() >= TRIAL_MAX_CAMPAIGNS:
+            raise ValidationError(
+                f"Your free trial can track {TRIAL_MAX_CAMPAIGNS} campaign. "
+                "Upgrade to a paid plan to add more.")
+        serializer.save()
+
     def perform_update(self, serializer):
         self._require_manager(serializer.instance.website.organization_id)
         serializer.save()

@@ -27,7 +27,14 @@ class WebsiteViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only Owners and Admins can modify websites.")
 
     def perform_create(self, serializer):
-        self._require_manager(serializer.validated_data["organization"].id)
+        org = serializer.validated_data["organization"]
+        self._require_manager(org.id)
+        from apps.billing.models import is_on_trial, TRIAL_MAX_WEBSITES
+        from rest_framework.exceptions import ValidationError
+        if is_on_trial(org.id) and Website.objects.filter(organization=org).count() >= TRIAL_MAX_WEBSITES:
+            raise ValidationError(
+                f"Your free trial can protect {TRIAL_MAX_WEBSITES} website. "
+                "Upgrade to a paid plan to add more.")
         website = serializer.save()
         from apps.rules.sync import publish_org
         publish_org(website.organization_id)

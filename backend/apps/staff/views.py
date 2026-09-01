@@ -81,6 +81,7 @@ class AdminSubscriptionsView(views.APIView):
             access = s.access_state()
             out.append({
                 "id": s.id,
+                "organization_id": s.organization_id,
                 "organization": s.organization.name,
                 "owner": s.organization.owner.email if s.organization.owner else "—",
                 "plan": s.plan.name, "price": s.plan.price,
@@ -112,3 +113,21 @@ class AdminFraudAlertsView(views.APIView):
                 "created_at": e.created_at,
             })
         return Response(out)
+
+
+class AdminGrantPlanView(views.APIView):
+    """Staff can put any workspace on any plan (active), bypassing payment."""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from apps.billing.views import _get_subscription, _activate
+        org_id = request.data.get("organization")
+        plan = Plan.objects.filter(slug=request.data.get("plan")).first()
+        if not org_id or not plan:
+            return Response({"detail": "organization and a valid plan are required."}, status=400)
+        sub = _get_subscription(org_id)
+        if not sub:
+            return Response({"detail": "Workspace not found."}, status=404)
+        _activate(sub, plan)
+        return Response({"detail": f"Granted {plan.name} to this workspace.",
+                         "plan": plan.name, "status": sub.status})
