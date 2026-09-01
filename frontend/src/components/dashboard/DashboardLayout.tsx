@@ -5,6 +5,7 @@ import Button from "../ui/Button";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import HelpChat from "./HelpChat";
 import AccessGate from "./AccessGate";
+import CommandPalette from "./CommandPalette";
 import VerifyEmailGate from "./VerifyEmailGate";
 import { TourProvider } from "../../context/TourContext";
 import { useAuth } from "../../context/AuthContext";
@@ -89,6 +90,11 @@ export default function DashboardLayout() {
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
               </button>
               <WorkspaceSwitcher />
+              <button onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
+                className="hidden items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-dim hover:border-brand/40 hover:text-fg md:flex" title="Search (Ctrl/Cmd + K)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                Search <kbd className="rounded border border-line px-1 py-0.5 text-[9px]">⌘K</kbd>
+              </button>
             </div>
             <div className="flex items-center gap-3 text-sm">
               {user?.is_staff && <Link to="/admin" className="rounded-lg bg-navy-900 px-3 py-1.5 font-semibold text-white hover:opacity-90">Admin</Link>}
@@ -100,6 +106,7 @@ export default function DashboardLayout() {
         <main className="mx-auto max-w-6xl px-5 py-8"><AccessGate><Outlet /></AccessGate></main>
       </div>
       <HelpChat />
+      <CommandPalette />
     </div>
     </VerifyEmailGate>
     </TourProvider>
