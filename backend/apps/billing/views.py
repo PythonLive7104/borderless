@@ -100,7 +100,33 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import permissions
 
+from django.core.mail import send_mail
+
 from . import bachs
+
+
+def _notify_activation(sub, plan):
+    """Email the workspace owner that their subscription is active. Never blocks
+    activation — mail failures are swallowed (fail_silently)."""
+    owner = getattr(sub.organization, "owner", None)
+    email = getattr(owner, "email", "")
+    if not email:
+        return
+    start, end = sub.current_period()
+    send_mail(
+        f"Your {plan.name} subscription is active",
+        (
+            f"Thanks for subscribing to Borderless.\n\n"
+            f"Plan: {plan.name} (${plan.price}/month)\n"
+            f"Included: {plan.monthly_events:,} events/month, "
+            f"{plan.retention_days}-day data retention.\n"
+            f"Current period: {start:%b %d, %Y} – {end:%b %d, %Y}\n\n"
+            f"Manage your subscription any time at {settings.FRONTEND_URL}/dashboard/billing"
+        ),
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        fail_silently=True,
+    )
 
 
 def _activate(sub, plan):
@@ -108,6 +134,7 @@ def _activate(sub, plan):
     sub.status = Subscription.Status.ACTIVE
     sub.period_start = timezone.now()
     sub.save(update_fields=["plan", "status", "period_start"])
+    _notify_activation(sub, plan)
 
 
 class CheckoutView(views.APIView):
