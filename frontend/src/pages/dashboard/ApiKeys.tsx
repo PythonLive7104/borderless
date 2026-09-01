@@ -37,11 +37,11 @@ export default function ApiKeys() {
   return (
     <div>
       <PageNote id="api-keys">
-        API keys let your own systems talk to Borderless securely — for example, to record a sale from your server. Create a key, copy it <b>once</b> (we never show it again), and keep it secret like a password.
+        API keys let your own systems talk to TrackAudit securely — for example, to record a sale from your server. Create a key, copy it <b>once</b> (we never show it again), and keep it secret like a password.
       </PageNote>
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-extrabold tracking-tight">API Keys</h1>
-          <p className="mt-1 text-sm text-fg-muted">Authenticate server-side requests to the Borderless API.</p></div>
+          <p className="mt-1 text-sm text-fg-muted">Authenticate server-side requests to the TrackAudit API.</p></div>
         {canManage && <Button onClick={() => { setCreated(null); setOpen(true); }}>+ Create key</Button>}
       </div>
 

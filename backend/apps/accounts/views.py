@@ -9,9 +9,41 @@ from .models import EmailVerification, PasswordReset
 from .serializers import RegisterSerializer, UserSerializer
 
 User = get_user_model()
-def _send(subject, body, to):
-    # Dev uses the console email backend; swap SMTP creds in settings for prod.
-    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [to], fail_silently=True)
+
+
+def _email_html(title, message, button_url=None, button_label=None):
+    brand = settings.BRAND_NAME
+    btn = ""
+    if button_url:
+        btn = (f'<tr><td style="padding:4px 0 24px">'
+               f'<a href="{button_url}" style="display:inline-block;background:#2563eb;color:#ffffff;'
+               f'text-decoration:none;font-weight:600;padding:12px 26px;border-radius:8px">'
+               f'{button_label or "Open"}</a></td></tr>')
+    return (
+        '<!doctype html><html><body style="margin:0;background:#f4f6fb;'
+        'font-family:Arial,Helvetica,sans-serif;color:#0f172a">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0">'
+        '<tr><td align="center">'
+        '<table role="presentation" cellpadding="0" cellspacing="0" width="480" '
+        'style="background:#ffffff;border-radius:14px;padding:32px;max-width:480px;text-align:left">'
+        f'<tr><td style="font-weight:800;font-size:18px;color:#2563eb;padding-bottom:18px">{brand}</td></tr>'
+        f'<tr><td style="font-size:20px;font-weight:700;padding-bottom:10px">{title}</td></tr>'
+        f'<tr><td style="font-size:15px;line-height:1.6;color:#334155;padding-bottom:18px">{message}</td></tr>'
+        f'{btn}'
+        '<tr><td style="font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:16px">'
+        f'You received this email because it was used to create or manage a {brand} account. '
+        'If this wasn\'t you, you can safely ignore it.</td></tr>'
+        '</table></td></tr></table></body></html>'
+    )
+
+
+def _send(subject, message, to, button_url=None, button_label=None):
+    """Send a branded HTML email (with a plain-text fallback) via the configured backend."""
+    from django.core.mail import EmailMultiAlternatives
+    text = message + (f"\n\n{button_label or 'Open'}: {button_url}" if button_url else "")
+    msg = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, [to])
+    msg.attach_alternative(_email_html(subject, message, button_url, button_label), "text/html")
+    msg.send(fail_silently=True)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -25,9 +57,13 @@ class RegisterView(generics.CreateAPIView):
         ws_name = (user.first_name and f"{user.first_name}'s Workspace") or "My Workspace"
         create_workspace(user, ws_name)
         ev = EmailVerification.objects.create(user=user)
-        _send("Verify your Borderless email",
-              f"Confirm your email: {settings.FRONTEND_URL}/verify-email?token={ev.token}",
-              user.email)
+        _send(
+            f"Confirm your {settings.BRAND_NAME} email",
+            "Welcome! Please confirm your email address to activate your account.",
+            user.email,
+            f"{settings.FRONTEND_URL}/verify-email?token={ev.token}",
+            "Confirm email",
+        )
 
 
 class MeView(generics.RetrieveUpdateAPIView):
@@ -58,9 +94,13 @@ class ForgotPasswordView(views.APIView):
         user = User.objects.filter(email__iexact=email).first()
         if user:  # silent when not found — never reveal account existence
             pr = PasswordReset.objects.create(user=user)
-            _send("Reset your Borderless password",
-                  f"Reset your password: {settings.FRONTEND_URL}/reset-password/{pr.token}",
-                  user.email)
+            _send(
+                f"Reset your {settings.BRAND_NAME} password",
+                "We received a request to reset your password. Use the button below to choose a new one. This link will expire soon.",
+                user.email,
+                f"{settings.FRONTEND_URL}/reset-password/{pr.token}",
+                "Reset password",
+            )
         return Response({"detail": "If the account exists, a reset link has been sent."})
 
 
@@ -110,7 +150,11 @@ class ResendVerificationView(views.APIView):
         if user.is_verified:
             return Response({"detail": "Your email is already verified."})
         ev = EmailVerification.objects.create(user=user)
-        _send("Verify your Borderless email",
-              f"Confirm your email: {settings.FRONTEND_URL}/verify-email?token={ev.token}",
-              user.email)
+        _send(
+            f"Confirm your {settings.BRAND_NAME} email",
+            "Welcome! Please confirm your email address to activate your account.",
+            user.email,
+            f"{settings.FRONTEND_URL}/verify-email?token={ev.token}",
+            "Confirm email",
+        )
         return Response({"detail": "Verification email sent. Check your inbox."})

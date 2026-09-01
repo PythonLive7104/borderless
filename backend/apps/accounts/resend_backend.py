@@ -61,7 +61,7 @@ class ResendBackend(BaseEmailBackend):
                 "Content-Type": "application/json",
                 # api.resend.com is behind Cloudflare, which blocks the default
                 # "Python-urllib" agent (403 / error 1010). Send a real UA.
-                "User-Agent": "Borderless/1.0 (+https://borderless.io)",
+                "User-Agent": "TrackAudit/1.0 (+https://trackaudit.info)",
                 "Accept": "application/json",
             },
             method="POST",

@@ -85,7 +85,7 @@ class InvitationListCreateView(generics.ListCreateAPIView):
             raise ValidationError({"detail": "That person is already a member."})
         inv = serializer.save(organization_id=org_id, invited_by=self.request.user, email=email)
         send_mail(
-            "You've been invited to a Borderless workspace",
+            "You've been invited to a TrackAudit workspace",
             f"Accept your invitation: {FRONTEND_URL}/accept-invite?token={inv.token}",
             "no-reply@borderless.local", [email], fail_silently=True,
         )

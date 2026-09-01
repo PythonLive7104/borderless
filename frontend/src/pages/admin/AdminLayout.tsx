@@ -15,7 +15,7 @@ export default function AdminLayout() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-2 font-extrabold">
-              Borderless <span className="rounded-md bg-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">Admin</span>
+              TrackAudit <span className="rounded-md bg-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">Admin</span>
             </span>
             <nav className="hidden gap-1 sm:flex">
               {LINKS.map((l) => (

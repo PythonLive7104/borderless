@@ -11,10 +11,10 @@ export default function Integrations() {
   return (
     <div>
       <PageNote id="integrations">
-        Integrations are the ways Borderless connects to your website and your other tools. Most people start with the <b>JavaScript Tracker</b>; developers can also use the <b>REST API</b> and <b>Webhooks</b>.
+        Integrations are the ways TrackAudit connects to your website and your other tools. Most people start with the <b>JavaScript Tracker</b>; developers can also use the <b>REST API</b> and <b>Webhooks</b>.
       </PageNote>
       <h1 className="text-2xl font-extrabold tracking-tight">Integrations</h1>
-      <p className="mt-1 text-sm text-fg-muted">Connect Borderless to your site and systems.</p>
+      <p className="mt-1 text-sm text-fg-muted">Connect TrackAudit to your site and systems.</p>
 
       <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {CARDS.map((c) => (

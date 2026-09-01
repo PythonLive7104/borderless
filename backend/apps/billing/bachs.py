@@ -41,7 +41,7 @@ def _post(path, payload):
         headers={
             "Authorization": f"Bearer {_key()}",
             "Content-Type": "application/json",
-            "User-Agent": "Borderless/1.0 (+https://borderless.io)",
+            "User-Agent": "TrackAudit/1.0 (+https://trackaudit.info)",
             "Accept": "application/json",
         },
         method="POST",

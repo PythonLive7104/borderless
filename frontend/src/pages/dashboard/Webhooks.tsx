@@ -42,7 +42,7 @@ export default function Webhooks() {
   return (
     <div>
       <PageNote id="webhooks">
-        A webhook lets Borderless <b>notify your systems automatically</b> when something happens — like a bot being caught or a sale being made. Enter a web address to send notifications to, and pick which events you care about.
+        A webhook lets TrackAudit <b>notify your systems automatically</b> when something happens — like a bot being caught or a sale being made. Enter a web address to send notifications to, and pick which events you care about.
       </PageNote>
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-extrabold tracking-tight">Webhooks</h1>

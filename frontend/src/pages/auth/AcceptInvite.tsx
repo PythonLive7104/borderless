@@ -31,7 +31,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <AuthLayout title="Team invitation" subtitle="Join a Borderless workspace."
+    <AuthLayout title="Team invitation" subtitle="Join a TrackAudit workspace."
       footer={<Link to="/dashboard" className="font-semibold text-brand">Go to dashboard</Link>}>
       {state === "ok" ? (
         <div className="rounded-xl border border-success/25 bg-success/5 p-5 text-sm text-emerald-700">{msg}

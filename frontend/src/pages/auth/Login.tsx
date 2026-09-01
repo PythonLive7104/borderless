@@ -21,7 +21,7 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your Borderless workspace."
+    <AuthLayout title="Welcome back" subtitle="Sign in to your TrackAudit workspace."
       footer={<>Don't have an account? <Link to="/signup" className="font-semibold text-brand">Create one</Link></>}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Work email" type="email" value={email} onChange={setEmail} placeholder="you@company.com" autoComplete="email" />

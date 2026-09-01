@@ -3,8 +3,8 @@
 export type KBEntry = { q: string; keywords: string[]; a: string };
 
 export const KB: KBEntry[] = [
-  { q: "What is Borderless?", keywords: ["what", "borderless", "about", "do", "purpose", "product"],
-    a: "Borderless is a traffic-intelligence platform. It scores every visitor to your site in real time, detects bots and fraud, and lets you automatically filter or redirect bad traffic so your ad budget reaches real people." },
+  { q: "What is TrackAudit?", keywords: ["what", "borderless", "about", "do", "purpose", "product"],
+    a: "TrackAudit is a traffic-intelligence platform. It scores every visitor to your site in real time, detects bots and fraud, and lets you automatically filter or redirect bad traffic so your ad budget reaches real people." },
   { q: "How do I install the tracker on my site?", keywords: ["install", "tracker", "snippet", "code", "setup", "add", "website", "embed", "script"],
     a: "Go to Websites → add your site → copy the tracking snippet shown and paste it into your site's HTML (before </body>). Once a visit is recorded, the site status turns Active. Use the Verify button to check installation." },
   { q: "What is a risk score?", keywords: ["risk", "score", "rating", "number", "0", "100"],
@@ -20,9 +20,9 @@ export const KB: KBEntry[] = [
   { q: "How do I restrict by country, device or OS?", keywords: ["country", "device", "os", "operating", "mobile", "desktop", "restrict", "geo"],
     a: "Create a Traffic Rule with a condition like Country is Russia, Device is Mobile, or OS is Android, then choose an action such as Block or Redirect. You can match several values with 'is any of'." },
   { q: "What is JA3 / TLS fingerprinting?", keywords: ["ja3", "tls", "fingerprint", "ssl"],
-    a: "JA3 is a fingerprint of a client's TLS handshake — useful for spotting automation tools that fake a normal browser. Borderless scores known-bad JA3 hashes; in production it needs a TLS-terminating proxy (like Cloudflare) to supply the value." },
+    a: "JA3 is a fingerprint of a client's TLS handshake — useful for spotting automation tools that fake a normal browser. TrackAudit scores known-bad JA3 hashes; in production it needs a TLS-terminating proxy (like Cloudflare) to supply the value." },
   { q: "What is A/B testing here?", keywords: ["a/b", "ab", "split", "test", "variant", "landing", "experiment"],
-    a: "On a Campaign you can add landing-page variants with weights. Real human visitors are split (stickily) across them and Borderless reports the conversion rate per variant. Bots are excluded from the test." },
+    a: "On a Campaign you can add landing-page variants with weights. Real human visitors are split (stickily) across them and TrackAudit reports the conversion rate per variant. Bots are excluded from the test." },
   { q: "How do conversions work?", keywords: ["conversion", "convert", "revenue", "sale", "postback", "track"],
     a: "Call the conversion function from your tracking snippet (or the public conversions API) when a visitor completes a goal. Conversions show under Conversions with revenue and attribution." },
   { q: "What are the plans and limits?", keywords: ["plan", "pricing", "billing", "price", "cost", "limit", "events", "upgrade", "subscription"],

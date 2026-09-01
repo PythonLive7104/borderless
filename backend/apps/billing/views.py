@@ -116,7 +116,7 @@ def _notify_activation(sub, plan):
     send_mail(
         f"Your {plan.name} subscription is active",
         (
-            f"Thanks for subscribing to Borderless.\n\n"
+            f"Thanks for subscribing to {settings.BRAND_NAME}.\n\n"
             f"Plan: {plan.name} (${plan.price}/month)\n"
             f"Included: {plan.monthly_events:,} events/month, "
             f"{plan.retention_days}-day data retention.\n"

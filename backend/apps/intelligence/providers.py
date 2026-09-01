@@ -8,7 +8,7 @@ import urllib.request
 
 
 def _get(url: str, timeout=3):
-    req = urllib.request.Request(url, headers={"User-Agent": "Borderless/1.0 (+https://borderless.io)", "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={"User-Agent": "TrackAudit/1.0 (+https://trackaudit.info)", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read().decode())
 
