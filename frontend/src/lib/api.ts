@@ -70,6 +70,7 @@ export const authApi = {
   forgotPassword: (email: string) => http.post("/auth/password/forgot/", { email }, false),
   resetPassword: (token: string, password: string) => http.post("/auth/password/reset/", { token, password }, false),
   verifyEmail: (token: string) => http.post("/auth/email/verify/", { token }, false),
+  resendVerification: () => http.post<{ detail: string }>("/auth/email/resend/", {}),
   updateProfile: (patch: Partial<User>) => http.patch<User>("/auth/me/", patch),
   changePassword: (current_password: string, new_password: string) =>
     http.post("/auth/password/change/", { current_password, new_password }),

@@ -100,3 +100,17 @@ class VerifyEmailView(views.APIView):
         ev.used_at = timezone.now()
         ev.save(update_fields=["used_at"])
         return Response({"detail": "Email verified."})
+
+
+class ResendVerificationView(views.APIView):
+    """Re-send the email-verification link to the signed-in user."""
+
+    def post(self, request):
+        user = request.user
+        if user.is_verified:
+            return Response({"detail": "Your email is already verified."})
+        ev = EmailVerification.objects.create(user=user)
+        _send("Verify your Borderless email",
+              f"Confirm your email: {settings.FRONTEND_URL}/verify-email?token={ev.token}",
+              user.email)
+        return Response({"detail": "Verification email sent. Check your inbox."})

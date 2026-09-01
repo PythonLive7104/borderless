@@ -5,6 +5,7 @@ import Button from "../ui/Button";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import HelpChat from "./HelpChat";
 import AccessGate from "./AccessGate";
+import VerifyEmailGate from "./VerifyEmailGate";
 import { TourProvider } from "../../context/TourContext";
 import { useAuth } from "../../context/AuthContext";
 
@@ -63,6 +64,7 @@ export default function DashboardLayout() {
   const [open, setOpen] = useState(false);
   return (
     <TourProvider>
+    <VerifyEmailGate>
     <div className="min-h-screen bg-bg-soft">
       {/* sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-60 border-r border-line bg-white transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
@@ -99,6 +101,7 @@ export default function DashboardLayout() {
       </div>
       <HelpChat />
     </div>
+    </VerifyEmailGate>
     </TourProvider>
   );
 }
