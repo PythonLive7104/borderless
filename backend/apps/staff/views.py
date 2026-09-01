@@ -8,7 +8,7 @@ from apps.organizations.models import Organization, OrganizationMember
 from apps.websites.models import Website
 from apps.campaigns.models import Campaign
 from apps.traffic.models import TrafficEvent, Conversion
-from apps.billing.models import Subscription
+from apps.billing.models import Subscription, Plan
 from apps.integrations.models import APIKey
 
 User = get_user_model()

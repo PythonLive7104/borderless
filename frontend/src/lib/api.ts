@@ -367,7 +367,7 @@ export interface AdminOverview {
 export interface AdminUser { id: number; email: string; name: string; is_verified: boolean; is_staff: boolean; orgs: number; date_joined: string; }
 export interface AdminOrg { id: number; name: string; owner: string; members: number; websites: number; plan: string; status: string; created_at: string; }
 export interface AdminSub {
-  id: number; organization: string; owner: string; plan: string; price: number;
+  id: number; organization: string; organization_id: number; owner: string; plan: string; price: number;
   status: string; locked: boolean; reason: string; trial_end: string | null; created_at: string;
 }
 export interface AdminFraudAlert {
@@ -380,6 +380,8 @@ export const adminApi = {
   organizations: () => http.get<AdminOrg[]>("/admin/organizations/"),
   subscriptions: () => http.get<AdminSub[]>("/admin/subscriptions/"),
   fraudAlerts: () => http.get<AdminFraudAlert[]>("/admin/fraud-alerts/"),
+  grantPlan: (organization: number, plan: string) =>
+    http.post<{ detail: string; plan: string; status: string }>("/admin/grant-plan/", { organization, plan }),
 };
 
 
