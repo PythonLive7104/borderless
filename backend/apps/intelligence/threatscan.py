@@ -30,7 +30,7 @@ def is_enabled():
 
 def _post_json(url, payload, headers=None):
     data = json.dumps(payload).encode()
-    h = {"Content-Type": "application/json"}
+    h = {"Content-Type": "application/json", "User-Agent": "Borderless/1.0 (+https://borderless.io)", "Accept": "application/json"}
     h.update(headers or {})
     req = urllib.request.Request(url, data=data, headers=h, method="POST")
     with urllib.request.urlopen(req, timeout=12) as r:
@@ -92,7 +92,7 @@ def _vt_scan(url: str) -> int:
     submit = urllib.request.Request(
         VT_URL,
         data=urllib.parse.urlencode({"url": url}).encode(),
-        headers={"x-apikey": _vt_key(),
+        headers={"x-apikey": _vt_key(), "User-Agent": "Borderless/1.0 (+https://borderless.io)",
                  "Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
@@ -100,7 +100,7 @@ def _vt_scan(url: str) -> int:
         pass
     url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
     get = urllib.request.Request(
-        f"{VT_URL}/{url_id}", headers={"x-apikey": _vt_key()}, method="GET")
+        f"{VT_URL}/{url_id}", headers={"x-apikey": _vt_key(), "User-Agent": "Borderless/1.0 (+https://borderless.io)"}, method="GET")
     with urllib.request.urlopen(get, timeout=12) as r:
         data = json.loads(r.read().decode())
     stats = data.get("data", {}).get("attributes", {}).get("last_analysis_stats", {})

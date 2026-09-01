@@ -59,6 +59,10 @@ class ResendBackend(BaseEmailBackend):
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
+                # api.resend.com is behind Cloudflare, which blocks the default
+                # "Python-urllib" agent (403 / error 1010). Send a real UA.
+                "User-Agent": "Borderless/1.0 (+https://borderless.io)",
+                "Accept": "application/json",
             },
             method="POST",
         )
