@@ -1,64 +1,66 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { AuthProvider } from "./context/AuthContext";
 import { WorkspaceProvider } from "./context/WorkspaceContext";
 import RequireAuth from "./components/auth/RequireAuth";
 import RequireStaff from "./components/auth/RequireStaff";
 import MarketingLayout from "./components/marketing/MarketingLayout";
 import Landing from "./pages/marketing/Landing";
-import Pricing from "./pages/marketing/Pricing";
-import BotCheck from "./pages/marketing/BotCheck";
-import Features from "./pages/marketing/Features";
-import FraudDetection from "./pages/marketing/FraudDetection";
-import Analytics from "./pages/marketing/Analytics";
-import TrafficIntelligence from "./pages/marketing/TrafficIntelligence";
-import Integrations from "./pages/marketing/Integrations";
-import ApiPage from "./pages/marketing/ApiPage";
-import Docs from "./pages/marketing/Docs";
-import Faq from "./pages/marketing/Faq";
-import Contact from "./pages/marketing/Contact";
-import Status from "./pages/marketing/Status";
-import Legal from "./pages/marketing/Legal";
-// auth
-import Login from "./pages/auth/Login";
-import Signup from "./pages/auth/Signup";
-import ForgotPassword from "./pages/auth/ForgotPassword";
-import ResetPassword from "./pages/auth/ResetPassword";
-import VerifyEmail from "./pages/auth/VerifyEmail";
-import AcceptInvite from "./pages/auth/AcceptInvite";
-// app (placeholder until dashboard phase)
-import DashboardLayout from "./components/dashboard/DashboardLayout";
-import Overview from "./pages/dashboard/Overview";
-import Websites from "./pages/dashboard/Websites";
-import WebsiteDetail from "./pages/dashboard/WebsiteDetail";
-import Campaigns from "./pages/dashboard/Campaigns";
-import CampaignDetail from "./pages/dashboard/CampaignDetail";
-import TrafficRules from "./pages/dashboard/TrafficRules";
-import BotScanner from "./pages/dashboard/BotScanner";
-import Visitors from "./pages/dashboard/Visitors";
-import VisitorDetail from "./pages/dashboard/VisitorDetail";
-import ClickLog from "./pages/dashboard/ClickLog";
-import TrafficSources from "./pages/dashboard/TrafficSources";
-import Conversions from "./pages/dashboard/Conversions";
-import DashIntegrations from "./pages/dashboard/Integrations";
-import ApiKeys from "./pages/dashboard/ApiKeys";
-import Webhooks from "./pages/dashboard/Webhooks";
-import Billing from "./pages/dashboard/Billing";
-import UsagePage from "./pages/dashboard/UsagePage";
-import Team from "./pages/dashboard/Team";
-import Settings from "./pages/dashboard/Settings";
-import Reports from "./pages/dashboard/Reports";
-import AdminLayout from "./pages/admin/AdminLayout";
-import AdminOverview from "./pages/admin/AdminOverview";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminOrgs from "./pages/admin/AdminOrgs";
-import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
-import AdminFraudAlerts from "./pages/admin/AdminFraudAlerts";
+// lazy-loaded route chunks (keeps the first load small + splits the dashboard/charts out)
+const Pricing = lazy(() => import("./pages/marketing/Pricing"));
+const BotCheck = lazy(() => import("./pages/marketing/BotCheck"));
+const Features = lazy(() => import("./pages/marketing/Features"));
+const FraudDetection = lazy(() => import("./pages/marketing/FraudDetection"));
+const Analytics = lazy(() => import("./pages/marketing/Analytics"));
+const TrafficIntelligence = lazy(() => import("./pages/marketing/TrafficIntelligence"));
+const Integrations = lazy(() => import("./pages/marketing/Integrations"));
+const ApiPage = lazy(() => import("./pages/marketing/ApiPage"));
+const Docs = lazy(() => import("./pages/marketing/Docs"));
+const Faq = lazy(() => import("./pages/marketing/Faq"));
+const Contact = lazy(() => import("./pages/marketing/Contact"));
+const Status = lazy(() => import("./pages/marketing/Status"));
+const Legal = lazy(() => import("./pages/marketing/Legal"));
+const Login = lazy(() => import("./pages/auth/Login"));
+const Signup = lazy(() => import("./pages/auth/Signup"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/auth/VerifyEmail"));
+const AcceptInvite = lazy(() => import("./pages/auth/AcceptInvite"));
+const DashboardLayout = lazy(() => import("./components/dashboard/DashboardLayout"));
+const Overview = lazy(() => import("./pages/dashboard/Overview"));
+const Websites = lazy(() => import("./pages/dashboard/Websites"));
+const WebsiteDetail = lazy(() => import("./pages/dashboard/WebsiteDetail"));
+const Campaigns = lazy(() => import("./pages/dashboard/Campaigns"));
+const CampaignDetail = lazy(() => import("./pages/dashboard/CampaignDetail"));
+const TrafficRules = lazy(() => import("./pages/dashboard/TrafficRules"));
+const BotScanner = lazy(() => import("./pages/dashboard/BotScanner"));
+const Visitors = lazy(() => import("./pages/dashboard/Visitors"));
+const VisitorDetail = lazy(() => import("./pages/dashboard/VisitorDetail"));
+const ClickLog = lazy(() => import("./pages/dashboard/ClickLog"));
+const TrafficSources = lazy(() => import("./pages/dashboard/TrafficSources"));
+const Conversions = lazy(() => import("./pages/dashboard/Conversions"));
+const DashIntegrations = lazy(() => import("./pages/dashboard/Integrations"));
+const ApiKeys = lazy(() => import("./pages/dashboard/ApiKeys"));
+const Webhooks = lazy(() => import("./pages/dashboard/Webhooks"));
+const Billing = lazy(() => import("./pages/dashboard/Billing"));
+const UsagePage = lazy(() => import("./pages/dashboard/UsagePage"));
+const Team = lazy(() => import("./pages/dashboard/Team"));
+const Settings = lazy(() => import("./pages/dashboard/Settings"));
+const Reports = lazy(() => import("./pages/dashboard/Reports"));
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminOrgs = lazy(() => import("./pages/admin/AdminOrgs"));
+const AdminSubscriptions = lazy(() => import("./pages/admin/AdminSubscriptions"));
+const AdminFraudAlerts = lazy(() => import("./pages/admin/AdminFraudAlerts"));
+
 
 export default function App() {
   return (
     <AuthProvider>
       <WorkspaceProvider>
       <BrowserRouter>
+        <Suspense fallback={<div className="grid min-h-screen place-items-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>}>
         <Routes>
           {/* marketing */}
           <Route element={<MarketingLayout />}>
@@ -122,6 +124,7 @@ export default function App() {
 
           <Route path="*" element={<Landing />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
       </WorkspaceProvider>
     </AuthProvider>

@@ -1,6 +1,8 @@
+import { useSeo } from "../../lib/seo";
 import FeaturePage from "../../components/marketing/FeaturePage";
 import { IShield, IRadar, IGauge, IBolt, IGlobe, ITarget } from "../../components/ui/icons";
 export default function FraudDetection() {
+  useSeo("Fraud detection", "Detect and block bots, click fraud, proxies and VPNs before they waste your ad budget.");
   return <FeaturePage eyebrow="Fraud Detection"
     title="Stop paying for traffic that never converts"
     sub="Detect bots, click fraud and automated abuse with transparent, explainable scoring — no deception, just defense."

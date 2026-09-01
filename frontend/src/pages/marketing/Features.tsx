@@ -1,6 +1,8 @@
+import { useSeo } from "../../lib/seo";
 import FeaturePage from "../../components/marketing/FeaturePage";
 import { IRadar, IShield, IGauge, IChart, ITarget, IBolt } from "../../components/ui/icons";
 export default function Features() {
+  useSeo("Features", "Real-time scoring, JS + TLS/JA3 fingerprinting, traffic rules, IP allow/deny, A/B testing and more.");
   return <FeaturePage eyebrow="Features"
     title="One platform for traffic you can trust"
     sub="Analyze, score, protect and measure every visitor — from first pageview to final conversion."

@@ -1,6 +1,8 @@
+import { useSeo } from "../../lib/seo";
 import FeaturePage from "../../components/marketing/FeaturePage";
 import { IChart, IGlobe, ITarget, IGauge, IRadar, IBolt } from "../../components/ui/icons";
 export default function Analytics() {
+  useSeo("Traffic analytics", "See traffic quality, sources, conversions and fraud across all your campaigns in one dashboard.");
   return <FeaturePage eyebrow="Analytics"
     title="Reports that tell you what to do next"
     sub="Fast, filterable analytics across campaigns, sources, geos and devices — with conversions and revenue built in."

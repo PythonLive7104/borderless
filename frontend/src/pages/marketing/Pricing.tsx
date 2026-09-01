@@ -1,3 +1,4 @@
+import { useSeo } from "../../lib/seo";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
@@ -87,6 +88,7 @@ function PlusDivider() {
 }
 
 export default function Pricing() {
+  useSeo("Pricing", "Simple plans for real-time bot and fraud detection. Start free, upgrade as you grow. Pay by card, mobile money or crypto.");
   return (
     <>
       <section className="hero-band relative overflow-hidden">

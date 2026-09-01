@@ -1,3 +1,4 @@
+import { useSeo } from "../../lib/seo";
 import Button from "../../components/ui/Button";
 import { Section, SectionHead } from "../../components/ui/Section";
 import LogoStrip from "../../components/marketing/LogoStrip";
@@ -55,6 +56,7 @@ const SLIDES: Slide[] = [
 ];
 
 export default function Landing() {
+  useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TrackAudit.");
   return (
     <>
       {/* HERO BAND */}

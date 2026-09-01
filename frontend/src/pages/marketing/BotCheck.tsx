@@ -1,3 +1,4 @@
+import { useSeo } from "../../lib/seo";
 import { useState } from "react";
 import { botCheckApi, type BotCheckResult } from "../../lib/api";
 import Button from "../../components/ui/Button";
@@ -12,6 +13,7 @@ const findTone: Record<string, { ring: string; icon: string }> = {
 };
 
 export default function BotCheck() {
+  useSeo("Free bot exposure check", "Scan any website in 10 seconds and see how exposed it is to bots — free, no signup.");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<BotCheckResult | null>(null);
