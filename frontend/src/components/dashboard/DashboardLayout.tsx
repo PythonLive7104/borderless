@@ -1,0 +1,104 @@
+import { useState } from "react";
+import { NavLink, Outlet, Link } from "react-router-dom";
+import Logo from "../marketing/Logo";
+import Button from "../ui/Button";
+import WorkspaceSwitcher from "./WorkspaceSwitcher";
+import HelpChat from "./HelpChat";
+import AccessGate from "./AccessGate";
+import { TourProvider } from "../../context/TourContext";
+import { useAuth } from "../../context/AuthContext";
+
+type Item = { label: string; to?: string; soon?: boolean };
+type Group = { title: string; items: Item[] };
+
+const NAV: Group[] = [
+  { title: "Overview", items: [
+    { label: "Dashboard", to: "/dashboard" },
+    { label: "Websites", to: "/dashboard/websites" },
+  ]},
+  { title: "Traffic", items: [
+    { label: "Campaigns", to: "/dashboard/campaigns" },
+    { label: "Traffic Rules", to: "/dashboard/traffic-rules" },
+    { label: "Bot Scanner", to: "/dashboard/scanner" },
+    { label: "Visitors", to: "/dashboard/visitors" },
+    { label: "Click Log", to: "/dashboard/click-log" },
+  ]},
+  { title: "Analytics", items: [
+    { label: "Reports", to: "/dashboard/reports" },
+    { label: "Conversions", to: "/dashboard/conversions" },
+    { label: "Traffic Sources", to: "/dashboard/traffic-sources" },
+  ]},
+  { title: "Developer", items: [
+    { label: "Integrations", to: "/dashboard/integrations" },
+    { label: "API Keys", to: "/dashboard/api" },
+    { label: "Webhooks", to: "/dashboard/webhooks" },
+  ]},
+  { title: "Settings", items: [
+    { label: "Team", to: "/dashboard/team" },
+    { label: "Billing", to: "/dashboard/billing" },
+    { label: "Usage", to: "/dashboard/usage" },
+    { label: "Settings", to: "/dashboard/settings" },
+  ]},
+];
+
+function SidebarLink({ item, onNavigate }: { item: Item; onNavigate?: () => void }) {
+  if (item.soon || !item.to) {
+    return (
+      <span className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-fg-dim/70">
+        {item.label}<span className="rounded-full bg-bg-mute px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">soon</span>
+      </span>
+    );
+  }
+  return (
+    <NavLink to={item.to} end={item.to === "/dashboard"} onClick={onNavigate}
+      className={({ isActive }) =>
+        `block rounded-lg px-3 py-2 text-sm font-medium transition ${isActive ? "bg-brand/10 text-brand" : "text-fg-muted hover:bg-bg-mute hover:text-fg"}`}>
+      {item.label}
+    </NavLink>
+  );
+}
+
+export default function DashboardLayout() {
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  return (
+    <TourProvider>
+    <div className="min-h-screen bg-bg-soft">
+      {/* sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-60 border-r border-line bg-white transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-16 items-center border-b border-line px-5"><Logo /></div>
+        <nav className="space-y-6 overflow-y-auto px-3 py-5" style={{ maxHeight: "calc(100vh - 4rem)" }}>
+          {NAV.map((g) => (
+            <div key={g.title}>
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-fg-dim">{g.title}</div>
+              <div className="space-y-0.5">{g.items.map((it) => <SidebarLink key={it.label} item={it} onNavigate={() => setOpen(false)} />)}</div>
+            </div>
+          ))}
+        </nav>
+      </aside>
+      {open && <div className="fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setOpen(false)} />}
+
+      {/* main */}
+      <div className="lg:pl-60">
+        <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-xl">
+          <div className="flex h-16 items-center justify-between gap-3 px-5">
+            <div className="flex items-center gap-3">
+              <button className="rounded-lg p-2 text-fg-muted hover:bg-bg-mute lg:hidden" onClick={() => setOpen(!open)}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+              </button>
+              <WorkspaceSwitcher />
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              {user?.is_staff && <Link to="/admin" className="rounded-lg bg-navy-900 px-3 py-1.5 font-semibold text-white hover:opacity-90">Admin</Link>}
+              <span className="hidden text-fg-muted sm:block">{user?.email}</span>
+              <Button variant="outline" onClick={logout}>Sign out</Button>
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto max-w-6xl px-5 py-8"><AccessGate><Outlet /></AccessGate></main>
+      </div>
+      <HelpChat />
+    </div>
+    </TourProvider>
+  );
+}

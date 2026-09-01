@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* ---- Borderless design tokens (light, blue accent — matches reference) ---- */
+@theme {
+  --color-bg: #ffffff;
+  --color-bg-soft: #f6f8fc;
+  --color-bg-mute: #eef2f8;
+  --color-card: #ffffff;
+  --color-line: #e6e9f0;
+  --color-line-soft: #eef1f6;
+
+  --color-navy-950: #070d1c;
+  --color-navy-900: #0b1120;
+  --color-navy-800: #111a30;
+
+  --color-fg: #0f1626;
+  --color-fg-muted: #566072;
+  --color-fg-dim: #8b93a3;
+
+  --color-brand: #2563eb;
+  --color-brand-600: #1d4ed8;
+  --color-brand-700: #1e40af;
+  --color-violet: #6d5efc;
+  --color-cyan: #06b6d4;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-xl2: 1.25rem;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: color-mix(in oklab, var(--color-brand) 25%, transparent); }
+}
+
+@layer utilities {
+  .container-page { @apply mx-auto w-full max-w-6xl px-5 sm:px-6; }
+  .text-gradient {
+    background: linear-gradient(100deg, #2563eb 0%, #6d5efc 60%, #06b6d4 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .card {
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-xl2);
+  }
+  .card-hover { transition: border-color .2s, transform .2s, box-shadow .2s; }
+  .card-hover:hover {
+    border-color: color-mix(in oklab, var(--color-brand) 45%, var(--color-line));
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px -20px rgba(37,99,235,.35);
+  }
+  .shadow-soft { box-shadow: 0 1px 2px rgba(15,22,38,.04), 0 8px 30px -18px rgba(15,22,38,.18); }
+  /* dark binary/grid backdrop for the hero band */
+  .hero-band {
+    background:
+      radial-gradient(1200px 400px at 70% -10%, rgba(37,99,235,.35), transparent 60%),
+      radial-gradient(900px 500px at 10% 120%, rgba(109,94,252,.25), transparent 55%),
+      var(--color-navy-900);
+  }
+  .binary-grid {
+    background-image:
+      linear-gradient(to right, rgba(120,160,255,.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120,160,255,.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .fade-up { animation: fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeUp { from { opacity:0; transform: translateY(14px);} to {opacity:1; transform:none;} }
+}

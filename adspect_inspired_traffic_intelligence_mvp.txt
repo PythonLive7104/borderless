@@ -1,0 +1,1878 @@
+ADSPECT-INSPIRED TRAFFIC INTELLIGENCE SaaS
+MVP PRODUCT REQUIREMENTS DOCUMENT
+Stack: React + Django/DRF + Go + PostgreSQL + Redis + Celery
+Date: August 31, 2026
+
+==================================================
+1. PRODUCT OVERVIEW
+==================================================
+
+Build a modern SaaS platform for traffic intelligence, fraud detection, visitor analysis, campaign monitoring, conversion tracking, and traffic-quality rules.
+
+The product is inspired by the general category and capabilities of Adspect, but must use original branding, UI, code, copy, and architecture.
+
+Core positioning:
+
+"See every visitor. Score every click. Protect every campaign."
+
+Primary users:
+- Performance marketers
+- Media buyers
+- Affiliate marketers
+- Agencies
+- E-commerce businesses
+- Advertisers
+- Developers
+
+The MVP must allow a customer to:
+1. Create an account.
+2. Create an organization/workspace.
+3. Add a website.
+4. Install a JavaScript tracking script.
+5. Create campaigns.
+6. Receive visitor/click data.
+7. Analyze visitor and traffic signals.
+8. Generate a risk score.
+9. Classify traffic.
+10. Create traffic-quality rules.
+11. View traffic analytics.
+12. Track conversions.
+13. Manage API keys and webhooks.
+14. Manage subscription and usage.
+15. Manage account/security settings.
+
+Important product boundary:
+The MVP should focus on legitimate traffic-quality, fraud detection, analytics, security, and campaign protection. Do not implement features designed to deceive ad-network reviewers, bypass advertising-platform enforcement, or evade platform policies.
+
+
+==================================================
+2. TECHNOLOGY STACK
+==================================================
+
+FRONTEND
+- React
+- Vite
+- Tailwind CSS
+- React Router
+- TanStack Query
+- Recharts or equivalent chart library
+- TypeScript
+
+BACKEND
+- Django
+- Django REST Framework
+- PostgreSQL
+- Redis
+- Celery
+- JWT authentication
+
+TRAFFIC ENGINE
+- Go
+- REST API
+- High-performance request processing
+- Risk scoring
+- Visitor signal analysis
+- Rule evaluation
+
+INFRASTRUCTURE
+- Docker
+- Docker Compose
+- Nginx
+- HTTPS
+- Optional Cloudflare
+- Linux VPS/cloud deployment
+
+Suggested architecture:
+
+React
+  |
+  | REST/JWT
+  v
+Django API
+  |
+  +---- PostgreSQL
+  |
+  +---- Redis/Celery
+  |
+  +---- Go Traffic Engine
+             |
+             +---- Risk Analysis
+             +---- Traffic Classification
+             +---- Rule Evaluation
+
+
+==================================================
+3. PUBLIC WEBSITE
+==================================================
+
+Required public routes:
+
+/
+ /features
+ /traffic-intelligence
+ /fraud-detection
+ /analytics
+ /integrations
+ /api
+ /pricing
+ /documentation
+ /faq
+ /contact
+ /login
+ /signup
+ /forgot-password
+ /reset-password/:token
+ /verify-email
+ /terms
+ /privacy
+ /status
+
+The website must have a premium modern SaaS design.
+
+Design direction:
+- Dark modern cybersecurity/ad-tech aesthetic
+- Large readable typography
+- Strong visual hierarchy
+- Minimal clutter
+- Rounded cards
+- Subtle borders
+- Subtle gradients
+- Professional charts
+- Responsive design
+- Desktop-first dashboard
+- Fully responsive mobile layout
+- Smooth hover/transition effects
+- Skeleton loading states
+- Empty states
+- Toast notifications
+- Accessible forms
+- Clear CTA buttons
+
+Suggested visual direction:
+
+Background: near-black
+Cards: dark charcoal
+Borders: subtle gray
+Primary accent: electric blue/violet
+Success: green
+Warning: amber
+Danger: red
+Text: white/light gray
+
+
+==================================================
+4. LANDING PAGE
+==================================================
+
+Hero section:
+
+Headline:
+"See every visitor. Score every click. Protect every campaign."
+
+Subheadline:
+"Analyze, score and protect incoming traffic with real-time visitor intelligence, fraud detection and campaign analytics."
+
+Buttons:
+- Start Free
+- View Demo
+
+Hero visual:
+Show an animated dashboard preview containing:
+- Traffic volume
+- Risk score
+- Traffic quality
+- Fraud detected
+- Conversion rate
+- Live visitor activity
+
+Trust/metrics section:
+- Visitors analyzed
+- Traffic processed
+- Average processing time
+- Traffic quality percentage
+
+Features section:
+1. Traffic Intelligence
+2. Fraud Detection
+3. Risk Scoring
+4. Campaign Analytics
+5. Conversion Tracking
+6. Real-Time Monitoring
+
+How it works:
+1. Connect your website
+2. Install tracking
+3. Analyze traffic
+4. Score visitors
+5. Protect campaigns
+6. Measure conversions
+
+CTA section:
+"Start understanding your traffic today."
+
+Footer:
+- Product
+- Features
+- Pricing
+- Documentation
+- API
+- Company
+- Contact
+- Privacy
+- Terms
+
+
+==================================================
+5. AUTHENTICATION
+==================================================
+
+Pages:
+- Login
+- Signup
+- Forgot Password
+- Reset Password
+- Email Verification
+- Accept Invitation
+
+SIGNUP FIELDS:
+- First name
+- Last name
+- Email
+- Password
+- Confirm password
+- Terms acceptance
+
+LOGIN:
+- Email
+- Password
+- Remember me
+- Forgot password
+- Login
+
+Security:
+- Password hashing
+- JWT access/refresh tokens
+- Email verification
+- Password reset token
+- Rate limiting
+- Login attempt protection
+- Secure token storage
+- Logout
+- Session management
+
+Optional later:
+- Google login
+- GitHub login
+- 2FA
+
+
+==================================================
+6. ONBOARDING
+==================================================
+
+After signup, do not send the user directly to an empty dashboard.
+
+Show onboarding wizard:
+
+Step 1:
+Create workspace
+
+Step 2:
+Add website
+
+Step 3:
+Install tracking script
+
+Step 4:
+Create first campaign
+
+Step 5:
+View first traffic
+
+Progress indicator:
+1 -> 2 -> 3 -> 4 -> 5
+
+Provide clear instructions and copy-to-clipboard buttons for tracking installation.
+
+
+==================================================
+7. DASHBOARD
+==================================================
+
+Main dashboard route:
+
+/dashboard
+
+Sidebar:
+
+OVERVIEW
+- Dashboard
+
+TRAFFIC
+- Campaigns
+- Traffic Rules
+- Visitors
+- Click Log
+
+ANALYTICS
+- Reports
+- Conversions
+- Traffic Sources
+
+DEVELOPER
+- Integrations
+- API
+- Webhooks
+
+BILLING
+- Subscription
+- Usage
+
+SETTINGS
+- Profile
+- Team
+- Security
+- General
+
+Bottom:
+- User account
+- Workspace switcher
+
+
+==================================================
+8. DASHBOARD OVERVIEW
+==================================================
+
+Top navigation:
+- Workspace selector
+- Date range selector
+- Search
+- Notifications
+- User menu
+
+Summary cards:
+
+Visitors
+- Total visitors
+- Percentage change
+
+Sessions
+- Total sessions
+- Percentage change
+
+Traffic Quality
+- Percentage
+- Percentage change
+
+Fraud/Suspicious Traffic
+- Number detected
+- Percentage change
+
+Conversions
+- Total conversions
+- Conversion rate
+
+Revenue
+- Total revenue
+
+Charts:
+
+1. Visitors over time
+2. Traffic quality over time
+3. Traffic sources
+4. Countries
+5. Device types
+6. Risk distribution
+7. Conversions over time
+
+Live traffic panel:
+- Recent visitor
+- Country
+- Device
+- Campaign
+- Risk score
+- Classification
+- Action
+
+
+==================================================
+9. WEBSITES
+==================================================
+
+Users can create and manage multiple websites.
+
+Website fields:
+- Website name
+- Domain
+- Website URL
+- Tracking ID
+- Status
+- Created date
+
+Website details:
+- Tracking installation status
+- Traffic statistics
+- Campaigns
+- API keys
+- Tracking script
+- Webhooks
+
+Tracking installation page:
+
+Display:
+
+<script
+  src="https://cdn.yourproduct.com/tracker.js"
+  data-site-id="SITE_ID">
+</script>
+
+Buttons:
+- Copy script
+- Verify installation
+- Documentation
+
+Installation status:
+- Not installed
+- Detected
+- Active
+- Error
+
+
+==================================================
+10. JAVASCRIPT TRACKING SDK
+==================================================
+
+Provide a lightweight JavaScript tracker.
+
+Purpose:
+- Identify a visit/session
+- Collect approved traffic signals
+- Capture page views
+- Capture referrer
+- Capture UTM parameters
+- Send events to traffic engine/API
+- Capture conversion events
+
+Example:
+
+<script
+  src="https://cdn.yourproduct.com/tracker.js"
+  data-site-id="SITE_ID">
+</script>
+
+The SDK should:
+- Be asynchronous
+- Avoid blocking page load
+- Handle network failures
+- Retry safely
+- Generate visitor/session identifiers
+- Support pageview events
+- Support custom events
+- Support conversion events
+
+Provide clear privacy documentation.
+
+
+==================================================
+11. CAMPAIGNS
+==================================================
+
+Route:
+
+/dashboard/campaigns
+
+Campaign list columns:
+- Campaign
+- Visitors
+- Quality
+- Conversions
+- Conversion rate
+- Revenue
+- Status
+- Created date
+
+Actions:
+- Create
+- Edit
+- Pause
+- Activate
+- Delete
+- View details
+
+Create Campaign fields:
+- Campaign name
+- Website
+- Destination URL
+- Traffic source
+- Country
+- UTM source
+- UTM medium
+- UTM campaign
+- Risk threshold
+- Status
+
+Campaign detail page:
+- Overview
+- Traffic
+- Visitors
+- Risk
+- Conversions
+- Sources
+- Countries
+- Devices
+- Rules
+
+
+==================================================
+12. TRAFFIC RULES
+==================================================
+
+Traffic rules allow customers to define legitimate traffic-quality actions.
+
+Route:
+
+/dashboard/traffic-rules
+
+Rule example:
+
+IF:
+Risk Score > 80
+
+THEN:
+Action = Block
+
+Another example:
+
+IF:
+Bot detected = true
+
+THEN:
+Action = Review
+
+Supported conditions:
+- Risk score
+- Bot detection
+- Proxy signal
+- Country
+- Device
+- Browser
+- Operating system
+- Referrer
+- Campaign
+- UTM source
+- UTM medium
+- UTM campaign
+
+Actions:
+- Allow
+- Review
+- Block
+- Tag
+
+Rule fields:
+- Rule name
+- Priority
+- Conditions
+- Action
+- Active/inactive
+
+Provide a visual rule builder.
+
+Example:
+
+IF [Risk Score] [greater than] [80]
+AND [Bot] [equals] [true]
+THEN [Action] [Block]
+
+
+==================================================
+13. TRAFFIC ANALYSIS
+==================================================
+
+Each visitor should receive a traffic analysis result.
+
+Example:
+
+Risk Score: 82/100
+Classification: Suspicious
+Confidence: 91%
+
+Signals:
+- Datacenter IP
+- Proxy detected
+- Automation signal
+- Abnormal request frequency
+
+Risk ranges:
+
+0-39:
+Low Risk
+
+40-69:
+Medium Risk
+
+70-84:
+High Risk
+
+85-100:
+Critical Risk
+
+Important:
+The score should be transparent and explain which signals contributed to it.
+
+
+==================================================
+14. FRAUD/BOT DETECTION
+==================================================
+
+MVP detection signals:
+
+- Datacenter IP
+- Proxy signal
+- VPN signal where available
+- Tor signal where available
+- Known bot/user-agent
+- Suspicious automation signal
+- Headless-browser indicators where technically reliable
+- Repeated visitor behavior
+- Abnormal request frequency
+- Geographic anomalies
+- IP/ASN reputation where available
+- Device/browser inconsistencies
+
+Output:
+
+classification:
+- Human
+- Suspicious
+- Bot
+- Fraud
+
+risk_score:
+0-100
+
+confidence:
+0-1
+
+signals:
+array of reasons
+
+
+==================================================
+15. VISITOR DETAILS
+==================================================
+
+Route:
+
+/dashboard/visitors
+
+Visitor table:
+
+- Timestamp
+- Visitor ID
+- IP
+- Country
+- Device
+- Browser
+- OS
+- Campaign
+- Risk score
+- Classification
+- Action
+
+Clicking a visitor opens:
+
+Visitor Details
+
+Risk Score
+84/100
+
+Classification
+Suspicious
+
+IP
+Masked/displayed according to privacy policy
+
+Country
+United States
+
+Region
+Example Region
+
+City
+Example City
+
+ASN
+Example ASN
+
+ISP
+Example ISP
+
+Browser
+Chrome
+
+Operating System
+Windows
+
+Device
+Desktop
+
+Proxy
+Detected
+
+Automation
+Possible
+
+Referrer
+example.com
+
+Campaign
+Summer Campaign
+
+First Seen
+Timestamp
+
+Last Seen
+Timestamp
+
+Events
+Pageview
+Click
+Conversion
+
+
+==================================================
+16. CLICK LOG
+==================================================
+
+Route:
+
+/dashboard/click-log
+
+Columns:
+- Time
+- Visitor
+- IP
+- Country
+- Campaign
+- Device
+- Risk score
+- Classification
+- Action
+
+Filters:
+- Date
+- Campaign
+- Country
+- Device
+- Classification
+- Risk score
+- Action
+
+Search:
+- Visitor ID
+- IP
+- Campaign
+
+
+==================================================
+17. CONVERSION TRACKING
+==================================================
+
+Route:
+
+/dashboard/conversions
+
+Metrics:
+- Total conversions
+- Conversion rate
+- Revenue
+- Revenue per visitor
+- Revenue per campaign
+
+Conversion fields:
+- Conversion ID
+- Visitor ID
+- Campaign
+- Event
+- Revenue
+- Currency
+- Timestamp
+
+Conversion API:
+
+POST /api/v1/conversions
+
+Example payload:
+
+{
+  "visitor_id": "visitor_123",
+  "campaign_id": "campaign_123",
+  "event": "purchase",
+  "revenue": 49.99,
+  "currency": "USD"
+}
+
+
+==================================================
+18. ANALYTICS
+==================================================
+
+Analytics filters:
+- Today
+- Yesterday
+- Last 7 days
+- Last 30 days
+- Custom date range
+
+Dimensions:
+- Campaign
+- Country
+- City
+- Device
+- Browser
+- OS
+- Referrer
+- UTM source
+- UTM medium
+- UTM campaign
+- Classification
+
+Reports:
+- Traffic report
+- Traffic quality report
+- Campaign report
+- Conversion report
+- Source report
+- Geographic report
+- Device report
+
+Export:
+- CSV
+
+PDF export can be added later.
+
+
+==================================================
+19. TRAFFIC SOURCES
+==================================================
+
+Display:
+
+Facebook
+Google
+TikTok
+Organic
+Direct
+Referral
+Other
+
+For each source:
+- Visitors
+- Sessions
+- Quality
+- Suspicious traffic
+- Conversions
+- Revenue
+- Conversion rate
+
+
+==================================================
+20. INTEGRATIONS
+==================================================
+
+MVP integrations:
+
+1. JavaScript Tracker
+2. REST API
+3. Webhooks
+
+Integration page:
+
+- Integration name
+- Status
+- Connect
+- Configure
+- Disconnect
+
+Future:
+- Google Ads
+- Meta Ads
+- TikTok Ads
+- Google Analytics
+- Shopify
+- WordPress
+
+
+==================================================
+21. API
+==================================================
+
+Developer page:
+
+API Keys
+
+Users can:
+- Create API key
+- Rename API key
+- Copy API key
+- Revoke API key
+- View last used time
+- View created date
+
+Never display the complete secret again after initial creation.
+
+MVP endpoints:
+
+GET /api/v1/websites
+POST /api/v1/websites
+
+GET /api/v1/campaigns
+POST /api/v1/campaigns
+GET /api/v1/campaigns/{id}
+PATCH /api/v1/campaigns/{id}
+DELETE /api/v1/campaigns/{id}
+
+GET /api/v1/visitors
+GET /api/v1/visitors/{id}
+
+GET /api/v1/traffic
+GET /api/v1/reports
+
+POST /api/v1/conversions
+
+GET /api/v1/traffic-rules
+POST /api/v1/traffic-rules
+
+
+==================================================
+22. WEBHOOKS
+==================================================
+
+Route:
+
+/dashboard/webhooks
+
+Users can:
+- Create webhook
+- Edit webhook
+- Disable webhook
+- Delete webhook
+- Test webhook
+
+Events:
+
+visitor.created
+traffic.classified
+conversion.created
+risk.high
+risk.critical
+campaign.updated
+
+Webhook delivery:
+- HTTPS only
+- Signed payload
+- Retry failed deliveries
+- Delivery logs
+
+
+==================================================
+23. BILLING
+==================================================
+
+Pricing page:
+
+STARTER
+$29/month
+
+- 50,000 visitors
+- Traffic analytics
+- Basic fraud detection
+- Campaigns
+- Click logs
+- 30-day retention
+- JavaScript tracking
+
+GROWTH
+$99/month
+
+- 500,000 visitors
+- Advanced fraud detection
+- Risk scoring
+- Conversion tracking
+- Traffic rules
+- API
+- Webhooks
+- 90-day retention
+
+BUSINESS
+$299/month
+
+- 2,000,000 visitors
+- Advanced traffic intelligence
+- Custom rules
+- Team members
+- Priority support
+- 12-month retention
+- Advanced API
+
+The actual payment processor can be implemented separately.
+
+Billing page:
+- Current plan
+- Usage
+- Billing cycle
+- Next billing date
+- Payment history
+- Upgrade
+- Downgrade
+- Cancel subscription
+
+
+==================================================
+24. USAGE
+==================================================
+
+Usage page:
+
+Visitors:
+362,421 / 500,000
+
+API Requests:
+61,292 / 100,000
+
+Data retention:
+Current plan limit
+
+Show:
+- Current usage
+- Percentage used
+- Remaining usage
+- Historical usage
+
+Warning thresholds:
+- 70%
+- 85%
+- 100%
+
+
+==================================================
+25. TEAM MANAGEMENT
+==================================================
+
+Route:
+
+/dashboard/team
+
+Roles:
+- Owner
+- Admin
+- Analyst
+
+Features:
+- Invite member
+- Remove member
+- Change role
+- Resend invitation
+
+Permissions:
+Owner:
+Everything
+
+Admin:
+Everything except billing/ownership
+
+Analyst:
+Read-only analytics and reports
+
+
+==================================================
+26. SETTINGS
+==================================================
+
+PROFILE
+- Name
+- Email
+- Avatar
+- Timezone
+- Language
+
+GENERAL
+- Workspace name
+- Default date range
+- Default currency
+
+SECURITY
+- Change password
+- Two-factor authentication
+- Active sessions
+- Login history
+- Revoke sessions
+
+NOTIFICATIONS
+- Email notifications
+- High-risk alerts
+- Usage alerts
+- Conversion alerts
+
+
+==================================================
+27. ADMIN PANEL
+==================================================
+
+Separate admin interface.
+
+Admin dashboard:
+
+Users
+Organizations
+Active subscriptions
+MRR
+Visitors processed
+API requests
+System errors
+
+Admin pages:
+- Users
+- Organizations
+- Subscriptions
+- Plans
+- Payments
+- Websites
+- Campaigns
+- Traffic
+- API usage
+- Fraud alerts
+- System logs
+- Audit logs
+- Feature flags
+
+Admin user detail:
+- Account information
+- Organization
+- Subscription
+- Usage
+- Websites
+- Campaigns
+- Login history
+- Account status
+
+
+==================================================
+28. DATABASE MODELS
+==================================================
+
+accounts:
+- User
+- UserProfile
+- EmailVerification
+- PasswordReset
+
+organizations:
+- Organization
+- OrganizationMember
+- Invitation
+
+billing:
+- Plan
+- Subscription
+- Payment
+- UsageRecord
+
+websites:
+- Website
+- TrackingConfiguration
+
+campaigns:
+- Campaign
+- TrafficRule
+- TrafficRuleCondition
+
+traffic:
+- Visitor
+- Session
+- Click
+- TrafficEvent
+- TrafficClassification
+- RiskSignal
+
+analytics:
+- Conversion
+- TrafficSource
+- DailyMetric
+
+integrations:
+- Integration
+- APIKey
+- Webhook
+- WebhookDelivery
+
+system:
+- Notification
+- AuditLog
+
+
+==================================================
+29. DJANGO API STRUCTURE
+==================================================
+
+Suggested Django apps:
+
+apps/
+    accounts/
+    organizations/
+    billing/
+    websites/
+    campaigns/
+    traffic/
+    analytics/
+    integrations/
+    notifications/
+    audit/
+
+
+API:
+
+/api/v1/auth/
+/api/v1/organizations/
+/api/v1/websites/
+/api/v1/campaigns/
+/api/v1/traffic/
+/api/v1/visitors/
+/api/v1/conversions/
+/api/v1/reports/
+/api/v1/integrations/
+/api/v1/api-keys/
+/api/v1/webhooks/
+/api/v1/billing/
+/api/v1/usage/
+
+
+==================================================
+30. GO TRAFFIC ENGINE
+==================================================
+
+Purpose:
+Handle high-volume traffic analysis without putting the entire workload on Django.
+
+Responsibilities:
+- Receive tracking events
+- Normalize visitor information
+- Analyze traffic signals
+- Calculate risk score
+- Classify traffic
+- Evaluate traffic rules
+- Return decision
+- Send events to backend/queue
+
+Example request:
+
+POST /v1/analyze
+
+Input:
+- site_id
+- visitor_id
+- session_id
+- IP
+- user agent
+- referrer
+- country
+- device
+- browser
+- OS
+- UTM data
+- event type
+
+Output:
+
+{
+  "risk_score": 82,
+  "classification": "suspicious",
+  "confidence": 0.91,
+  "action": "review",
+  "signals": [
+    "datacenter_ip",
+    "proxy_detected",
+    "automation_signal"
+  ]
+}
+
+
+==================================================
+31. RISK ENGINE
+==================================================
+
+MVP should start with deterministic rules rather than machine learning.
+
+Example weighted signals:
+
+Known bot:
++50
+
+Datacenter:
++25
+
+Proxy:
++15
+
+Suspicious automation:
++25
+
+Abnormal request rate:
++20
+
+Repeated suspicious activity:
++15
+
+Normalize final score to 0-100.
+
+Classification:
+
+0-39:
+human/low risk
+
+40-69:
+medium risk
+
+70-84:
+suspicious/high risk
+
+85-100:
+critical risk
+
+The exact weights must be configurable and validated against real data.
+
+Do not claim a specific detection accuracy until it has been measured using a representative labeled dataset.
+
+
+==================================================
+32. CELERY/REDIS JOBS
+==================================================
+
+Background jobs:
+
+- Aggregate analytics
+- Process webhook retries
+- Generate reports
+- Send usage notifications
+- Clean expired data
+- Update daily metrics
+- Send email notifications
+- Process billing events
+
+
+==================================================
+33. SECURITY REQUIREMENTS
+==================================================
+
+- HTTPS everywhere
+- Secure password hashing
+- JWT rotation/refresh strategy
+- API rate limiting
+- CSRF protection where applicable
+- CORS restrictions
+- Input validation
+- SQL injection protection through ORM
+- XSS protection
+- Secure cookies where used
+- Secret management
+- Audit logs
+- Permission checks
+- API key hashing/storage strategy
+- Webhook signature verification
+- Brute-force protection
+- Admin access protection
+- Database backups
+
+
+==================================================
+34. PRIVACY
+==================================================
+
+Because visitor analytics can involve personal or potentially identifying information, build privacy controls into the MVP.
+
+Requirements:
+- Privacy policy
+- Data retention settings
+- Data deletion process
+- User data export where applicable
+- Minimize collected information
+- Mask sensitive data in UI where appropriate
+- Document tracking behavior
+- Provide customer-facing tracking documentation
+- Follow applicable privacy/data-protection requirements
+
+
+==================================================
+35. RESPONSIVE DESIGN
+==================================================
+
+Desktop:
+Full sidebar + dashboard
+
+Tablet:
+Collapsible sidebar
+
+Mobile:
+Bottom navigation or collapsible navigation
+
+All pages must work on:
+- Desktop
+- Tablet
+- Mobile
+
+Tables on mobile should become:
+- Horizontal scroll
+OR
+- Responsive cards
+
+
+==================================================
+36. UI COMPONENT SYSTEM
+==================================================
+
+Create reusable components:
+
+Button
+Input
+Select
+Checkbox
+Switch
+Modal
+Drawer
+Dropdown
+Tooltip
+Toast
+Badge
+Avatar
+Card
+StatCard
+ChartCard
+DataTable
+Pagination
+Tabs
+DatePicker
+SearchInput
+FilterBar
+EmptyState
+ErrorState
+Skeleton
+Breadcrumb
+Sidebar
+Navbar
+CommandPalette
+ConfirmDialog
+CodeBlock
+
+
+==================================================
+37. IMPORTANT EMPTY STATES
+==================================================
+
+Dashboard without traffic:
+
+"No traffic yet"
+
+"Install your tracking script to start receiving visitor data."
+
+Button:
+"View Installation Guide"
+
+Campaigns empty:
+
+"No campaigns yet"
+
+"Create your first campaign to start organizing traffic."
+
+Visitors empty:
+
+"No visitors recorded yet."
+
+Conversions empty:
+
+"No conversions yet."
+
+
+==================================================
+38. NOTIFICATIONS
+==================================================
+
+Notification center:
+
+- High-risk traffic detected
+- Traffic threshold reached
+- Usage approaching limit
+- Conversion received
+- Webhook failed
+- Tracking installation detected
+- Campaign paused
+
+Notification types:
+- Info
+- Success
+- Warning
+- Critical
+
+
+==================================================
+39. SEARCH
+==================================================
+
+Global search:
+
+Shortcut:
+Cmd/Ctrl + K
+
+Search:
+- Campaigns
+- Visitors
+- Websites
+- Reports
+- Settings
+
+Actions:
+- Create campaign
+- Add website
+- Generate API key
+- View billing
+
+
+==================================================
+40. MVP SUCCESS CRITERIA
+==================================================
+
+A user should be able to complete this flow successfully:
+
+1. Visit landing page.
+2. Understand the product within seconds.
+3. Click Start Free.
+4. Create account.
+5. Verify email.
+6. Create workspace.
+7. Add website.
+8. Copy tracking script.
+9. Install script.
+10. Verify installation.
+11. Create campaign.
+12. Generate traffic.
+13. See visitors appear.
+14. See risk scores.
+15. See traffic classifications.
+16. View visitor details.
+17. Create traffic rule.
+18. See rule evaluation.
+19. Track conversion.
+20. See conversion in dashboard.
+21. View analytics.
+22. Create API key.
+23. Configure webhook.
+24. View usage.
+25. Manage subscription.
+26. Update profile/security settings.
+
+
+==================================================
+41. FRONTEND ROUTES
+==================================================
+
+PUBLIC:
+
+/
+/features
+/traffic-intelligence
+/fraud-detection
+/analytics
+/integrations
+/api
+/pricing
+/docs
+/faq
+/contact
+/terms
+/privacy
+/status
+
+AUTH:
+
+/login
+/signup
+/forgot-password
+/reset-password/:token
+/verify-email
+/accept-invite
+
+ONBOARDING:
+
+/onboarding
+/onboarding/website
+/onboarding/tracking
+/onboarding/campaign
+
+APP:
+
+/dashboard
+/dashboard/websites
+/dashboard/websites/:id
+/dashboard/campaigns
+/dashboard/campaigns/new
+/dashboard/campaigns/:id
+/dashboard/traffic-rules
+/dashboard/traffic-rules/new
+/dashboard/visitors
+/dashboard/visitors/:id
+/dashboard/click-log
+/dashboard/reports
+/dashboard/conversions
+/dashboard/traffic-sources
+/dashboard/integrations
+/dashboard/api
+/dashboard/webhooks
+/dashboard/billing
+/dashboard/usage
+/dashboard/team
+/dashboard/settings
+/dashboard/security
+/dashboard/notifications
+
+
+==================================================
+42. PROJECT FOLDER STRUCTURE
+==================================================
+
+Frontend:
+
+src/
+  app/
+  components/
+    ui/
+    charts/
+    tables/
+    forms/
+    layout/
+  pages/
+    marketing/
+    auth/
+    onboarding/
+    dashboard/
+  hooks/
+  services/
+  store/
+  types/
+  utils/
+  assets/
+
+Backend:
+
+backend/
+  manage.py
+  config/
+  apps/
+    accounts/
+    organizations/
+    websites/
+    campaigns/
+    traffic/
+    analytics/
+    integrations/
+    billing/
+    notifications/
+    audit/
+  requirements.txt
+
+Go:
+
+traffic-engine/
+  cmd/
+  internal/
+    analyzer/
+    classifier/
+    risk/
+    rules/
+    signals/
+    api/
+  pkg/
+  go.mod
+
+
+==================================================
+43. MVP DEVELOPMENT ORDER
+==================================================
+
+PHASE 1:
+Project setup
+- Docker
+- PostgreSQL
+- Redis
+- Django
+- React
+- Go
+- Nginx
+
+PHASE 2:
+Authentication
+- Signup
+- Login
+- Logout
+- Email verification
+- Forgot password
+- Reset password
+
+PHASE 3:
+Organizations
+- Workspace
+- Members
+- Roles
+
+PHASE 4:
+Websites
+- Add website
+- Tracking ID
+- Installation instructions
+- Installation verification
+
+PHASE 5:
+Tracking
+- JavaScript SDK
+- Pageview events
+- Visitor/session creation
+- Event ingestion
+
+PHASE 6:
+Go traffic engine
+- Event receiver
+- Signal extraction
+- Risk scoring
+- Classification
+
+PHASE 7:
+Campaigns
+- CRUD
+- Campaign analytics
+- Campaign detail
+
+PHASE 8:
+Traffic rules
+- Rule builder
+- Rule evaluation
+- Allow/review/block/tag
+
+PHASE 9:
+Analytics
+- Dashboard
+- Charts
+- Filters
+- Visitor analytics
+- Traffic sources
+
+PHASE 10:
+Conversions
+- Conversion API
+- Conversion dashboard
+
+PHASE 11:
+Developer tools
+- API keys
+- Webhooks
+- Documentation
+
+PHASE 12:
+Billing
+- Pricing
+- Subscription
+- Usage
+- Payment integration
+
+PHASE 13:
+Settings
+- Profile
+- Team
+- Security
+- Notifications
+
+PHASE 14:
+Admin
+- Users
+- Organizations
+- Billing
+- Usage
+- Logs
+
+PHASE 15:
+Polish
+- Responsive UI
+- Loading states
+- Error states
+- Empty states
+- Accessibility
+- Security review
+- Performance optimization
+
+
+==================================================
+44. MVP EXCLUSIONS
+==================================================
+
+Do NOT include in the first MVP:
+
+- Complex machine learning
+- Huge proprietary IP database
+- Dozens of third-party integrations
+- Advanced reverse proxy infrastructure
+- Website mirroring
+- Ad-reviewer deception
+- Advertising-platform enforcement evasion
+- Fake CAPTCHA systems
+- Automatic cloaking designed to hide prohibited content
+- Enterprise white labeling
+- Advanced predictive analytics
+- Multi-region distributed traffic infrastructure
+
+These can be considered only after the core product is stable, tested, and compliant.
+
+
+==================================================
+45. FINAL MVP DEFINITION
+==================================================
+
+The MVP is complete when the platform can reliably perform:
+
+TRACK
+Website traffic
+    ↓
+COLLECT
+Visitor/session/event data
+    ↓
+ANALYZE
+Traffic signals
+    ↓
+SCORE
+Risk score 0-100
+    ↓
+CLASSIFY
+Human / Suspicious / Bot / Fraud
+    ↓
+APPLY RULES
+Allow / Review / Block / Tag
+    ↓
+REPORT
+Dashboard / Analytics / Click Log
+    ↓
+CONVERT
+Conversion tracking
+    ↓
+MEASURE
+Campaign performance and traffic quality
+
+The product should feel like a polished commercial SaaS from the first login, not a developer prototype.
+
+Primary priorities:
+1. Excellent UX
+2. Fast dashboard
+3. Reliable traffic ingestion
+4. Explainable risk scoring
+5. Useful analytics
+6. Secure API
+7. Clean architecture
+8. Scalable Go traffic engine
+9. Clear onboarding
+10. Professional modern visual design

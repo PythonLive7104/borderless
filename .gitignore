@@ -1,0 +1,37 @@
+# --- Secrets (never commit) ---
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.sqlite3
+staticfiles/
+media/
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/node_modules/
+*.local
+
+# --- Go ---
+decision/decision-bin
+decision/go.sum
+
+# --- Runtime / misc ---
+*.log
+celerybeat-schedule*
+.DS_Store
+.idea/
+.vscode/
+*.swp
+pgdata/
