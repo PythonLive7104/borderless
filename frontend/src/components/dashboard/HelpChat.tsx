@@ -47,12 +47,20 @@ const SUGGESTIONS = [
 
 export default function HelpChat() {
   const [open, setOpen] = useState(false);
+  const [tawkActive, setTawkActive] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([
     { from: "bot", text: "Hi! I'm the TrackAudit assistant. Ask me anything about using the app — or tap a suggestion below." },
   ]);
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => { scroller.current?.scrollTo(0, scroller.current.scrollHeight); }, [msgs, open]);
+
+  // Escalate to Tawk: close our widget and hide our bubble so the two chats
+  // don't stack in the same corner (Tawk becomes the active chat).
+  function talkToHuman() { openTawk(); setOpen(false); setTawkActive(true); }
+
+  // If Tawk is the active chat, get out of its way entirely.
+  if (tawkActive) return null;
 
   function ask(text: string) {
     const q = text.trim();
@@ -85,7 +93,7 @@ export default function HelpChat() {
           <div className="flex items-center gap-2 border-b border-line bg-bg-soft px-4 py-3">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-brand/10 text-brand">?</span>
             <div className="flex-1"><div className="text-sm font-bold">Help & answers</div><div className="text-[11px] text-fg-dim">Ask about anything in TrackAudit</div></div>
-            <button onClick={openTawk} title="Chat with a support agent"
+            <button onClick={talkToHuman} title="Chat with a support agent"
               className="flex items-center gap-1 rounded-full border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/5">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" /> Talk to a human
             </button>
@@ -97,7 +105,7 @@ export default function HelpChat() {
                 <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-brand text-white" : "bg-bg-mute text-fg"}`}>
                   {m.text}
                   {m.human && (
-                    <button onClick={openTawk} className="mt-2 block w-full rounded-lg bg-brand px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-brand-600">
+                    <button onClick={talkToHuman} className="mt-2 block w-full rounded-lg bg-brand px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-brand-600">
                       Chat with a human
                     </button>
                   )}
