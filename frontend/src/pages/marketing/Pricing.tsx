@@ -13,41 +13,40 @@ type Plan = {
 };
 
 const BASE: string[] = [
-  "Click fraud detection",
-  "Filtering by browser fingerprints",
-  "Detailed statistics · 6-month retention",
+  "Real-time bot & fraud scoring",
+  "JS + TLS/JA3 fingerprinting",
+  "Traffic rules: country, device, OS, browser",
+  "IP allow / deny lists",
 ];
-const CLOAKING: string[] = [
-  "Cloaking: Google, Facebook, TikTok, Bing, X, Yandex",
-  "VLA™ machine-learning classification",
-  "Flexible filtering levels",
+const GROWTH_ADD: string[] = [
+  "A/B split testing with per-variant conversion rates",
+  "Destination URL threat scanning",
+  "Webhooks & full REST API",
+  "Priority email support",
 ];
 const ADVANCED: string[] = [
-  "Cloaking for apps, WebView & PWA",
-  "Click Check against 12 competitor filters",
   "Guest access to statistics",
-  "APIs for streams, integrations & reports",
-  "Priority support",
+  "Higher rate limits",
+  "Dedicated onboarding",
 ];
 
 const PLANS: Plan[] = [
   {
     name: "Starter", price: 29, tag: "Detect click fraud in contextual & display ads",
     cta: "Buy this tariff", campaignLimit: "20", clickLimit: "no limit",
-    warning: "This plan only covers click-fraud protection and does not include cloaking features.",
     groups: [{ items: BASE }],
   },
   {
     name: "Growth", price: 99, tag: "For scaling media buyers & teams",
     cta: "Buy this tariff", highlight: true, campaignLimit: "50", clickLimit: "no limit",
-    groups: [{ items: BASE }, { label: "Everything in Starter, plus:", items: CLOAKING, added: true }],
+    groups: [{ items: BASE }, { label: "Everything in Starter, plus:", items: GROWTH_ADD, added: true }],
   },
   {
-    name: "Business", price: 299, tag: "Advanced cloaking & API for agencies",
+    name: "Business", price: 299, tag: "Advanced protection & API for agencies",
     cta: "Buy this tariff", ribbon: "TOP VALUE", campaignLimit: "unlimited", clickLimit: "no limit",
     groups: [
       { items: BASE },
-      { label: "Everything in Growth, plus:", items: CLOAKING, added: true },
+      { label: "Everything in Growth, plus:", items: GROWTH_ADD, added: true },
       { label: "Plus advanced:", items: ADVANCED, added: true },
     ],
   },

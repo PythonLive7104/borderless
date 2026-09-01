@@ -18,7 +18,7 @@ export default function AuthLayout({ title, subtitle, children, footer }: {
               See every visitor. Score every click. <span className="text-gradient">Protect every campaign.</span>
             </h2>
             <p className="mt-4 max-w-sm text-slate-300">
-              Real-time traffic intelligence, fraud detection and cloaking for serious media buyers.
+              Real-time traffic intelligence, fraud detection and campaign protection for serious media buyers.
             </p>
             <div className="mt-8 flex gap-6 text-slate-300">
               {[["120M+", "visitors analyzed"], ["<8ms", "avg decision"], ["92.7%", "median quality"]].map(([v, k]) => (
