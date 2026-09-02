@@ -348,26 +348,26 @@ func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
-	auth := r.Header.Get("Authorization")
-	const pfx = "Bearer "
-	if !strings.HasPrefix(auth, pfx) {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "missing API key"})
-		return
-	}
-	keyOrg := h.orgForKey(ctx, auth[len(pfx):])
-	if keyOrg == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "invalid API key"})
-		return
-	}
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 16*1024))
 	var p DecidePayload
 	if err := json.Unmarshal(body, &p); err != nil || p.SiteID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"action": "allow", "error": "site_id required"})
 		return
 	}
-	if org := h.st.GetStr(ctx, "site:"+p.SiteID); org == "" || org != keyOrg {
-		writeJSON(w, http.StatusForbidden, map[string]any{"action": "allow", "error": "API key not valid for this site_id"})
+	// Auth: the public site_id alone authorizes (like the tracking snippet) — the
+	// site just has to exist. An API key is OPTIONAL and, when present, must own
+	// the site (stricter, server-to-server setups).
+	siteOrg := h.st.GetStr(ctx, "site:"+p.SiteID)
+	if siteOrg == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "unknown site_id"})
 		return
+	}
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		// A VALID key must own the site; an invalid/placeholder key is ignored.
+		if keyOrg := h.orgForKey(ctx, auth[len("Bearer "):]); keyOrg != "" && keyOrg != siteOrg {
+			writeJSON(w, http.StatusForbidden, map[string]any{"action": "allow", "error": "API key not valid for this site_id"})
+			return
+		}
 	}
 	ip := p.IP
 	if ip == "" {
@@ -388,11 +388,20 @@ func (h *handler) guard(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
-	org := h.orgForKey(ctx, r.Header.Get("X-TA-Key"))
+	// Public site_id alone authorizes; an X-TA-Key is optional (must own the site
+	// when present). Any misconfiguration fails open (204 = allow) so a broken
+	// setup never takes the site down.
 	site := r.Header.Get("X-TA-Site")
-	if org == "" || site == "" || h.st.GetStr(ctx, "site:"+site) != org {
-		w.WriteHeader(http.StatusNoContent) // fail open
+	siteOrg := h.st.GetStr(ctx, "site:"+site)
+	if site == "" || siteOrg == "" {
+		w.WriteHeader(http.StatusNoContent)
 		return
+	}
+	if key := r.Header.Get("X-TA-Key"); key != "" {
+		if org := h.orgForKey(ctx, key); org != "" && org != siteOrg {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 	}
 	sr := h.score(ctx, site,
 		firstHeader(r, "X-TA-IP", "X-Real-IP", "X-Forwarded-For"),

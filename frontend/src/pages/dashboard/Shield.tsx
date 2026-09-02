@@ -30,7 +30,7 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     steps: [
       "In cPanel, open File Manager and go into your site folder (usually public_html).",
       "Click “+ New File”, name it shield.php, then select it and click Edit.",
-      "Paste the whole snippet above into it, replace YOUR_API_KEY with a key from API Keys, and Save.",
+      "Paste the whole snippet above into it and Save. Your site ID is already filled in — there's nothing to edit.",
       "Back in File Manager, turn on “Show Hidden Files” (Settings, top-right), then Edit the .htaccess file (create it if it isn't there).",
       "Add these two lines at the top, using the full path shown at the top of File Manager for shield.php:",
       "    AddHandler application/x-httpd-php .html .htm",
@@ -44,15 +44,14 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     steps: [
       "Open the PHP file for the page you want to protect (e.g. index.php).",
       "Paste the snippet at the VERY TOP, before any HTML or output (before <!DOCTYPE>).",
-      "Replace YOUR_API_KEY with a key from API Keys, then save.",
+      "Save. Your site ID is already filled in — there's nothing to edit.",
       "Repeat for each page you want protected. To cover the whole site at once without editing every page, use the cPanel / Apache tab instead.",
     ],
   },
   django: {
     title: "Install on a Django site",
     steps: [
-      "Save the snippet as trynobot_shield.py inside one of your Django apps (next to views.py).",
-      "Set TA_KEY to a key from API Keys.",
+      "Save the snippet as trynobot_shield.py inside one of your Django apps (next to views.py). Your site ID is already in it.",
       "In settings.py, add \"yourapp.trynobot_shield.TryNoBotShield\" to the TOP of MIDDLEWARE.",
       "Restart your app (e.g. sudo systemctl restart gunicorn).",
       "Note: this only guards pages Django serves. If your pages are a static React build served by nginx, use the nginx or Cloudflare tab.",
@@ -62,7 +61,7 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     title: "Install on your own nginx server (VPS)",
     steps: [
       "This is a job for whoever manages your server. Open your site's nginx config (the server { } block).",
-      "Add the three blocks from the snippet, filling in YOUR_API_KEY.",
+      "Add the three blocks from the snippet — your site ID is already filled in.",
       "Test and reload: nginx -t && systemctl reload nginx.",
     ],
   },
@@ -70,15 +69,14 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     title: "Install as a Cloudflare Worker (if your site is on Cloudflare)",
     steps: [
       "In the Cloudflare dashboard, go to Workers & Pages → Create → Worker.",
-      "Replace the sample code with the snippet, set YOUR_API_KEY, and Deploy.",
+      "Replace the sample code with the snippet and Deploy — your site ID is already filled in.",
       "Go to your Worker → Settings → Triggers → Add a Route like example.com/* so it runs on your site.",
     ],
   },
   node: {
     title: "Install on a Node / Express site",
     steps: [
-      "Add the snippet as middleware in your Express app (before your routes).",
-      "Set the TA_KEY environment variable to a key from API Keys.",
+      "Add the snippet as middleware in your Express app (before your routes). Your site ID is already in it.",
       "Restart your app.",
     ],
   },
@@ -86,7 +84,7 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     title: "This tab is only for testing — not for your website",
     steps: [
       "This is a command to run in a TERMINAL to check the shield answers. Do NOT put it on your site or in a file.",
-      "Paste your API key, run it, and you should get back a JSON reply with an \"action\".",
+      "Run it as-is (your site ID is already filled in) and you should get back a JSON reply with an \"action\".",
       "To actually protect your site, use one of the other tabs (cPanel, PHP, nginx, Cloudflare or Node).",
     ],
   },
@@ -98,8 +96,7 @@ function snippets(site: string): Record<Lang, string> {
     php: `<?php
 // TryNoBot server-side shield — paste at the VERY TOP of your page,
 // before any HTML is sent. Turns bad visitors away before the page loads.
-$ta_key  = 'YOUR_API_KEY';   // Dashboard → API Keys (create one, paste it here)
-$ta_site = '${S}';
+$ta_site = '${S}';   // your site ID — already filled in, nothing to change
 // Behind Cloudflare/a proxy, use the real client IP header instead of REMOTE_ADDR:
 $ta_ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
 $ch = curl_init('${ENDPOINT}');
@@ -107,7 +104,7 @@ curl_setopt_array($ch, [
   CURLOPT_POST => true,
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_TIMEOUT => 2,                     // fail open if we're slow
-  CURLOPT_HTTPHEADER => ['Content-Type: application/json', "Authorization: Bearer $ta_key"],
+  CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
   CURLOPT_POSTFIELDS => json_encode([
     'site_id' => $ta_site,
     'ip'      => $ta_ip,
@@ -124,15 +121,14 @@ if (($ta['action'] ?? '') === 'redirect' && !empty($ta['redirect'])) { header('L
 // shield.php — TryNoBot shield for cPanel / Apache sites.
 // Save this WHOLE file as shield.php in your public_html, then load it site-wide
 // from .htaccess (click "How do I install this?" below). No need to edit each page.
-$ta_key  = 'YOUR_API_KEY';   // Dashboard → API Keys (create one, paste it here)
-$ta_site = '${S}';
+$ta_site = '${S}';   // your site ID — already filled in, nothing to change
 $ta_ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
 $ch = curl_init('${ENDPOINT}');
 curl_setopt_array($ch, [
   CURLOPT_POST => true,
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_TIMEOUT => 2,                     // fail open if we're slow
-  CURLOPT_HTTPHEADER => ['Content-Type: application/json', "Authorization: Bearer $ta_key"],
+  CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
   CURLOPT_POSTFIELDS => json_encode([
     'site_id' => $ta_site,
     'ip'      => $ta_ip,
@@ -154,8 +150,7 @@ import json, urllib.request
 from django.http import HttpResponseForbidden, HttpResponseRedirect
 
 TA_ENDPOINT = "${ENDPOINT}"
-TA_KEY  = "YOUR_API_KEY"        # Dashboard -> API Keys (create one, paste it here)
-TA_SITE = "${S}"
+TA_SITE = "${S}"   # your site ID — already filled in
 
 def _client_ip(request):
     xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
@@ -181,7 +176,6 @@ class TryNoBotShield:
             }).encode()
             req = urllib.request.Request(TA_ENDPOINT, data=data, headers={
                 "Content-Type": "application/json",
-                "Authorization": "Bearer " + TA_KEY,
             })
             with urllib.request.urlopen(req, timeout=2) as resp:   # fail open if slow
                 d = json.loads(resp.read() or "{}")
@@ -218,7 +212,6 @@ location = /_ta_guard {
     proxy_set_header Host ${HOST};
     proxy_pass_request_body off;
     proxy_set_header Content-Length "";
-    proxy_set_header X-TA-Key  "YOUR_API_KEY";   # from Dashboard -> API Keys
     proxy_set_header X-TA-Site "${S}";
     proxy_set_header X-TA-IP   $remote_addr;
     proxy_set_header X-TA-UA   $http_user_agent;
@@ -235,7 +228,7 @@ export default {
   async fetch(request, env, ctx) {
     const d = await fetch("${ENDPOINT}", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer YOUR_API_KEY" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         site_id: "${S}",
         ip: request.headers.get("CF-Connecting-IP") || "",
@@ -252,7 +245,7 @@ async function trackauditShield(req, res, next) {
   try {
     const r = await fetch("${ENDPOINT}", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + process.env.TA_KEY },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         site_id: "${S}",
         ip: (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress,
@@ -267,10 +260,9 @@ async function trackauditShield(req, res, next) {
   next();
 }
 app.use(trackauditShield);`,
-    curl: `# Test the shield from your terminal. Swap in your API key and try a
-# datacenter IP or a bot user-agent to see it flip to "block".
+    curl: `# Test the shield from your terminal (your site ID is already filled in).
+# Try a bot user-agent to see how it scores.
 curl -s -X POST ${ENDPOINT} \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"site_id":"${S}","ip":"1.2.3.4","ua":"python-requests/2.31"}'
 # -> {"action":"allow|block|redirect","classification":"...","risk_score":..,"redirect":"..."}`,
@@ -317,7 +309,8 @@ export default function Shield() {
         Think of your tracking snippet as a <b>security camera</b> — it watches visitors and can send bots away
         after the page opens. The Shield is a <b>bouncer at the door</b>: it checks each visitor <b>before</b> your
         page loads and can fully block bad ones. It's stronger, but it needs a one-time bit of code added to your
-        website — so it's usually a job for whoever builds or manages your site.
+        website — so it's usually a job for whoever builds or manages your site. Good news: the snippet is
+        <b>ready to paste</b> — your site ID is already in it, so there's <b>no key and nothing to edit</b>.
       </PageNote>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -352,8 +345,8 @@ export default function Shield() {
         </div>
         <div className="card shadow-soft p-4">
           <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 2 · You</div>
-          <p className="mt-1 text-sm font-semibold">Get your secure key</p>
-          <p className="mt-1 text-sm text-fg-muted">Go to <Link to="/dashboard/api" className="font-semibold text-brand hover:underline">API Keys</Link> and create one. It's a private password that lets your website talk to us. Copy it — it's shown only once.</p>
+          <p className="mt-1 text-sm font-semibold">Copy the snippet</p>
+          <p className="mt-1 text-sm text-fg-muted">Pick your site below and copy the snippet. Your site ID is already filled in — <b>no key, no setup, nothing to edit.</b></p>
         </div>
         <div className="card shadow-soft p-4">
           <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 3 · Your web person</div>
@@ -368,7 +361,7 @@ export default function Shield() {
       {/* code section — clearly framed as the developer's part */}
       <div className="mt-8 border-t border-line pt-6">
         <h2 className="text-lg font-bold">The snippet <span className="text-sm font-normal text-fg-dim">— for whoever manages your website</span></h2>
-        <p className="mt-1 text-sm text-fg-muted">Pick your site and platform, then copy. Replace <code className="rounded bg-bg-mute px-1">YOUR_API_KEY</code> with the key from Step 2.</p>
+        <p className="mt-1 text-sm text-fg-muted">Pick your site and platform, then copy. It's ready to paste — your site ID is already filled in, <b>nothing to edit</b>.</p>
       </div>
 
       {/* site picker */}
