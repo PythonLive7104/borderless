@@ -4,14 +4,16 @@ import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { websiteApi, type Website } from "../../lib/api";
 import FolderGuard from "../../components/dashboard/FolderGuard";
+import Button from "../../components/ui/Button";
 
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
 const HOST = typeof window !== "undefined" ? window.location.hostname : "trynobot.com";
 const ENDPOINT = ORIGIN + "/v1/decide";
 const GUARD = ORIGIN + "/v1/guard";
 
-type Lang = "php" | "django" | "nginx" | "cloudflare" | "node" | "curl";
+type Lang = "php" | "cpanel" | "django" | "nginx" | "cloudflare" | "node" | "curl";
 const TABS: { id: Lang; label: string }[] = [
+  { id: "cpanel", label: "cPanel / Apache" },
   { id: "php", label: "PHP" },
   { id: "django", label: "Python / Django" },
   { id: "nginx", label: "nginx (VPS)" },
@@ -19,6 +21,76 @@ const TABS: { id: Lang; label: string }[] = [
   { id: "node", label: "Node / Express" },
   { id: "curl", label: "Test (cURL)" },
 ];
+
+// Plain-English, step-by-step install help for non-technical users — shown when
+// they click "How do I install this?" under the snippet.
+const HINTS: Record<Lang, { title: string; steps: string[] }> = {
+  cpanel: {
+    title: "Install on a cPanel / Apache site (most shared hosting)",
+    steps: [
+      "In cPanel, open File Manager and go into your site folder (usually public_html).",
+      "Click “+ New File”, name it shield.php, then select it and click Edit.",
+      "Paste the whole snippet above into it, replace YOUR_API_KEY with a key from API Keys, and Save.",
+      "Back in File Manager, turn on “Show Hidden Files” (Settings, top-right), then Edit the .htaccess file (create it if it isn't there).",
+      "Add these two lines at the top, using the full path shown at the top of File Manager for shield.php:",
+      "    AddHandler application/x-httpd-php .html .htm",
+      "    php_value auto_prepend_file \"/home/YOUR_CPANEL_USER/public_html/shield.php\"",
+      "Save. Your whole site is now protected — every page runs the shield before it loads. No need to edit each page.",
+      "If your host blocks that .htaccess line, open cPanel → “MultiPHP INI Editor”, pick your domain, and set auto_prepend_file to the same shield.php path there instead.",
+    ],
+  },
+  php: {
+    title: "Install on a PHP site",
+    steps: [
+      "Open the PHP file for the page you want to protect (e.g. index.php).",
+      "Paste the snippet at the VERY TOP, before any HTML or output (before <!DOCTYPE>).",
+      "Replace YOUR_API_KEY with a key from API Keys, then save.",
+      "Repeat for each page you want protected. To cover the whole site at once without editing every page, use the cPanel / Apache tab instead.",
+    ],
+  },
+  django: {
+    title: "Install on a Django site",
+    steps: [
+      "Save the snippet as trynobot_shield.py inside one of your Django apps (next to views.py).",
+      "Set TA_KEY to a key from API Keys.",
+      "In settings.py, add \"yourapp.trynobot_shield.TryNoBotShield\" to the TOP of MIDDLEWARE.",
+      "Restart your app (e.g. sudo systemctl restart gunicorn).",
+      "Note: this only guards pages Django serves. If your pages are a static React build served by nginx, use the nginx or Cloudflare tab.",
+    ],
+  },
+  nginx: {
+    title: "Install on your own nginx server (VPS)",
+    steps: [
+      "This is a job for whoever manages your server. Open your site's nginx config (the server { } block).",
+      "Add the three blocks from the snippet, filling in YOUR_API_KEY.",
+      "Test and reload: nginx -t && systemctl reload nginx.",
+    ],
+  },
+  cloudflare: {
+    title: "Install as a Cloudflare Worker (if your site is on Cloudflare)",
+    steps: [
+      "In the Cloudflare dashboard, go to Workers & Pages → Create → Worker.",
+      "Replace the sample code with the snippet, set YOUR_API_KEY, and Deploy.",
+      "Go to your Worker → Settings → Triggers → Add a Route like example.com/* so it runs on your site.",
+    ],
+  },
+  node: {
+    title: "Install on a Node / Express site",
+    steps: [
+      "Add the snippet as middleware in your Express app (before your routes).",
+      "Set the TA_KEY environment variable to a key from API Keys.",
+      "Restart your app.",
+    ],
+  },
+  curl: {
+    title: "This tab is only for testing — not for your website",
+    steps: [
+      "This is a command to run in a TERMINAL to check the shield answers. Do NOT put it on your site or in a file.",
+      "Paste your API key, run it, and you should get back a JSON reply with an \"action\".",
+      "To actually protect your site, use one of the other tabs (cPanel, PHP, nginx, Cloudflare or Node).",
+    ],
+  },
+};
 
 function snippets(site: string): Record<Lang, string> {
   const S = site || "YOUR_SITE_ID";
@@ -47,6 +119,32 @@ curl_close($ch);
 if (($ta['action'] ?? 'allow') === 'block') { http_response_code(403); exit('Access denied'); }
 if (($ta['action'] ?? '') === 'redirect' && !empty($ta['redirect'])) { header('Location: '.$ta['redirect']); exit; }
 // else: allow — carry on rendering your page
+?>`,
+    cpanel: `<?php
+// shield.php — TryNoBot shield for cPanel / Apache sites.
+// Save this WHOLE file as shield.php in your public_html, then load it site-wide
+// from .htaccess (click "How do I install this?" below). No need to edit each page.
+$ta_key  = 'YOUR_API_KEY';   // Dashboard → API Keys (create one, paste it here)
+$ta_site = '${S}';
+$ta_ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+$ch = curl_init('${ENDPOINT}');
+curl_setopt_array($ch, [
+  CURLOPT_POST => true,
+  CURLOPT_RETURNTRANSFER => true,
+  CURLOPT_TIMEOUT => 2,                     // fail open if we're slow
+  CURLOPT_HTTPHEADER => ['Content-Type: application/json', "Authorization: Bearer $ta_key"],
+  CURLOPT_POSTFIELDS => json_encode([
+    'site_id' => $ta_site,
+    'ip'      => $ta_ip,
+    'ua'      => $_SERVER['HTTP_USER_AGENT'] ?? '',
+    'path'    => $_SERVER['REQUEST_URI'] ?? '',
+  ]),
+]);
+$ta = json_decode(curl_exec($ch), true) ?: [];
+curl_close($ch);
+if (($ta['action'] ?? 'allow') === 'block') { http_response_code(403); exit('Access denied'); }
+if (($ta['action'] ?? '') === 'redirect' && !empty($ta['redirect'])) { header('Location: '.$ta['redirect']); exit; }
+// else: allow — let the page load normally
 ?>`,
     django: `# trackaudit_shield.py — save in your Django app, then add it to
 # settings.py MIDDLEWARE (near the top). Blocks bad visitors before your views run.
@@ -183,8 +281,11 @@ export default function Shield() {
   const { current } = useWorkspace();
   const [sites, setSites] = useState<Website[]>([]);
   const [siteId, setSiteId] = useState("");
-  const [tab, setTab] = useState<Lang>("php");
+  const [tab, setTab] = useState<Lang>("cpanel");
   const [copied, setCopied] = useState(false);
+  const [showHint, setShowHint] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (!current) return;
@@ -198,6 +299,16 @@ export default function Shield() {
   function copy() {
     navigator.clipboard?.writeText(code);
     setCopied(true); setTimeout(() => setCopied(false), 1500);
+  }
+  async function verifyShield() {
+    const site = sites.find((s) => s.tracking_id === siteId);
+    if (!site) return;
+    setVerifying(true); setVerifyMsg(null);
+    try {
+      const r = await websiteApi.verifyShield(site.id);
+      setVerifyMsg({ ok: r.active, text: r.message });
+    } catch { setVerifyMsg({ ok: false, text: "Couldn't check right now — please try again." }); }
+    finally { setVerifying(false); }
   }
 
   return (
@@ -286,6 +397,38 @@ export default function Shield() {
           </button>
         </div>
         <pre className="overflow-x-auto bg-navy-900 p-4 text-[12.5px] leading-relaxed text-slate-200"><code>{code}</code></pre>
+      </div>
+
+      {/* Per-platform step-by-step help (Hint) */}
+      <div className="card shadow-soft mt-4 overflow-hidden border-brand/30">
+        <button type="button" onClick={() => setShowHint((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-bg-soft">
+          <span className="text-sm font-bold text-brand">💡 How do I install this? — {HINTS[tab].title}</span>
+          <span className="text-fg-dim">{showHint ? "▲" : "▼"}</span>
+        </button>
+        {showHint && (
+          <ol className="space-y-1.5 border-t border-line px-5 py-4 text-sm text-fg-muted">
+            {HINTS[tab].steps.map((s, i) => (
+              s.startsWith("    ")
+                ? <li key={i} className="ml-4 list-none rounded bg-bg-mute px-2 py-1 font-mono text-xs text-fg">{s.trim()}</li>
+                : <li key={i} className="ml-4 list-decimal">{s}</li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      {/* Verify the shield is actually running — same idea as snippet verification */}
+      <div className="card shadow-soft mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold">Check the Shield is working</div>
+          <div className="text-xs text-fg-muted">Once installed, open any page on your site in a browser, then click Verify — we'll confirm your server is calling the Shield.</div>
+        </div>
+        <Button onClick={verifyShield} disabled={verifying || !siteId}>{verifying ? "Checking…" : "Verify Shield"}</Button>
+        {verifyMsg && (
+          <div className={`w-full rounded-lg px-3 py-2 text-sm ${verifyMsg.ok ? "bg-success/10 text-emerald-700" : "bg-warning/10 text-amber-700"}`}>
+            {verifyMsg.ok ? "✅ " : "⏳ "}{verifyMsg.text}
+          </div>
+        )}
       </div>
 
       <p className="mt-3 text-xs text-fg-dim">

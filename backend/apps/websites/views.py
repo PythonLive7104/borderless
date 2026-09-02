@@ -67,3 +67,18 @@ class WebsiteViewSet(viewsets.ModelViewSet):
             "message": "Installation detected — you're receiving traffic." if installed
                        else "No events received yet. Make sure the snippet is on your site.",
         })
+
+    @action(detail=True, methods=["post"], url_path="verify-shield")
+    def verify_shield(self, request, pk=None):
+        """Report server-side Shield status. Active once the site's server/edge has
+        called /v1/decide or /v1/guard (those emit type='server_check' events)."""
+        w = self.get_object()
+        from apps.traffic.models import TrafficEvent
+        ev = TrafficEvent.objects.filter(website=w, type="server_check").order_by("-created_at").first()
+        active = ev is not None
+        return Response({
+            "active": active,
+            "last_check_at": ev.created_at if ev else None,
+            "message": "Shield is working — we're receiving server-side checks from your site." if active
+                       else "No server-side checks yet. Make sure the Shield snippet (not just the tracking snippet) is installed, then open a page on your site.",
+        })
