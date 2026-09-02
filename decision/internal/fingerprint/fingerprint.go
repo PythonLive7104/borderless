@@ -28,6 +28,37 @@ var botMarkers = []string{
 	"ahrefsbot", "semrushbot", "facebookexternalhit", "slurp", "duckduckbot",
 }
 
+// FromValues builds a Fingerprint from explicit values. Used by the server-side
+// shield (/v1/decide), where the visitor's IP/UA are supplied by the customer's
+// server rather than read from our own socket.
+func FromValues(ip, ua, country string) Fingerprint {
+	lua := strings.ToLower(ua)
+	fp := Fingerprint{
+		IP:        ip,
+		Country:   strings.ToUpper(country),
+		UserAgent: ua,
+		Device:    deviceClass(lua),
+		Browser:   browser(lua),
+		OS:        os(lua),
+	}
+	for _, m := range headlessMarkers {
+		if strings.Contains(lua, m) {
+			fp.IsHeadless = true
+			break
+		}
+	}
+	for _, m := range botMarkers {
+		if strings.Contains(lua, m) {
+			fp.IsBot = true
+			break
+		}
+	}
+	if ua == "" {
+		fp.IsHeadless = true
+	}
+	return fp
+}
+
 func Extract(r *http.Request) Fingerprint {
 	ua := r.UserAgent()
 	lua := strings.ToLower(ua)

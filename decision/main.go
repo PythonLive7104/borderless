@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,6 +51,19 @@ type FP struct {
 	Flags      []string `json:"flags"`
 }
 
+// DecidePayload is the server-side shield request: a customer's server sends the
+// visitor's IP/UA (and optional JA3/country) and gets a synchronous verdict so
+// it can block bots BEFORE rendering the page.
+type DecidePayload struct {
+	SiteID   string `json:"site_id"`
+	IP       string `json:"ip"`
+	UA       string `json:"ua"`
+	JA3      string `json:"ja3"`
+	Country  string `json:"country"`
+	Referrer string `json:"referrer"`
+	Path     string `json:"path"`
+}
+
 func main() {
 	redisURL := env("REDIS_URL", "redis://localhost:6379/0")
 	port := env("DECISION_PORT", "8080")
@@ -70,6 +85,7 @@ func main() {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("/bl.js", serveTracker)
 	mux.HandleFunc("/v1/collect", h.collect)
+	mux.HandleFunc("/v1/decide", h.decide)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -234,6 +250,127 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /v1/decide — synchronous server-side verdict. A customer's server sends
+// the visitor's IP/UA (authenticated with a blk_ API key) and gets back
+// allow/block/redirect so it can turn bad traffic away BEFORE rendering.
+// Fails open: any auth/parse problem returns action="allow" so the customer's
+// site never breaks because of us.
+func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
+	cors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"action": "allow", "error": "POST only"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	// API-key auth: Authorization: Bearer blk_...  -> org id (published by Django)
+	auth := r.Header.Get("Authorization")
+	const pfx = "Bearer "
+	if !strings.HasPrefix(auth, pfx) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "missing API key"})
+		return
+	}
+	sum := sha256.Sum256([]byte(strings.TrimSpace(auth[len(pfx):])))
+	keyOrg := h.st.GetStr(ctx, "apikey:"+hex.EncodeToString(sum[:]))
+	if keyOrg == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "invalid API key"})
+		return
+	}
+
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 16*1024))
+	var p DecidePayload
+	if err := json.Unmarshal(body, &p); err != nil || p.SiteID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"action": "allow", "error": "site_id required"})
+		return
+	}
+	// The API key must own the site it's asking about.
+	if org := h.st.GetStr(ctx, "site:"+p.SiteID); org == "" || org != keyOrg {
+		writeJSON(w, http.StatusForbidden, map[string]any{"action": "allow", "error": "API key not valid for this site_id"})
+		return
+	}
+
+	ip := p.IP
+	if ip == "" {
+		ip = firstHeader(r, "X-Forwarded-For", "X-Real-IP")
+	}
+	fp := fingerprint.FromValues(ip, p.UA, p.Country)
+	if fp.Country == "" {
+		fp.Country = geo.Country(fp.IP)
+	}
+	ja3 := p.JA3
+	rate := h.st.RateIncr(ctx, "srate:"+p.SiteID+":"+fp.IP, time.Minute)
+
+	// Server-side signals only (no JS fingerprint expected on this path).
+	result := risk.Evaluate(risk.Input{
+		KnownBot:      fp.IsBot,
+		Automation:    fp.IsHeadless,
+		Datacenter:    h.st.InSet(ctx, "ipintel:datacenter", fp.IP),
+		Proxy:         h.st.InSet(ctx, "ipintel:proxy", fp.IP),
+		NoFingerprint: false,
+		AbnormalRate:  rate > 40,
+		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+	})
+
+	ruleSet := rules.Parse(h.st.GetRules(ctx, p.SiteID))
+	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
+		RiskScore: result.Score,
+		Fields: map[string]string{
+			"classification": result.Classification,
+			"country":        fp.Country,
+			"device":         fp.Device,
+			"browser":        fp.Browser,
+			"os":             fp.OS,
+			"is_bot":         boolStr(fp.IsBot),
+			"is_proxy":       boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
+			"referrer":       p.Referrer,
+			"ja3":            ja3,
+		},
+	})
+	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, p.SiteID)), fp.IP) {
+	case ipfilter.Allow:
+		action, redirect = "allow", ""
+	case ipfilter.Deny:
+		action, redirect = "block", ""
+	}
+	sigJSON, _ := json.Marshal(result.Signals)
+
+	// Record it so server-side checks show up in the dashboard like any traffic.
+	go h.st.EmitTraffic(context.Background(), map[string]any{
+		"site_id": p.SiteID, "visitor_id": "server:" + fp.IP, "session_id": "",
+		"type": "server_check", "url": p.Path, "referrer": p.Referrer,
+		"ip": fp.IP, "country": fp.Country, "device": fp.Device, "browser": fp.Browser, "os": fp.OS,
+		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
+		"risk_score": result.Score, "classification": result.Classification,
+		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
+		"ja3": ja3, "action": action, "tag": tag, "redirect_url": redirect,
+	})
+
+	// Normalize to an enforcement verdict. review/tag are labels -> allow.
+	verdict := "allow"
+	if action == "block" {
+		verdict = "block"
+	} else if action == "redirect" && redirect != "" {
+		verdict = "redirect"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"action": verdict, "redirect": redirect,
+		"classification": result.Classification, "risk_score": result.Score,
+		"reason": strings.Join(result.Signals, ","),
+	})
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func boolStr(b bool) string {

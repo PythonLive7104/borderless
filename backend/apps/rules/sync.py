@@ -45,5 +45,6 @@ def publish_org(org_id):
         for tid in Website.objects.filter(organization_id=org_id).values_list("tracking_id", flat=True):
             c.set(f"rules:{tid}", rules_data)
             c.set(f"ipfilter:{tid}", ip_data)
+            c.set(f"site:{tid}", str(org_id))  # binds API keys to this site on the shield
     except Exception:
         pass  # Redis outage must not break the control plane

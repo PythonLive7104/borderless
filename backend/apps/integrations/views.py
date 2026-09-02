@@ -40,6 +40,8 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         raw, prefix, key_hash = APIKey.generate()
         key = APIKey.objects.create(organization_id=org_id, name=request.data.get("name", "API key"),
                                     prefix=prefix, key_hash=key_hash)
+        from .shield import publish_key
+        publish_key(key)  # let the server-side shield authenticate this key
         data = APIKeySerializer(key).data
         data["key"] = raw  # shown ONCE
         return Response(data, status=status.HTTP_201_CREATED)
@@ -49,6 +51,8 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         _require_manager(request.user, key.organization_id)
         key.revoked = True
         key.save(update_fields=["revoked"])
+        from .shield import unpublish_key
+        unpublish_key(key.key_hash)  # revoked keys stop working on the shield too
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

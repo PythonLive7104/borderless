@@ -56,6 +56,16 @@ func (s *Store) InSet(ctx context.Context, key, member string) bool {
 	return ok
 }
 
+// GetStr returns the raw string value at key ("" if missing). Used by the
+// server-side shield to resolve apikey:{hash} and site:{tid} -> org id.
+func (s *Store) GetStr(ctx context.Context, key string) string {
+	v, err := s.rdb.Get(ctx, key).Result()
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
 // GetRules returns the raw rules JSON for a site (empty string if none).
 func (s *Store) GetRules(ctx context.Context, siteID string) string {
 	v, err := s.rdb.Get(ctx, "rules:"+siteID).Result()
