@@ -79,7 +79,7 @@ class UsageView(views.APIView):
         # plans are uncapped here (limit 0 = unlimited, same convention as team).
         from apps.websites.models import Website
         from apps.campaigns.models import Campaign
-        from .models import is_on_trial, TRIAL_MAX_WEBSITES, TRIAL_MAX_CAMPAIGNS
+        from .models import is_on_trial, website_limit, campaign_limit
         on_trial = is_on_trial(org_id)
         n_sites = Website.objects.filter(organization_id=org_id).count()
         n_campaigns = Campaign.objects.filter(website__organization_id=org_id).count()
@@ -96,8 +96,8 @@ class UsageView(views.APIView):
             "period": {"start": start, "end": end},
             "events": {"used": used, "limit": limit, "pct": pct, "remaining": max(limit - used, 0), "level": level},
             "team": {"used": members, "limit": sub.plan.team_members},
-            "websites": {"used": n_sites, "limit": TRIAL_MAX_WEBSITES if on_trial else 0},
-            "campaigns": {"used": n_campaigns, "limit": TRIAL_MAX_CAMPAIGNS if on_trial else 0},
+            "websites": {"used": n_sites, "limit": website_limit(org_id)},
+            "campaigns": {"used": n_campaigns, "limit": campaign_limit(org_id)},
             "on_trial": on_trial,
             "retention_days": sub.plan.retention_days,
             "plan": PlanSerializer(sub.plan).data,

@@ -32,12 +32,14 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         org_id = serializer.validated_data["website"].organization_id
-        from apps.billing.models import is_on_trial, TRIAL_MAX_CAMPAIGNS
+        from apps.billing.models import campaign_limit, is_on_trial
         from rest_framework.exceptions import ValidationError
-        if is_on_trial(org_id) and Campaign.objects.filter(website__organization_id=org_id).count() >= TRIAL_MAX_CAMPAIGNS:
+        limit = campaign_limit(org_id)  # 0 = unlimited
+        if limit and Campaign.objects.filter(website__organization_id=org_id).count() >= limit:
+            where = "free trial" if is_on_trial(org_id) else "current plan"
             raise ValidationError(
-                f"You're on the free trial, which can track {TRIAL_MAX_CAMPAIGNS} campaign. "
-                "To create more campaigns, upgrade to a paid plan on the Billing page.")
+                f"Your {where} can track {limit} campaign{'s' if limit != 1 else ''}. "
+                "Upgrade to a higher plan on the Billing page to add more.")
         serializer.save()
 
     def perform_update(self, serializer):

@@ -62,7 +62,7 @@ export default function Campaigns() {
             {usage && (
               <span className="ml-1 font-semibold text-fg">
                 {usage.campaigns.used}{usage.campaigns.limit ? ` of ${usage.campaigns.limit}` : ""} used
-                {usage.campaigns.limit ? " on your trial" : ""}.
+                {usage.campaigns.limit ? (usage.on_trial ? " on your trial" : " on your plan") : ""}.
               </span>
             )}
           </p>

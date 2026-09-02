@@ -13,6 +13,8 @@ class Plan(models.Model):
     monthly_events = models.BigIntegerField(help_text="Metered event limit per period")
     retention_days = models.IntegerField(default=30)
     team_members = models.IntegerField(default=3, help_text="0 = unlimited")
+    max_websites = models.IntegerField(default=0, help_text="0 = unlimited")
+    max_campaigns = models.IntegerField(default=0, help_text="0 = unlimited")
     sort = models.IntegerField(default=0)
     # Maps this plan to a product created in the Bachs dashboard. Checkout uses it.
     bachs_product_id = models.CharField(max_length=80, blank=True, default="")
@@ -76,3 +78,20 @@ TRIAL_MAX_CAMPAIGNS = 1
 def is_on_trial(organization_id) -> bool:
     sub = Subscription.objects.filter(organization_id=organization_id).first()
     return bool(sub and sub.status == Subscription.Status.TRIALING)
+
+
+def website_limit(organization_id) -> int:
+    """Effective website cap for an org (0 = unlimited). Trial caps at 1; a paid
+    plan uses its max_websites."""
+    sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
+    if not sub or sub.status == Subscription.Status.TRIALING:
+        return TRIAL_MAX_WEBSITES
+    return sub.plan.max_websites
+
+
+def campaign_limit(organization_id) -> int:
+    """Effective campaign cap for an org (0 = unlimited)."""
+    sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
+    if not sub or sub.status == Subscription.Status.TRIALING:
+        return TRIAL_MAX_CAMPAIGNS
+    return sub.plan.max_campaigns

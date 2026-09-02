@@ -9,7 +9,7 @@ type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
   name: string; price: number; tag: string; cta: string;
   highlight?: boolean; ribbon?: string; warning?: string;
-  campaignLimit: string; clickLimit: string;
+  websiteLimit: string; campaignLimit: string; clickLimit: string;
   groups: Group[];
 };
 
@@ -34,17 +34,17 @@ const ADVANCED: string[] = [
 const PLANS: Plan[] = [
   {
     name: "Starter", price: 29, tag: "Detect click fraud in contextual & display ads",
-    cta: "Buy this tariff", campaignLimit: "20", clickLimit: "no limit",
+    cta: "Buy this tariff", websiteLimit: "5", campaignLimit: "20", clickLimit: "no limit",
     groups: [{ items: BASE }],
   },
   {
     name: "Growth", price: 99, tag: "For scaling media buyers & teams",
-    cta: "Buy this tariff", highlight: true, campaignLimit: "50", clickLimit: "no limit",
+    cta: "Buy this tariff", highlight: true, websiteLimit: "20", campaignLimit: "50", clickLimit: "no limit",
     groups: [{ items: BASE }, { label: "Everything in Starter, plus:", items: GROWTH_ADD, added: true }],
   },
   {
     name: "Business", price: 299, tag: "Advanced protection & API for agencies",
-    cta: "Buy this tariff", ribbon: "TOP VALUE", campaignLimit: "unlimited", clickLimit: "no limit",
+    cta: "Buy this tariff", ribbon: "TOP VALUE", websiteLimit: "unlimited", campaignLimit: "unlimited", clickLimit: "no limit",
     groups: [
       { items: BASE },
       { label: "Everything in Growth, plus:", items: GROWTH_ADD, added: true },
@@ -158,7 +158,8 @@ export default function Pricing() {
               {/* limits + CTA pinned to bottom for card alignment */}
               <div className="mt-6 flex-1" />
               <div className="border-t border-line pt-5 text-sm">
-                <div className="flex justify-between"><span className="text-fg-dim">Campaign limit</span><span className="font-semibold">{p.campaignLimit}</span></div>
+                <div className="flex justify-between"><span className="text-fg-dim">Website limit</span><span className="font-semibold">{p.websiteLimit}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Campaign limit</span><span className="font-semibold">{p.campaignLimit}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Click limit</span><span className="font-semibold">{p.clickLimit}</span></div>
               </div>
               <Button to="/signup" variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {p.cta}</Button>

@@ -29,12 +29,14 @@ class WebsiteViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         org = serializer.validated_data["organization"]
         self._require_manager(org.id)
-        from apps.billing.models import is_on_trial, TRIAL_MAX_WEBSITES
+        from apps.billing.models import website_limit, is_on_trial
         from rest_framework.exceptions import ValidationError
-        if is_on_trial(org.id) and Website.objects.filter(organization=org).count() >= TRIAL_MAX_WEBSITES:
+        limit = website_limit(org.id)  # 0 = unlimited
+        if limit and Website.objects.filter(organization=org).count() >= limit:
+            where = "free trial" if is_on_trial(org.id) else "current plan"
             raise ValidationError(
-                f"You're on the free trial, which can protect {TRIAL_MAX_WEBSITES} website. "
-                "To add and protect more websites, upgrade to a paid plan on the Billing page.")
+                f"Your {where} can protect {limit} website{'s' if limit != 1 else ''}. "
+                "Upgrade to a higher plan on the Billing page to add more.")
         website = serializer.save()
         from apps.rules.sync import publish_org
         publish_org(website.organization_id)

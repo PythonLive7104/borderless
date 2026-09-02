@@ -62,7 +62,7 @@ export default function UsagePage() {
           <div className="mt-2 text-2xl font-extrabold">{u.websites.used}{u.websites.limit ? ` / ${u.websites.limit}` : ""}</div>
           <div className={`mt-1 text-xs ${u.websites.limit && u.websites.used >= u.websites.limit ? "font-semibold text-amber-700" : "text-fg-dim"}`}>
             {u.websites.limit
-              ? (u.websites.used >= u.websites.limit ? "Trial limit reached — upgrade to add more" : "of your trial limit")
+              ? (u.websites.used >= u.websites.limit ? (u.on_trial ? "Trial limit reached — upgrade to add more" : "Plan limit reached — upgrade to add more") : (u.on_trial ? "of your trial limit" : "of your plan"))
               : "Unlimited on your plan"}
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function UsagePage() {
           <div className="mt-2 text-2xl font-extrabold">{u.campaigns.used}{u.campaigns.limit ? ` / ${u.campaigns.limit}` : ""}</div>
           <div className={`mt-1 text-xs ${u.campaigns.limit && u.campaigns.used >= u.campaigns.limit ? "font-semibold text-amber-700" : "text-fg-dim"}`}>
             {u.campaigns.limit
-              ? (u.campaigns.used >= u.campaigns.limit ? "Trial limit reached — upgrade to add more" : "of your trial limit")
+              ? (u.campaigns.used >= u.campaigns.limit ? (u.on_trial ? "Trial limit reached — upgrade to add more" : "Plan limit reached — upgrade to add more") : (u.on_trial ? "of your trial limit" : "of your plan"))
               : "Unlimited on your plan"}
           </div>
         </div>

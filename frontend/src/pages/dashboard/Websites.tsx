@@ -55,7 +55,7 @@ export default function Websites() {
             {usage && (
               <span className="ml-1 font-semibold text-fg">
                 {usage.websites.used}{usage.websites.limit ? ` of ${usage.websites.limit}` : ""} used
-                {usage.websites.limit ? " on your trial" : ""}.
+                {usage.websites.limit ? (usage.on_trial ? " on your trial" : " on your plan") : ""}.
               </span>
             )}
           </p>
