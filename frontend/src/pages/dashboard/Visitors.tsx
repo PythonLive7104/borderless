@@ -4,6 +4,9 @@ import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type VisitorRow } from "../../lib/api";
 import NoData from "../../components/dashboard/NoData";
+import Pager from "../../components/ui/Pager";
+
+const PAGE_SIZE = 25;
 
 const riskTone = (r: number | null) =>
   r == null ? "text-fg-dim" : r >= 85 ? "text-red-600" : r >= 70 ? "text-orange-600" : r >= 40 ? "text-amber-600" : "text-emerald-600";
@@ -14,14 +17,19 @@ export default function Visitors() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [device, setDevice] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
   async function load() {
     if (!current) return;
     setLoading(true);
-    try { setRows((await analyticsApi.visitors(current.id, { search, device })).results); }
-    finally { setLoading(false); }
+    try {
+      const res = await analyticsApi.visitors(current.id, { search, device, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+      setRows(res.results); setTotal(res.count);
+    } finally { setLoading(false); }
   }
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [current?.id, search, device]);
+  useEffect(() => { setPage(0); /* eslint-disable-next-line */ }, [search, device]);
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [current?.id, search, device, page]);
 
   return (
     <div>
@@ -41,6 +49,7 @@ export default function Visitors() {
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : rows.length === 0 ? <div className="card shadow-soft mt-5"><NoData msg="No visitors match." /></div>
        : (
+        <>
         <div className="card shadow-soft mt-5 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -63,6 +72,8 @@ export default function Visitors() {
             </table>
           </div>
         </div>
+        <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
+        </>
       )}
     </div>
   );

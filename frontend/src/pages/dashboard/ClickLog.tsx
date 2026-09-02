@@ -4,6 +4,9 @@ import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type EventRow } from "../../lib/api";
 import ClassBadge from "../../components/ui/ClassBadge";
 import NoData from "../../components/dashboard/NoData";
+import Pager from "../../components/ui/Pager";
+
+const PAGE_SIZE = 25;
 
 const actionTone: Record<string, string> = {
   allow: "bg-success/10 text-emerald-700", review: "bg-warning/10 text-amber-700",
@@ -15,14 +18,21 @@ export default function ClickLog() {
   const [rows, setRows] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [f, setF] = useState({ search: "", classification: "", action: "", type: "", min_risk: "" });
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const set = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
 
   async function load() {
     if (!current) return;
     setLoading(true);
-    try { setRows((await analyticsApi.events(current.id, f)).results); } finally { setLoading(false); }
+    try {
+      const res = await analyticsApi.events(current.id, { ...f, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+      setRows(res.results); setTotal(res.count);
+    } finally { setLoading(false); }
   }
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [current?.id, JSON.stringify(f)]);
+  // Jump back to the first page whenever a filter changes.
+  useEffect(() => { setPage(0); /* eslint-disable-next-line */ }, [JSON.stringify(f)]);
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [current?.id, JSON.stringify(f), page]);
 
   return (
     <div>
@@ -47,6 +57,7 @@ export default function ClickLog() {
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : rows.length === 0 ? <div className="card shadow-soft mt-5"><NoData msg="No events match." /></div>
        : (
+        <>
         <div className="card shadow-soft mt-5 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -69,6 +80,8 @@ export default function ClickLog() {
             </table>
           </div>
         </div>
+        <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
+        </>
       )}
     </div>
   );
