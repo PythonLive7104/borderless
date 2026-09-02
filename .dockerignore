@@ -1,0 +1,13 @@
+# Keep build context small and correct. Node modules are installed inside the
+# image (npm ci); never copy the host's node_modules in (stale / wrong arch).
+**/node_modules
+**/dist
+**/dist-server
+.git
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+*.log
+.env
+**/.DS_Store

@@ -2,8 +2,17 @@
 # API (Django) and the tracker/collect endpoints (Go engine). Build context = repo root.
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY frontend/package.json ./
-RUN npm install
+# Copy the lockfile too so installs are deterministic and cacheable.
+COPY frontend/package.json frontend/package-lock.json ./
+# Resilient install for slow/flaky networks: long per-request timeout + retries
+# so a transient ETIMEDOUT to the npm registry doesn't fail the whole build.
+# Falls back to `npm install` if the lockfile is ever out of sync with package.json.
+RUN npm ci --no-audit --no-fund \
+      --fetch-timeout=600000 --fetch-retries=5 \
+      --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 \
+  || npm install --no-audit --no-fund \
+      --fetch-timeout=600000 --fetch-retries=5 \
+      --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 COPY frontend/ ./
 # VITE_TAWK_SRC can be injected at build time; empty falls back to mailto.
 ARG VITE_TAWK_SRC=""
