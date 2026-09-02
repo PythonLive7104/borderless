@@ -58,6 +58,24 @@ export default function UsagePage() {
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <div className="card shadow-soft p-5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-fg-dim">Websites</div>
+          <div className="mt-2 text-2xl font-extrabold">{u.websites.used}{u.websites.limit ? ` / ${u.websites.limit}` : ""}</div>
+          <div className={`mt-1 text-xs ${u.websites.limit && u.websites.used >= u.websites.limit ? "font-semibold text-amber-700" : "text-fg-dim"}`}>
+            {u.websites.limit
+              ? (u.websites.used >= u.websites.limit ? "Trial limit reached — upgrade to add more" : "of your trial limit")
+              : "Unlimited on your plan"}
+          </div>
+        </div>
+        <div className="card shadow-soft p-5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-fg-dim">Campaigns</div>
+          <div className="mt-2 text-2xl font-extrabold">{u.campaigns.used}{u.campaigns.limit ? ` / ${u.campaigns.limit}` : ""}</div>
+          <div className={`mt-1 text-xs ${u.campaigns.limit && u.campaigns.used >= u.campaigns.limit ? "font-semibold text-amber-700" : "text-fg-dim"}`}>
+            {u.campaigns.limit
+              ? (u.campaigns.used >= u.campaigns.limit ? "Trial limit reached — upgrade to add more" : "of your trial limit")
+              : "Unlimited on your plan"}
+          </div>
+        </div>
+        <div className="card shadow-soft p-5">
           <div className="text-xs font-semibold uppercase tracking-wide text-fg-dim">Team members</div>
           <div className="mt-2 text-2xl font-extrabold">{u.team.used}{u.team.limit ? ` / ${u.team.limit}` : ""}</div>
           <div className="mt-1 text-xs text-fg-dim">{u.team.limit ? "of your plan" : "Unlimited"}</div>

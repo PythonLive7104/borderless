@@ -361,6 +361,9 @@ export interface Usage {
   period: { start: string; end: string };
   events: { used: number; limit: number; pct: number; remaining: number; level: "ok" | "notice" | "warning" | "critical" };
   team: { used: number; limit: number };
+  websites: { used: number; limit: number };
+  campaigns: { used: number; limit: number };
+  on_trial: boolean;
   retention_days: number; plan: Plan;
 }
 export const billingApi = {

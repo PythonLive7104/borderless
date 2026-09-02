@@ -75,6 +75,15 @@ class UsageView(views.APIView):
         pct = round(used / limit, 4) if limit else 0
         members = OrganizationMember.objects.filter(organization_id=org_id).count()
 
+        # Website / campaign counts vs. their limits. Trial caps at 1/1; paid
+        # plans are uncapped here (limit 0 = unlimited, same convention as team).
+        from apps.websites.models import Website
+        from apps.campaigns.models import Campaign
+        from .models import is_on_trial, TRIAL_MAX_WEBSITES, TRIAL_MAX_CAMPAIGNS
+        on_trial = is_on_trial(org_id)
+        n_sites = Website.objects.filter(organization_id=org_id).count()
+        n_campaigns = Campaign.objects.filter(website__organization_id=org_id).count()
+
         level = "ok"
         if pct >= 1.0:
             level = "critical"
@@ -87,6 +96,9 @@ class UsageView(views.APIView):
             "period": {"start": start, "end": end},
             "events": {"used": used, "limit": limit, "pct": pct, "remaining": max(limit - used, 0), "level": level},
             "team": {"used": members, "limit": sub.plan.team_members},
+            "websites": {"used": n_sites, "limit": TRIAL_MAX_WEBSITES if on_trial else 0},
+            "campaigns": {"used": n_campaigns, "limit": TRIAL_MAX_CAMPAIGNS if on_trial else 0},
+            "on_trial": on_trial,
             "retention_days": sub.plan.retention_days,
             "plan": PlanSerializer(sub.plan).data,
         })

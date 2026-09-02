@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { campaignApi, websiteApi, type Campaign, type Website } from "../../lib/api";
+import { campaignApi, websiteApi, billingApi, type Campaign, type Website, type Usage } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
@@ -19,6 +19,7 @@ export default function Campaigns() {
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({ website: "", name: "", destination_url: "", traffic_source: "facebook", utm_campaign: "", risk_threshold: "70" });
   const canManage = current?.role === "owner" || current?.role === "admin";
+  const [usage, setUsage] = useState<Usage | null>(null);
 
   async function load() {
     if (!current) return;
@@ -27,6 +28,7 @@ export default function Campaigns() {
       const [c, w] = await Promise.all([campaignApi.list(current.id), websiteApi.list(current.id)]);
       setRows(c.results); setSites(w.results);
     } finally { setLoading(false); }
+    billingApi.usage(current.id).then(setUsage).catch(() => {});
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
@@ -55,7 +57,15 @@ export default function Campaigns() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Campaigns</h1>
-          <p className="mt-1 text-sm text-fg-muted">Organize and monitor your traffic in {current?.name}.</p>
+          <p className="mt-1 text-sm text-fg-muted">
+            Organize and monitor your traffic in {current?.name}.
+            {usage && (
+              <span className="ml-1 font-semibold text-fg">
+                {usage.campaigns.used}{usage.campaigns.limit ? ` of ${usage.campaigns.limit}` : ""} used
+                {usage.campaigns.limit ? " on your trial" : ""}.
+              </span>
+            )}
+          </p>
         </div>
         {canManage && <Button onClick={openModal} >+ New campaign</Button>}
       </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { websiteApi, type Website } from "../../lib/api";
+import { websiteApi, billingApi, type Website, type Usage } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
@@ -19,10 +19,12 @@ export default function Websites() {
   const [busy, setBusy] = useState(false);
   const canManage = current?.role === "owner" || current?.role === "admin";
 
+  const [usage, setUsage] = useState<Usage | null>(null);
   async function load() {
     if (!current) return;
     setLoading(true);
     try { setSites((await websiteApi.list(current.id)).results); } finally { setLoading(false); }
+    billingApi.usage(current.id).then(setUsage).catch(() => {});
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
@@ -48,7 +50,15 @@ export default function Websites() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Websites</h1>
-          <p className="mt-1 text-sm text-fg-muted">Sites you're tracking in {current?.name}.</p>
+          <p className="mt-1 text-sm text-fg-muted">
+            Sites you're tracking in {current?.name}.
+            {usage && (
+              <span className="ml-1 font-semibold text-fg">
+                {usage.websites.used}{usage.websites.limit ? ` of ${usage.websites.limit}` : ""} used
+                {usage.websites.limit ? " on your trial" : ""}.
+              </span>
+            )}
+          </p>
         </div>
         {canManage && <Button onClick={() => setOpen(true)}>+ Add website</Button>}
       </div>
