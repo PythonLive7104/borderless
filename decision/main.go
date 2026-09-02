@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -193,6 +194,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 			"utm_campaign":   p.UTMCampaign,
 			"referrer":       p.Referrer,
 			"ja3":            ja3,
+			"path":           urlPath(p.URL),
 		},
 	})
 
@@ -300,6 +302,7 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 			"is_proxy":       boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
 			"referrer":       referrer,
 			"ja3":            ja3,
+			"path":           urlPath(path),
 		},
 	})
 	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, siteID)), fp.IP) {
@@ -427,6 +430,18 @@ func firstHeader(r *http.Request, names ...string) string {
 		}
 	}
 	return ""
+}
+
+// urlPath extracts just the path ("/admin") from a full URL, for Folder Guard
+// rules that match on the URL path. Falls back to the raw value.
+func urlPath(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if u, err := url.Parse(raw); err == nil && u.Path != "" {
+		return u.Path
+	}
+	return raw
 }
 
 func env(k, def string) string {

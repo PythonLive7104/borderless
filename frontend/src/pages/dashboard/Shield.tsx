@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { websiteApi, type Website } from "../../lib/api";
+import FolderGuard from "../../components/dashboard/FolderGuard";
 
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trackaudit.info";
 const HOST = typeof window !== "undefined" ? window.location.hostname : "trackaudit.info";
@@ -249,6 +250,9 @@ export default function Shield() {
           <p className="mt-1 text-sm text-fg-muted">Copy one snippet below and add it to your website's server (or Cloudflare). Not sure how? Send this page and your key to whoever manages your site.</p>
         </div>
       </div>
+
+      {/* Folder Guard — protect specific paths (enforced by the shield). */}
+      {current && <FolderGuard orgId={current.id} canManage={current.role === "owner" || current.role === "admin"} />}
 
       {/* code section — clearly framed as the developer's part */}
       <div className="mt-8 border-t border-line pt-6">

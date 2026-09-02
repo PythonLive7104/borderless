@@ -7,7 +7,7 @@ FIELD_CHOICES = [
     ("country", "Country"), ("device", "Device"), ("browser", "Browser"), ("os", "OS"),
     ("is_bot", "Bot detected"), ("is_proxy", "Proxy/Datacenter"),
     ("utm_source", "UTM source"), ("utm_medium", "UTM medium"), ("utm_campaign", "UTM campaign"),
-    ("referrer", "Referrer"), ("ja3", "TLS/JA3 hash"),
+    ("referrer", "Referrer"), ("ja3", "TLS/JA3 hash"), ("path", "URL path"),
 ]
 OP_CHOICES = [
     ("eq", "equals"), ("ne", "not equals"), ("gt", "greater than"), ("gte", "≥"),

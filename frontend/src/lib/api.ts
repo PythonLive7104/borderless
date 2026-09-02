@@ -213,6 +213,7 @@ export const RULE_FIELDS = [
   ["device", "Device"], ["browser", "Browser"], ["os", "OS"], ["is_bot", "Bot detected"],
   ["is_proxy", "Proxy/Datacenter"], ["utm_source", "UTM source"], ["utm_medium", "UTM medium"],
   ["utm_campaign", "UTM campaign"], ["referrer", "Referrer"], ["ja3", "TLS/JA3 hash"],
+  ["path", "URL path"],
 ] as const;
 // Plain-English operator labels (values stay the same for the engine).
 export const RULE_OPS = [
