@@ -4,12 +4,16 @@ import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { websiteApi, type Website } from "../../lib/api";
 
-const ENDPOINT = (typeof window !== "undefined" ? window.location.origin : "https://trackaudit.info") + "/v1/decide";
+const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trackaudit.info";
+const HOST = typeof window !== "undefined" ? window.location.hostname : "trackaudit.info";
+const ENDPOINT = ORIGIN + "/v1/decide";
+const GUARD = ORIGIN + "/v1/guard";
 
-type Lang = "php" | "django" | "cloudflare" | "node" | "curl";
+type Lang = "php" | "django" | "nginx" | "cloudflare" | "node" | "curl";
 const TABS: { id: Lang; label: string }[] = [
   { id: "php", label: "PHP" },
   { id: "django", label: "Python / Django" },
+  { id: "nginx", label: "nginx (VPS)" },
   { id: "cloudflare", label: "Cloudflare Worker" },
   { id: "node", label: "Node / Express" },
   { id: "curl", label: "Test (cURL)" },
@@ -92,6 +96,41 @@ class TrackAuditShield:
 
 # settings.py:
 # MIDDLEWARE = ["yourapp.trackaudit_shield.TrackAuditShield", *MIDDLEWARE]`,
+    nginx: `# TrackAudit shield via nginx auth_request — self-hosted, no Cloudflare.
+# Best for a React build served statically by nginx. Add to your server { } block.
+# (Behind Cloudflare? use $http_cf_connecting_ip instead of $remote_addr for X-TA-IP.)
+
+# 1) Guard the location that serves your site — add the first 4 lines:
+location / {
+    auth_request /_ta_guard;
+    auth_request_set $ta_action   $upstream_http_x_ta_action;
+    auth_request_set $ta_redirect $upstream_http_x_ta_redirect;
+    error_page 403 = @ta_denied;
+
+    try_files $uri $uri/ /index.html;   # <- your existing page-serving line
+}
+
+# 2) The internal check — asks TrackAudit about this visitor:
+location = /_ta_guard {
+    internal;
+    resolver 1.1.1.1 ipv6=off;
+    proxy_pass ${GUARD};
+    proxy_ssl_server_name on;
+    proxy_set_header Host ${HOST};
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-TA-Key  "YOUR_API_KEY";   # from Dashboard -> API Keys
+    proxy_set_header X-TA-Site "${S}";
+    proxy_set_header X-TA-IP   $remote_addr;
+    proxy_set_header X-TA-UA   $http_user_agent;
+}
+
+# 3) What happens to blocked visitors:
+location @ta_denied {
+    if ($ta_action = "redirect") { return 302 $ta_redirect; }
+    return 403 "Access denied";
+}
+# Reload nginx after editing:  nginx -t && systemctl reload nginx`,
     cloudflare: `// TrackAudit shield as a Cloudflare Worker — runs at the edge, before your origin.
 export default {
   async fetch(request, env, ctx) {

@@ -86,6 +86,7 @@ func main() {
 	mux.HandleFunc("/bl.js", serveTracker)
 	mux.HandleFunc("/v1/collect", h.collect)
 	mux.HandleFunc("/v1/decide", h.decide)
+	mux.HandleFunc("/v1/guard", h.guard)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -252,63 +253,31 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// POST /v1/decide — synchronous server-side verdict. A customer's server sends
-// the visitor's IP/UA (authenticated with a blk_ API key) and gets back
-// allow/block/redirect so it can turn bad traffic away BEFORE rendering.
-// Fails open: any auth/parse problem returns action="allow" so the customer's
-// site never breaks because of us.
-func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
-	cors(w)
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"action": "allow", "error": "POST only"})
-		return
-	}
+// scoreResult is a normalized enforcement verdict shared by /v1/decide (JSON)
+// and /v1/guard (nginx auth_request, status codes).
+type scoreResult struct {
+	Action, Redirect, Classification, Reason string
+	Score                                    int
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
+// orgForKey resolves a raw blk_ API key to its organization id via the Redis
+// mapping Django publishes ("" = unknown/invalid).
+func (h *handler) orgForKey(ctx context.Context, rawKey string) string {
+	if rawKey == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(strings.TrimSpace(rawKey)))
+	return h.st.GetStr(ctx, "apikey:"+hex.EncodeToString(sum[:]))
+}
 
-	// API-key auth: Authorization: Bearer blk_...  -> org id (published by Django)
-	auth := r.Header.Get("Authorization")
-	const pfx = "Bearer "
-	if !strings.HasPrefix(auth, pfx) {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "missing API key"})
-		return
-	}
-	sum := sha256.Sum256([]byte(strings.TrimSpace(auth[len(pfx):])))
-	keyOrg := h.st.GetStr(ctx, "apikey:"+hex.EncodeToString(sum[:]))
-	if keyOrg == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "invalid API key"})
-		return
-	}
-
-	body, _ := io.ReadAll(io.LimitReader(r.Body, 16*1024))
-	var p DecidePayload
-	if err := json.Unmarshal(body, &p); err != nil || p.SiteID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"action": "allow", "error": "site_id required"})
-		return
-	}
-	// The API key must own the site it's asking about.
-	if org := h.st.GetStr(ctx, "site:"+p.SiteID); org == "" || org != keyOrg {
-		writeJSON(w, http.StatusForbidden, map[string]any{"action": "allow", "error": "API key not valid for this site_id"})
-		return
-	}
-
-	ip := p.IP
-	if ip == "" {
-		ip = firstHeader(r, "X-Forwarded-For", "X-Real-IP")
-	}
-	fp := fingerprint.FromValues(ip, p.UA, p.Country)
+// score runs the same risk + rules + IP-filter pipeline the JS path uses, but
+// from server-side signals only, and records the check to the traffic stream.
+func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, referrer, path string) scoreResult {
+	fp := fingerprint.FromValues(ip, ua, country)
 	if fp.Country == "" {
 		fp.Country = geo.Country(fp.IP)
 	}
-	ja3 := p.JA3
-	rate := h.st.RateIncr(ctx, "srate:"+p.SiteID+":"+fp.IP, time.Minute)
-
-	// Server-side signals only (no JS fingerprint expected on this path).
+	rate := h.st.RateIncr(ctx, "srate:"+siteID+":"+fp.IP, time.Minute)
 	result := risk.Evaluate(risk.Input{
 		KnownBot:      fp.IsBot,
 		Automation:    fp.IsHeadless,
@@ -318,8 +287,7 @@ func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
 		AbnormalRate:  rate > 40,
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 	})
-
-	ruleSet := rules.Parse(h.st.GetRules(ctx, p.SiteID))
+	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Fields: map[string]string{
@@ -330,41 +298,112 @@ func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
 			"os":             fp.OS,
 			"is_bot":         boolStr(fp.IsBot),
 			"is_proxy":       boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
-			"referrer":       p.Referrer,
+			"referrer":       referrer,
 			"ja3":            ja3,
 		},
 	})
-	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, p.SiteID)), fp.IP) {
+	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, siteID)), fp.IP) {
 	case ipfilter.Allow:
 		action, redirect = "allow", ""
 	case ipfilter.Deny:
 		action, redirect = "block", ""
 	}
 	sigJSON, _ := json.Marshal(result.Signals)
-
-	// Record it so server-side checks show up in the dashboard like any traffic.
 	go h.st.EmitTraffic(context.Background(), map[string]any{
-		"site_id": p.SiteID, "visitor_id": "server:" + fp.IP, "session_id": "",
-		"type": "server_check", "url": p.Path, "referrer": p.Referrer,
+		"site_id": siteID, "visitor_id": "server:" + fp.IP, "session_id": "",
+		"type": "server_check", "url": path, "referrer": referrer,
 		"ip": fp.IP, "country": fp.Country, "device": fp.Device, "browser": fp.Browser, "os": fp.OS,
 		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
 		"risk_score": result.Score, "classification": result.Classification,
 		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
 		"ja3": ja3, "action": action, "tag": tag, "redirect_url": redirect,
 	})
-
-	// Normalize to an enforcement verdict. review/tag are labels -> allow.
 	verdict := "allow"
 	if action == "block" {
 		verdict = "block"
 	} else if action == "redirect" && redirect != "" {
 		verdict = "redirect"
 	}
+	return scoreResult{Action: verdict, Redirect: redirect, Classification: result.Classification,
+		Score: result.Score, Reason: strings.Join(result.Signals, ",")}
+}
+
+// POST /v1/decide — synchronous JSON verdict for app code (PHP/Django/Node).
+// Fails open: any auth/parse problem returns action="allow".
+func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
+	cors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"action": "allow", "error": "POST only"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	auth := r.Header.Get("Authorization")
+	const pfx = "Bearer "
+	if !strings.HasPrefix(auth, pfx) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "missing API key"})
+		return
+	}
+	keyOrg := h.orgForKey(ctx, auth[len(pfx):])
+	if keyOrg == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"action": "allow", "error": "invalid API key"})
+		return
+	}
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 16*1024))
+	var p DecidePayload
+	if err := json.Unmarshal(body, &p); err != nil || p.SiteID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"action": "allow", "error": "site_id required"})
+		return
+	}
+	if org := h.st.GetStr(ctx, "site:"+p.SiteID); org == "" || org != keyOrg {
+		writeJSON(w, http.StatusForbidden, map[string]any{"action": "allow", "error": "API key not valid for this site_id"})
+		return
+	}
+	ip := p.IP
+	if ip == "" {
+		ip = firstHeader(r, "X-Forwarded-For", "X-Real-IP")
+	}
+	sr := h.score(ctx, p.SiteID, ip, p.UA, p.JA3, p.Country, p.Referrer, p.Path)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"action": verdict, "redirect": redirect,
-		"classification": result.Classification, "risk_score": result.Score,
-		"reason": strings.Join(result.Signals, ","),
+		"action": sr.Action, "redirect": sr.Redirect,
+		"classification": sr.Classification, "risk_score": sr.Score, "reason": sr.Reason,
 	})
+}
+
+// GET /v1/guard — nginx auth_request endpoint. Reads the visitor + credentials
+// from headers nginx sets and answers with a status code: 204 allow, 403 block
+// (with X-TA-Action/X-TA-Redirect headers when a redirect rule matched). Fails
+// open (204) on any misconfiguration so a broken setup never blocks the site.
+func (h *handler) guard(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	org := h.orgForKey(ctx, r.Header.Get("X-TA-Key"))
+	site := r.Header.Get("X-TA-Site")
+	if org == "" || site == "" || h.st.GetStr(ctx, "site:"+site) != org {
+		w.WriteHeader(http.StatusNoContent) // fail open
+		return
+	}
+	sr := h.score(ctx, site,
+		firstHeader(r, "X-TA-IP", "X-Real-IP", "X-Forwarded-For"),
+		r.Header.Get("X-TA-UA"),
+		firstHeader(r, "X-TA-JA3", "CF-JA3-Hash"),
+		"", r.Header.Get("X-TA-Referrer"), r.Header.Get("X-TA-Path"))
+	switch sr.Action {
+	case "block":
+		w.WriteHeader(http.StatusForbidden)
+	case "redirect":
+		w.Header().Set("X-TA-Action", "redirect")
+		w.Header().Set("X-TA-Redirect", sr.Redirect)
+		w.WriteHeader(http.StatusForbidden)
+	default:
+		w.WriteHeader(http.StatusNoContent) // allow
+	}
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
