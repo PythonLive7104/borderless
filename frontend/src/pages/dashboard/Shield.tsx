@@ -113,36 +113,62 @@ export default function Shield() {
   return (
     <div>
       <PageNote id="shield">
-        The <b>server-side shield</b> turns bad visitors away <b>before your page loads</b> — real protection,
-        not just labels. Your server asks us for a verdict and we answer using the same <b>Traffic Rules</b> you
-        already set. Add a rule (e.g. block fraud &amp; bots), create an <b>API key</b>, then paste one snippet below.
+        Think of your tracking snippet as a <b>security camera</b> — it watches visitors and can send bots away
+        after the page opens. The Shield is a <b>bouncer at the door</b>: it checks each visitor <b>before</b> your
+        page loads and can fully block bad ones. It's stronger, but it needs a one-time bit of code added to your
+        website — so it's usually a job for whoever builds or manages your site.
       </PageNote>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Server-side shield</h1>
-          <p className="mt-1 text-sm text-fg-muted">Block bots &amp; fraud at your server or edge, before rendering.</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold tracking-tight">Server-side shield</h1>
+            <span className="rounded-full bg-bg-mute px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-fg-dim">Advanced</span>
+          </div>
+          <p className="mt-1 text-sm text-fg-muted">The strongest way to block bots &amp; fraud — before your page is shown.</p>
         </div>
       </div>
 
-      {/* setup checklist */}
+      {/* Non-technical off-ramp: most people should use the no-code option instead. */}
+      <div className="card shadow-soft mt-5 flex flex-wrap items-center justify-between gap-3 border-emerald-500/30 bg-emerald-500/5 p-5">
+        <div>
+          <h2 className="font-bold">Not technical? You probably don't need this page.</h2>
+          <p className="mt-1 max-w-2xl text-sm text-fg-muted">
+            For most sites, the <b>one-click protection in Traffic Rules</b> already turns bad visitors away using
+            the snippet you installed — <b>no code, no developer</b>. Use the Shield only if you want the strongest
+            possible blocking and can add a small snippet to your server.
+          </p>
+        </div>
+        <Link to="/dashboard/traffic-rules" className="whitespace-nowrap rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Use the easy option →</Link>
+      </div>
+
+      {/* setup checklist — plain language */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="card shadow-soft p-4">
-          <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 1</div>
-          <p className="mt-1 text-sm">Set your <Link to="/dashboard/traffic-rules" className="font-semibold text-brand hover:underline">Traffic Rules</Link> — the shield enforces block/redirect rules.</p>
+          <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 1 · You</div>
+          <p className="mt-1 text-sm font-semibold">Decide what "bad" means</p>
+          <p className="mt-1 text-sm text-fg-muted">In <Link to="/dashboard/traffic-rules" className="font-semibold text-brand hover:underline">Traffic Rules</Link>, set a rule like "block fraud &amp; bots". The Shield uses these same rules — nothing new to learn here.</p>
         </div>
         <div className="card shadow-soft p-4">
-          <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 2</div>
-          <p className="mt-1 text-sm">Create an <Link to="/dashboard/api" className="font-semibold text-brand hover:underline">API key</Link> and paste it into the snippet.</p>
+          <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 2 · You</div>
+          <p className="mt-1 text-sm font-semibold">Get your secure key</p>
+          <p className="mt-1 text-sm text-fg-muted">Go to <Link to="/dashboard/api" className="font-semibold text-brand hover:underline">API Keys</Link> and create one. It's a private password that lets your website talk to us. Copy it — it's shown only once.</p>
         </div>
         <div className="card shadow-soft p-4">
-          <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 3</div>
-          <p className="mt-1 text-sm">Install the snippet on your server or Cloudflare. Done.</p>
+          <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Step 3 · Your web person</div>
+          <p className="mt-1 text-sm font-semibold">Add the snippet to your site</p>
+          <p className="mt-1 text-sm text-fg-muted">Copy one snippet below and add it to your website's server (or Cloudflare). Not sure how? Send this page and your key to whoever manages your site.</p>
         </div>
+      </div>
+
+      {/* code section — clearly framed as the developer's part */}
+      <div className="mt-8 border-t border-line pt-6">
+        <h2 className="text-lg font-bold">The snippet <span className="text-sm font-normal text-fg-dim">— for whoever manages your website</span></h2>
+        <p className="mt-1 text-sm text-fg-muted">Pick your site and platform, then copy. Replace <code className="rounded bg-bg-mute px-1">YOUR_API_KEY</code> with the key from Step 2.</p>
       </div>
 
       {/* site picker */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <label className="text-sm font-semibold">Protecting site:</label>
         <select value={siteId} onChange={(e) => setSiteId(e.target.value)}
           className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-brand">
