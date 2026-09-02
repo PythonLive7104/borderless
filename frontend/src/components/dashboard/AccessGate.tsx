@@ -39,7 +39,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
           <p className="mt-2 text-sm text-fg-muted">
             {canceled
               ? "Reactivate a plan to regain access to your workspace, traffic data and rules."
-              : "Thanks for trying TrackAudit! Choose a plan to keep filtering traffic and unlock your dashboard again."}
+              : "Thanks for trying TryNoBot! Choose a plan to keep filtering traffic and unlock your dashboard again."}
           </p>
           <Link to={BILLING_PATH}
             className="mt-6 inline-flex items-center justify-center rounded-full bg-brand px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600">

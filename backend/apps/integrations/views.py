@@ -86,7 +86,7 @@ class WebhookViewSet(viewsets.ModelViewSet):
     def test(self, request, pk=None):
         hook = self.get_object()
         dispatch(hook.organization_id, hook.events[0] if hook.events else "traffic.classified",
-                 {"test": True, "message": "This is a test delivery from TrackAudit."})
+                 {"test": True, "message": "This is a test delivery from TryNoBot."})
         return Response({"detail": "Test delivery sent."})
 
 

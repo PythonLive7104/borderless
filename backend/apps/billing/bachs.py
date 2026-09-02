@@ -41,7 +41,7 @@ def _post(path, payload):
         headers={
             "Authorization": f"Bearer {_key()}",
             "Content-Type": "application/json",
-            "User-Agent": "TrackAudit/1.0 (+https://trackaudit.info)",
+            "User-Agent": "TryNoBot/1.0 (+https://trynobot.com)",
             "Accept": "application/json",
         },
         method="POST",

@@ -98,7 +98,7 @@ export default function BotScanner() {
             </ul>
           </div>
           <div className="mt-4 rounded-xl bg-bg-soft p-4 text-sm text-fg-muted">
-            Want TrackAudit to actually filter this traffic? <Link to="/dashboard/websites" className="font-semibold text-brand hover:underline">Add the site & install the tracker →</Link>
+            Want TryNoBot to actually filter this traffic? <Link to="/dashboard/websites" className="font-semibold text-brand hover:underline">Add the site & install the tracker →</Link>
           </div>
         </div>
       )}

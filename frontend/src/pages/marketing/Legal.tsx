@@ -4,9 +4,9 @@ import Badge from "../../components/ui/Badge";
 const CONTENT: Record<string, { title: string; intro: string; sections: [string, string][] }> = {
   terms: {
     title: "Terms of Service",
-    intro: "These terms govern your use of the TrackAudit platform. This is placeholder MVP copy — replace with counsel-reviewed terms before launch.",
+    intro: "These terms govern your use of the TryNoBot platform. This is placeholder MVP copy — replace with counsel-reviewed terms before launch.",
     sections: [
-      ["Acceptable use", "TrackAudit may be used only for legitimate traffic-quality, fraud detection and analytics. Using it to deceive advertising networks or evade platform enforcement is prohibited."],
+      ["Acceptable use", "TryNoBot may be used only for legitimate traffic-quality, fraud detection and analytics. Using it to deceive advertising networks or evade platform enforcement is prohibited."],
       ["Accounts", "You are responsible for safeguarding your credentials and API keys, and for all activity under your workspace."],
       ["Billing", "Paid plans are billed monthly. Usage limits and overage behavior are described on the pricing page."],
       ["Termination", "You may cancel anytime. We may suspend accounts that violate the acceptable-use policy."],

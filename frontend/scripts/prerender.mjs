@@ -5,24 +5,24 @@ import { render } from "../dist-server/entry-server.js";
 
 const dist = path.resolve("dist");
 const template = fs.readFileSync(path.join(dist, "index.html"), "utf-8");
-const BRAND = "TrackAudit";
+const BRAND = "TryNoBot";
 
 const routes = [
-  { path: "/", out: "index.html", title: "Real-time traffic intelligence & bot detection", desc: "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TrackAudit." },
+  { path: "/", out: "index.html", title: "Real-time traffic intelligence & bot detection", desc: "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot." },
   { path: "/features", out: "features/index.html", title: "Features", desc: "Real-time scoring, JS + TLS/JA3 fingerprinting, traffic rules, IP allow/deny, A/B testing and more." },
   { path: "/traffic-intelligence", out: "traffic-intelligence/index.html", title: "Traffic intelligence", desc: "Understand who's really visiting — real users vs bots — with real-time visitor intelligence." },
   { path: "/fraud-detection", out: "fraud-detection/index.html", title: "Fraud detection", desc: "Detect and block bots, click fraud, proxies and VPNs before they waste your ad budget." },
   { path: "/analytics", out: "analytics/index.html", title: "Traffic analytics", desc: "See traffic quality, sources, conversions and fraud across all your campaigns in one dashboard." },
-  { path: "/integrations", out: "integrations/index.html", title: "Integrations", desc: "Connect TrackAudit with your stack via the JavaScript tracker, REST API and webhooks." },
-  { path: "/api", out: "api/index.html", title: "API", desc: "Automate everything with the TrackAudit REST API and webhooks." },
+  { path: "/integrations", out: "integrations/index.html", title: "Integrations", desc: "Connect TryNoBot with your stack via the JavaScript tracker, REST API and webhooks." },
+  { path: "/api", out: "api/index.html", title: "API", desc: "Automate everything with the TryNoBot REST API and webhooks." },
   { path: "/pricing", out: "pricing/index.html", title: "Pricing", desc: "Simple plans for real-time bot and fraud detection. Start free, upgrade as you grow." },
   { path: "/bot-check", out: "bot-check/index.html", title: "Free bot exposure check", desc: "Scan any website in 10 seconds and see how exposed it is to bots — free, no signup." },
-  { path: "/docs", out: "docs/index.html", title: "Documentation", desc: "Install the tracker, create rules and integrate TrackAudit with your site." },
-  { path: "/faq", out: "faq/index.html", title: "FAQ", desc: "Answers to common questions about TrackAudit's bot detection and pricing." },
-  { path: "/contact", out: "contact/index.html", title: "Contact", desc: "Get in touch with the TrackAudit team." },
-  { path: "/status", out: "status/index.html", title: "Status", desc: "TrackAudit system status." },
-  { path: "/terms", out: "terms/index.html", title: "Terms of Service", desc: "TrackAudit terms of service." },
-  { path: "/privacy", out: "privacy/index.html", title: "Privacy Policy", desc: "How TrackAudit handles your data." },
+  { path: "/docs", out: "docs/index.html", title: "Documentation", desc: "Install the tracker, create rules and integrate TryNoBot with your site." },
+  { path: "/faq", out: "faq/index.html", title: "FAQ", desc: "Answers to common questions about TryNoBot's bot detection and pricing." },
+  { path: "/contact", out: "contact/index.html", title: "Contact", desc: "Get in touch with the TryNoBot team." },
+  { path: "/status", out: "status/index.html", title: "Status", desc: "TryNoBot system status." },
+  { path: "/terms", out: "terms/index.html", title: "Terms of Service", desc: "TryNoBot terms of service." },
+  { path: "/privacy", out: "privacy/index.html", title: "Privacy Policy", desc: "How TryNoBot handles your data." },
 ];
 
 function withHead(html, title, desc) {

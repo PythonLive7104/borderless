@@ -58,7 +58,7 @@ const SLIDES: Slide[] = [
 ];
 
 export default function Landing() {
-  useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TrackAudit.");
+  useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot.");
   return (
     <>
       {/* HERO BAND */}

@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urljoin, urlparse
 
-UA = "TrackAuditBotCheck/1.0 (+https://trackaudit.info/bot-check)"
+UA = "TryNoBotBotCheck/1.0 (+https://trynobot.com/bot-check)"
 MAX_BYTES = 600_000
 TIMEOUT = 8
 MAX_REDIRECTS = 3
@@ -140,7 +140,7 @@ def run_check(url: str) -> dict:
     if any(h in body_l or h in hdr_blob for h in BOTMGMT_HINTS):
         add("good", "Bot management present", "A bot-detection or challenge system was detected.")
     else:
-        add("bad", "No bot detection detected", "Nothing was found that scores or challenges automated visitors — this is the gap TrackAudit fills.", 25)
+        add("bad", "No bot detection detected", "Nothing was found that scores or challenges automated visitors — this is the gap TryNoBot fills.", 25)
 
     # security headers
     missing = [name for key, name in SECURITY_HEADERS if key not in headers]

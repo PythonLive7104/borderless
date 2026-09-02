@@ -3,8 +3,8 @@ import { Section, SectionHead } from "../../components/ui/Section";
 import Badge from "../../components/ui/Badge";
 
 const QA = [
-  ["What is TrackAudit?", "A traffic-intelligence platform that analyzes, scores and classifies your incoming traffic in real time so you can detect fraud, protect campaigns and measure conversions."],
-  ["Do you deceive ad networks or hide content from reviewers?", "No. TrackAudit is built for legitimate traffic-quality, fraud detection and analytics. We don't provide ad-reviewer deception or platform-policy evasion."],
+  ["What is TryNoBot?", "A traffic-intelligence platform that analyzes, scores and classifies your incoming traffic in real time so you can detect fraud, protect campaigns and measure conversions."],
+  ["Do you deceive ad networks or hide content from reviewers?", "No. TryNoBot is built for legitimate traffic-quality, fraud detection and analytics. We don't provide ad-reviewer deception or platform-policy evasion."],
   ["How does risk scoring work?", "Each visitor is evaluated against weighted signals (datacenter IP, proxy, automation, abnormal request rate and more), normalized to a 0–100 score, and classified as Human, Suspicious, Bot or Fraud. Every score lists its contributing signals."],
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],

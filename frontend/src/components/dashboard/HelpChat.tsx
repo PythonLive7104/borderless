@@ -6,7 +6,7 @@ const TAWK_SRC = ((import.meta as any).env?.VITE_TAWK_SRC as string | undefined)
 
 function openTawk() {
   const w = window as any;
-  if (!TAWK_SRC) { window.open("mailto:support@trackaudit.info?subject=Support%20request", "_blank"); return; }
+  if (!TAWK_SRC) { window.open("mailto:support@trynobot.com?subject=Support%20request", "_blank"); return; }
   if (w.Tawk_API?.maximize) { w.Tawk_API.maximize(); return; }
   w.Tawk_API = w.Tawk_API || {};
   w.Tawk_LoadStart = new Date();
@@ -51,7 +51,7 @@ export default function HelpChat() {
   const [tawkActive, setTawkActive] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([
-    { from: "bot", text: "Hi! I'm the TrackAudit assistant. Ask me anything about using the app — or tap a suggestion below." },
+    { from: "bot", text: "Hi! I'm the TryNoBot assistant. Ask me anything about using the app — or tap a suggestion below." },
   ]);
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => { scroller.current?.scrollTo(0, scroller.current.scrollHeight); }, [msgs, open]);
@@ -93,7 +93,7 @@ export default function HelpChat() {
         <div className="fixed bottom-24 right-5 z-[90] flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-[0_30px_80px_-20px_rgba(0,0,0,.35)]">
           <div className="flex items-center gap-2 border-b border-line bg-bg-soft px-4 py-3">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-brand/10 text-brand">?</span>
-            <div className="flex-1"><div className="text-sm font-bold">Help & answers</div><div className="text-[11px] text-fg-dim">Ask about anything in TrackAudit</div></div>
+            <div className="flex-1"><div className="text-sm font-bold">Help & answers</div><div className="text-[11px] text-fg-dim">Ask about anything in TryNoBot</div></div>
             <button onClick={talkToHuman} title="Chat with a support agent"
               className="flex items-center gap-1 rounded-full border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/5">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" /> Talk to a human

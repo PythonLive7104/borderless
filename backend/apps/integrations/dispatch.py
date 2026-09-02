@@ -24,8 +24,8 @@ def dispatch(org_id: int, event: str, payload: dict):
             try:
                 req = urllib.request.Request(hook.url, data=body, method="POST", headers={
                     "Content-Type": "application/json",
-                    "X-TrackAudit-Event": event,
-                    "X-TrackAudit-Signature": sig,
+                    "X-TryNoBot-Event": event,
+                    "X-TryNoBot-Signature": sig,
                 })
                 with urllib.request.urlopen(req, timeout=3) as resp:
                     code = resp.status

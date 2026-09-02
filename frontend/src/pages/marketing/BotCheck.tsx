@@ -81,8 +81,8 @@ export default function BotCheck() {
           </div>
 
           <div className="mt-6 rounded-2xl bg-navy-900 p-7 text-center text-white">
-            <h3 className="text-xl font-bold">Close these gaps with TrackAudit</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-white/70">TrackAudit scores every visitor in real time, blocks bots and fraud, and shows you exactly what's hitting your site — free to start.</p>
+            <h3 className="text-xl font-bold">Close these gaps with TryNoBot</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-white/70">TryNoBot scores every visitor in real time, blocks bots and fraud, and shows you exactly what's hitting your site — free to start.</p>
             <div className="mt-5 flex justify-center gap-2">
               <Button to="/signup" size="lg">Start free</Button>
               <Button to="/pricing" variant="light" size="lg">View pricing</Button>

@@ -5,8 +5,8 @@ import { useWorkspace } from "../../context/WorkspaceContext";
 import { websiteApi, type Website } from "../../lib/api";
 import FolderGuard from "../../components/dashboard/FolderGuard";
 
-const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trackaudit.info";
-const HOST = typeof window !== "undefined" ? window.location.hostname : "trackaudit.info";
+const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
+const HOST = typeof window !== "undefined" ? window.location.hostname : "trynobot.com";
 const ENDPOINT = ORIGIN + "/v1/decide";
 const GUARD = ORIGIN + "/v1/guard";
 
@@ -24,7 +24,7 @@ function snippets(site: string): Record<Lang, string> {
   const S = site || "YOUR_SITE_ID";
   return {
     php: `<?php
-// TrackAudit server-side shield — paste at the VERY TOP of your page,
+// TryNoBot server-side shield — paste at the VERY TOP of your page,
 // before any HTML is sent. Turns bad visitors away before the page loads.
 $ta_key  = 'YOUR_API_KEY';   // Dashboard → API Keys (create one, paste it here)
 $ta_site = '${S}';
@@ -63,7 +63,7 @@ def _client_ip(request):
     xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
     return xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "")
 
-class TrackAuditShield:
+class TryNoBotShield:
     SKIP = ("/static/", "/media/", "/api/", "/admin/")
 
     def __init__(self, get_response):
@@ -96,8 +96,8 @@ class TrackAuditShield:
         return self.get_response(request)
 
 # settings.py:
-# MIDDLEWARE = ["yourapp.trackaudit_shield.TrackAuditShield", *MIDDLEWARE]`,
-    nginx: `# TrackAudit shield via nginx auth_request — self-hosted, no Cloudflare.
+# MIDDLEWARE = ["yourapp.trackaudit_shield.TryNoBotShield", *MIDDLEWARE]`,
+    nginx: `# TryNoBot shield via nginx auth_request — self-hosted, no Cloudflare.
 # Best for a React build served statically by nginx. Add to your server { } block.
 # (Behind Cloudflare? use $http_cf_connecting_ip instead of $remote_addr for X-TA-IP.)
 
@@ -111,7 +111,7 @@ location / {
     try_files $uri $uri/ /index.html;   # <- your existing page-serving line
 }
 
-# 2) The internal check — asks TrackAudit about this visitor:
+# 2) The internal check — asks TryNoBot about this visitor:
 location = /_ta_guard {
     internal;
     resolver 1.1.1.1 ipv6=off;
@@ -132,7 +132,7 @@ location @ta_denied {
     return 403 "Access denied";
 }
 # Reload nginx after editing:  nginx -t && systemctl reload nginx`,
-    cloudflare: `// TrackAudit shield as a Cloudflare Worker — runs at the edge, before your origin.
+    cloudflare: `// TryNoBot shield as a Cloudflare Worker — runs at the edge, before your origin.
 export default {
   async fetch(request, env, ctx) {
     const d = await fetch("${ENDPOINT}", {
@@ -149,7 +149,7 @@ export default {
     return fetch(request); // allow -> pass through to your site
   },
 };`,
-    node: `// TrackAudit shield as Express middleware. Node 18+ has global fetch.
+    node: `// TryNoBot shield as Express middleware. Node 18+ has global fetch.
 async function trackauditShield(req, res, next) {
   try {
     const r = await fetch("${ENDPOINT}", {

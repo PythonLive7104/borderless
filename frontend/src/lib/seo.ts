@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const BRAND = "TrackAudit";
+const BRAND = "TryNoBot";
 
 function setMeta(attr: "name" | "property", key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);

@@ -1,5 +1,5 @@
 export const BRAND = {
-  name: "TrackAudit",
+  name: "TryNoBot",
   tagline: "See every visitor. Score every click. Protect every campaign.",
   subtitle:
     "Analyze, score and protect incoming traffic with real-time visitor intelligence, fraud detection and campaign analytics.",

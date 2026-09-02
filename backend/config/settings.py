@@ -171,7 +171,7 @@ else:
 
 # Resend requires a verified sender domain; onboarding@resend.dev works for tests.
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@borderless.local")
-BRAND_NAME = os.getenv("BRAND_NAME", "TrackAudit")
+BRAND_NAME = os.getenv("BRAND_NAME", "TryNoBot")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Payments (Bachs — bachs.io). Set these to accept live payments; when blank,
