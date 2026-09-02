@@ -6,9 +6,10 @@ import { websiteApi, type Website } from "../../lib/api";
 
 const ENDPOINT = (typeof window !== "undefined" ? window.location.origin : "https://trackaudit.info") + "/v1/decide";
 
-type Lang = "php" | "cloudflare" | "node" | "curl";
+type Lang = "php" | "django" | "cloudflare" | "node" | "curl";
 const TABS: { id: Lang; label: string }[] = [
   { id: "php", label: "PHP" },
+  { id: "django", label: "Python / Django" },
   { id: "cloudflare", label: "Cloudflare Worker" },
   { id: "node", label: "Node / Express" },
   { id: "curl", label: "Test (cURL)" },
@@ -42,6 +43,55 @@ if (($ta['action'] ?? 'allow') === 'block') { http_response_code(403); exit('Acc
 if (($ta['action'] ?? '') === 'redirect' && !empty($ta['redirect'])) { header('Location: '.$ta['redirect']); exit; }
 // else: allow — carry on rendering your page
 ?>`,
+    django: `# trackaudit_shield.py — save in your Django app, then add it to
+# settings.py MIDDLEWARE (near the top). Blocks bad visitors before your views run.
+# NOTE: this guards pages Django itself serves. If nginx serves your React build
+# directly, put the shield in Cloudflare/nginx instead (Django never sees those loads).
+import json, urllib.request
+from django.http import HttpResponseForbidden, HttpResponseRedirect
+
+TA_ENDPOINT = "${ENDPOINT}"
+TA_KEY  = "YOUR_API_KEY"        # Dashboard -> API Keys (create one, paste it here)
+TA_SITE = "${S}"
+
+def _client_ip(request):
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    return xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "")
+
+class TrackAuditShield:
+    SKIP = ("/static/", "/media/", "/api/", "/admin/")
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Only guard real page views — skip assets, API and admin for speed.
+        if (request.method != "GET" or request.path.startswith(self.SKIP)
+                or "text/html" not in request.META.get("HTTP_ACCEPT", "")):
+            return self.get_response(request)
+        try:
+            data = json.dumps({
+                "site_id": TA_SITE,
+                "ip": _client_ip(request),
+                "ua": request.META.get("HTTP_USER_AGENT", ""),
+                "path": request.path,
+            }).encode()
+            req = urllib.request.Request(TA_ENDPOINT, data=data, headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + TA_KEY,
+            })
+            with urllib.request.urlopen(req, timeout=2) as resp:   # fail open if slow
+                d = json.loads(resp.read() or "{}")
+            if d.get("action") == "block":
+                return HttpResponseForbidden("Access denied")
+            if d.get("action") == "redirect" and d.get("redirect"):
+                return HttpResponseRedirect(d["redirect"])
+        except Exception:
+            pass  # never break your own site on our error
+        return self.get_response(request)
+
+# settings.py:
+# MIDDLEWARE = ["yourapp.trackaudit_shield.TrackAuditShield", *MIDDLEWARE]`,
     cloudflare: `// TrackAudit shield as a Cloudflare Worker — runs at the edge, before your origin.
 export default {
   async fetch(request, env, ctx) {
