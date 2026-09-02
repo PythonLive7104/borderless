@@ -209,7 +209,7 @@ export interface TrafficRule {
   conditions: RuleCondition[]; created_at: string;
 }
 export const RULE_FIELDS = [
-  ["risk_score", "Risk score"], ["classification", "Classification"], ["country", "Country"],
+  ["risk_score", "Risk score"], ["requests_per_min", "Requests per minute"], ["classification", "Classification"], ["country", "Country"],
   ["device", "Device"], ["browser", "Browser"], ["os", "OS"], ["is_bot", "Bot detected"],
   ["is_proxy", "Proxy/Datacenter"], ["utm_source", "UTM source"], ["utm_medium", "UTM medium"],
   ["utm_campaign", "UTM campaign"], ["referrer", "Referrer"], ["ja3", "TLS/JA3 hash"],

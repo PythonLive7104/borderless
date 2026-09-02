@@ -181,6 +181,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
+		Rate:      int(rate),
 		Fields: map[string]string{
 			"classification": result.Classification,
 			"country":        fp.Country,
@@ -292,6 +293,7 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
+		Rate:      int(rate),
 		Fields: map[string]string{
 			"classification": result.Classification,
 			"country":        fp.Country,

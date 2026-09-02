@@ -3,7 +3,7 @@ from apps.organizations.models import Organization
 
 # Fields a condition can test (shared contract with the Go engine).
 FIELD_CHOICES = [
-    ("risk_score", "Risk score"), ("classification", "Classification"),
+    ("risk_score", "Risk score"), ("requests_per_min", "Requests/minute"), ("classification", "Classification"),
     ("country", "Country"), ("device", "Device"), ("browser", "Browser"), ("os", "OS"),
     ("is_bot", "Bot detected"), ("is_proxy", "Proxy/Datacenter"),
     ("utm_source", "UTM source"), ("utm_medium", "UTM medium"), ("utm_campaign", "UTM campaign"),

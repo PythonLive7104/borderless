@@ -40,9 +40,10 @@ function valueLabel(field: string, value: string): string {
 const NUM_OPS = ["gte", "gt", "lte", "lt", "eq", "ne"];
 const ENUM_OPS = ["eq", "ne", "in"];
 const TEXT_OPS = ["eq", "ne", "contains", "in"];
+const NUMERIC_FIELDS = ["risk_score", "requests_per_min"];
 function opsFor(field: string): readonly (readonly [string, string])[] {
   let allow: string[];
-  if (field === "risk_score") allow = NUM_OPS;
+  if (NUMERIC_FIELDS.includes(field)) allow = NUM_OPS;
   else if (FIELD_VALUE_OPTIONS[field] || field === "country") allow = ENUM_OPS;
   else allow = TEXT_OPS;
   return RULE_OPS.filter(([v]) => allow.includes(v));
@@ -55,6 +56,8 @@ function CondValue({ c, onChange }: { c: RuleCondition; onChange: (v: string) =>
   const opts = FIELD_VALUE_OPTIONS[c.field];
   if (c.field === "risk_score")
     return <input type="number" min={0} max={100} value={c.value} onChange={(e) => onChange(e.target.value)} placeholder="0–100" required className={cls} />;
+  if (c.field === "requests_per_min")
+    return <input type="number" min={1} value={c.value} onChange={(e) => onChange(e.target.value)} placeholder="e.g. 30" required className={cls} />;
   if (c.field === "country")
     return (
       <select value={c.value} onChange={(e) => onChange(e.target.value)} required className={cls}>

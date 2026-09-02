@@ -22,7 +22,8 @@ type Rule struct {
 // Event is the flattened context a rule is evaluated against.
 type Event struct {
 	RiskScore int
-	Fields    map[string]string // classification, country, device, browser, os, utm_*, referrer, is_bot, is_proxy
+	Rate      int               // requests/minute from this visitor (rate limiting)
+	Fields    map[string]string // classification, country, device, browser, os, utm_*, referrer, is_bot, is_proxy, path
 }
 
 // Parse decodes the JSON rule list stored in Redis. Nil/invalid -> no rules.
@@ -63,6 +64,9 @@ func matches(r Rule, ev Event) bool {
 func condMatch(c Condition, ev Event) bool {
 	if c.Field == "risk_score" {
 		return numMatch(ev.RiskScore, c.Operator, c.Value)
+	}
+	if c.Field == "requests_per_min" {
+		return numMatch(ev.Rate, c.Operator, c.Value)
 	}
 	actual := strings.ToLower(ev.Fields[c.Field])
 	want := strings.ToLower(strings.TrimSpace(c.Value))
