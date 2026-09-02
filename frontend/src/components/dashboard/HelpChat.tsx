@@ -40,6 +40,7 @@ function findAnswer(question: string): string | null {
 type Msg = { from: "bot" | "user"; text: string; human?: boolean };
 const SUGGESTIONS = [
   "How do I install the tracker?",
+  "How do I actually block bots?",
   "What do the actions mean?",
   "How do I block an IP?",
   "What are the plans?",
