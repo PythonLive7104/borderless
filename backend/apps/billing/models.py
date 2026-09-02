@@ -41,6 +41,10 @@ class Subscription(models.Model):
 
     # Bachs checkout session id for the most recent upgrade attempt.
     bachs_session_id = models.CharField(max_length=120, blank=True, default="")
+    # Plan the user is paying for right now (set at checkout, applied on the
+    # webhook, then cleared). Lets us activate without relying on Bachs echoing
+    # our metadata back in the webhook.
+    pending_plan_slug = models.CharField(max_length=50, blank=True, default="")
 
     def access_state(self):
         """Whether this workspace can use the app, and why.

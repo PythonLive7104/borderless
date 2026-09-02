@@ -145,7 +145,8 @@ def _activate(sub, plan):
     sub.plan = plan
     sub.status = Subscription.Status.ACTIVE
     sub.period_start = timezone.now()
-    sub.save(update_fields=["plan", "status", "period_start"])
+    sub.pending_plan_slug = ""
+    sub.save(update_fields=["plan", "status", "period_start", "pending_plan_slug"])
     _notify_activation(sub, plan)
 
 
@@ -184,9 +185,11 @@ class CheckoutView(views.APIView):
             return Response({"detail": err}, status=502)
         checkout_url = data.get("checkout_url") or data.get("url") or data.get("redirect_url")
         session_id = data.get("id") or data.get("session_id") or ""
-        if session_id:
-            sub.bachs_session_id = session_id
-            sub.save(update_fields=["bachs_session_id"])
+        # Remember what they're buying so the webhook can activate it even if
+        # Bachs doesn't echo our metadata back.
+        sub.bachs_session_id = session_id
+        sub.pending_plan_slug = plan.slug
+        sub.save(update_fields=["bachs_session_id", "pending_plan_slug"])
         if not checkout_url:
             return Response({"detail": "Bachs did not return a checkout URL.", "raw": data}, status=502)
         return Response({"checkout_url": checkout_url})
@@ -209,6 +212,24 @@ def _find_metadata(event: dict) -> dict:
     return {}
 
 
+def _find_session_id(event: dict) -> str:
+    """Find the Bachs checkout/collection id in the webhook body — used to match
+    the subscription we saved it against at checkout."""
+    for path in (("id",), ("data", "id"), ("data", "object", "id"),
+                 ("data", "checkout_session_id"), ("checkout_session_id",), ("session_id",)):
+        node = event
+        ok = True
+        for k in path:
+            if isinstance(node, dict) and k in node:
+                node = node[k]
+            else:
+                ok = False
+                break
+        if ok and isinstance(node, str) and node:
+            return node
+    return ""
+
+
 @method_decorator(csrf_exempt, name="dispatch")
 class BachsWebhookView(views.APIView):
     permission_classes = [permissions.AllowAny]
@@ -229,19 +250,31 @@ class BachsWebhookView(views.APIView):
         except Exception:
             return Response({"detail": "Bad payload."}, status=400)
 
+        import logging
+        log = logging.getLogger("bachs")
         etype = (event.get("type") or event.get("event") or "").lower()
         meta = _find_metadata(event)
-        org_id = meta.get("organization_id")
-        plan_slug = meta.get("plan_slug")
+        session_id = _find_session_id(event)
 
-        # A successful payment can arrive as collection.succeeded or as the
-        # checkout-completed event, depending on Bachs — activate on either.
-        PAID = {"collection.succeeded", "checkout.completed", "checkout_session.completed"}
-        if etype in PAID and org_id and plan_slug:
-            plan = Plan.objects.filter(slug=plan_slug).first()
-            sub = _get_subscription(org_id)
-            if plan and sub:
-                _activate(sub, plan)
-        # collection.failed / abandoned / refund: leave the current plan untouched.
-        # refund.paid: could downgrade; we log it by no-op for the MVP.
+        # A successful payment, matched defensively across Bachs's event names
+        # (collection.succeeded / checkout.completed / *.paid, but not *.failed).
+        paid = any(k in etype for k in ("succeeded", "completed", "paid")) and "fail" not in etype
+        if not paid:
+            log.info("bachs webhook: ignoring event type=%s", etype)
+            return Response({"received": True})
+
+        # Find the subscription: prefer our metadata org id, else the checkout
+        # session id we saved. Find the plan: metadata, else the pending plan.
+        sub = _get_subscription(meta["organization_id"]) if meta.get("organization_id") else None
+        if not sub and session_id:
+            sub = Subscription.objects.filter(bachs_session_id=session_id).first()
+        plan_slug = meta.get("plan_slug") or (sub.pending_plan_slug if sub else "")
+        plan = Plan.objects.filter(slug=plan_slug).first() if plan_slug else None
+
+        if sub and plan:
+            _activate(sub, plan)
+            log.info("bachs webhook: activated org=%s plan=%s (type=%s)", sub.organization_id, plan.slug, etype)
+        else:
+            log.warning("bachs webhook: could NOT activate — type=%s sub_found=%s plan_slug=%r session=%r",
+                        etype, bool(sub), plan_slug, session_id)
         return Response({"received": True})

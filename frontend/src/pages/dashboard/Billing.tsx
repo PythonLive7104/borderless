@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { billingApi, type Plan, type Subscription } from "../../lib/api";
 import Button from "../../components/ui/Button";
@@ -50,6 +51,8 @@ export default function Billing() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [params, setParams] = useSearchParams();
+  const [payMsg, setPayMsg] = useState<{ kind: "confirming" | "done" | "cancelled"; text: string } | null>(null);
   const canManage = current?.role === "owner" || current?.role === "admin";
 
   async function load() {
@@ -61,6 +64,34 @@ export default function Billing() {
     } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
+
+  // After returning from Bachs checkout, poll until the webhook activates the
+  // plan, so the purchase reflects here without a manual refresh.
+  useEffect(() => {
+    const c = params.get("checkout");
+    const clear = () => { params.delete("checkout"); setParams(params, { replace: true }); };
+    if (!c || !current) return;
+    if (c === "cancelled") { setPayMsg({ kind: "cancelled", text: "Checkout was cancelled — you have not been charged." }); clear(); return; }
+    if (c !== "success") return;
+    setPayMsg({ kind: "confirming", text: "Confirming your payment — this can take a few seconds…" });
+    let tries = 0;
+    const iv = setInterval(async () => {
+      tries++;
+      try {
+        const s = await billingApi.subscription(current.id);
+        if (s.status === "active") {
+          setSub(s);
+          setPayMsg({ kind: "done", text: `Payment confirmed — you're now on the ${s.plan.name} plan. A receipt has been emailed to you.` });
+          clearInterval(iv); clear(); return;
+        }
+      } catch { /* keep polling */ }
+      if (tries >= 12) {
+        setPayMsg({ kind: "confirming", text: "Payment received — your plan will update within a minute. Refresh the page, or contact support if it doesn't." });
+        clearInterval(iv); clear();
+      }
+    }, 2000);
+    return () => clearInterval(iv);
+  /* eslint-disable-next-line */ }, [current?.id]);
 
   async function doChange() {
     if (!target) return;
@@ -94,6 +125,16 @@ export default function Billing() {
       </PageNote>
       <h1 className="text-2xl font-extrabold tracking-tight">Billing</h1>
       <p className="mt-1 text-sm text-fg-muted">Manage your workspace subscription.</p>
+
+      {payMsg && (
+        <div className={`mt-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${
+          payMsg.kind === "done" ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+          : payMsg.kind === "cancelled" ? "border-line bg-bg-soft text-fg-muted"
+          : "border-brand/30 bg-brand/5 text-brand"}`}>
+          {payMsg.kind === "confirming" && <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+          <span>{payMsg.kind === "done" ? "✅ " : ""}{payMsg.text}</span>
+        </div>
+      )}
 
       <div className="card shadow-soft mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
         <div>
