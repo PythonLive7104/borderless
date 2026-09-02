@@ -33,6 +33,12 @@ function withHead(html, title, desc) {
   return html.replace("</head>", og + "</head>");
 }
 
+// Blank SPA shell (empty #root) for app routes (dashboard/admin/auth). nginx
+// serves this as the fallback so those routes DON'T flash the pre-rendered
+// landing page before React boots — the shell is empty, so React paints the
+// real page (or its auth spinner) directly.
+fs.writeFileSync(path.join(dist, "_shell.html"), template);
+
 let ok = 0;
 for (const r of routes) {
   let appHtml = "";

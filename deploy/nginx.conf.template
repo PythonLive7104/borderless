@@ -35,5 +35,9 @@ server {
     location /v1/     { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
 
     location /assets/ { root /usr/share/nginx/html; expires 1y; add_header Cache-Control "public, immutable"; }
-    location / { root /usr/share/nginx/html; try_files $uri $uri/ /index.html; }
+    # Marketing routes resolve to their own pre-rendered index.html (via $uri/).
+    # Everything else (dashboard/admin/auth — not pre-rendered) falls back to the
+    # blank SPA shell, NOT the landing page, so a hard refresh doesn't flash the
+    # landing markup before React routes to the real page.
+    location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/ /_shell.html; }
 }
