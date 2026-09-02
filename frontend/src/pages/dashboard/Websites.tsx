@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { websiteApi, type Website } from "../../lib/api";
@@ -10,6 +10,7 @@ import StatusBadge from "../../components/ui/StatusBadge";
 
 export default function Websites() {
   const { current } = useWorkspace();
+  const navigate = useNavigate();
   const [sites, setSites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -28,8 +29,11 @@ export default function Websites() {
   async function create(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
     try {
-      await websiteApi.create({ organization: current!.id, ...form });
-      setOpen(false); setForm({ name: "", domain: "", url: "" }); load();
+      const site = await websiteApi.create({ organization: current!.id, ...form });
+      setOpen(false); setForm({ name: "", domain: "", url: "" });
+      // Take them straight to the new site's install page (snippet + verify),
+      // which now also nudges them to set up Traffic Rules protection.
+      navigate(`/dashboard/websites/${site.id}`);
     } catch (e: any) { setErr(e.data?.detail || e.message); } finally { setBusy(false); }
   }
 

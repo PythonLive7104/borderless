@@ -21,8 +21,8 @@ const actionTone: Record<RuleAction, string> = {
 // Plain-English meaning of each action, shown to guide non-technical users.
 const ACTION_META: Record<RuleAction, { label: string; desc: string }> = {
   allow: { label: "Allow", desc: "Let the visitor through normally. Use this to always trust certain traffic." },
-  redirect: { label: "Redirect to another page", desc: "Send the visitor to a URL you choose — e.g. send bots to a blank or safe page and keep them off your real offer." },
-  block: { label: "Block", desc: "Stop the visitor — they get nothing back. Use for clearly bad traffic." },
+  redirect: { label: "Redirect (turn them away)", desc: "The only action that stops a visitor in real time: their browser is sent to a URL you choose (e.g. a blank or safe page), so bots and fraud never reach your real page. Use this to actually keep bad traffic out." },
+  block: { label: "Block (label only)", desc: "Marks the visitor as blocked in your Click Log and reports — but with the tracking snippet they still load the page. To truly turn a visitor away in real time, use “Redirect” instead." },
   review: { label: "Flag for review", desc: "Don't stop anyone — just mark these visits so you can inspect them later in Visitors / Click Log." },
   tag: { label: "Add a label (tag)", desc: "Attach a label of your choice for filtering and reports. The visitor is not affected." },
 };
@@ -78,10 +78,13 @@ export default function TrafficRules() {
   const [rules, setRules] = useState<TrafficRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState<{ name: string; priority: string; action: RuleAction; tag: string; redirect_url: string; conditions: RuleCondition[] }>(
-    { name: "", priority: "100", action: "review", tag: "", redirect_url: "", conditions: [emptyCond()] });
+  const [presetUrl, setPresetUrl] = useState("");
+  const [presetBusy, setPresetBusy] = useState(false);
+  const blank = { name: "", priority: "100", action: "review" as RuleAction, tag: "", redirect_url: "", conditions: [emptyCond()] };
+  const [form, setForm] = useState<{ name: string; priority: string; action: RuleAction; tag: string; redirect_url: string; conditions: RuleCondition[] }>(blank);
   const canManage = current?.role === "owner" || current?.role === "admin";
 
   async function load() {
@@ -110,17 +113,52 @@ export default function TrafficRules() {
   const addCond = () => setForm((f) => ({ ...f, conditions: [...f.conditions, emptyCond()] }));
   const rmCond = (i: number) => setForm((f) => ({ ...f, conditions: f.conditions.filter((_, j) => j !== i) }));
 
-  async function create(e: React.FormEvent) {
+  function openCreate() { setEditingId(null); setForm(blank); setErr(""); setOpen(true); }
+  function openEdit(r: TrafficRule) {
+    setEditingId(r.id);
+    setForm({
+      name: r.name, priority: String(r.priority), action: r.action, tag: r.tag || "",
+      redirect_url: r.redirect_url || "",
+      conditions: r.conditions.length
+        ? r.conditions.map((c) => ({ field: c.field, operator: c.operator, value: c.value }))
+        : [emptyCond()],
+    });
+    setErr(""); setOpen(true);
+  }
+  function closeModal() { setOpen(false); setEditingId(null); }
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
+    const payload = {
+      name: form.name, priority: Number(form.priority), action: form.action,
+      tag: form.tag, redirect_url: form.redirect_url, conditions: form.conditions,
+    };
     try {
-      await ruleApi.create({
-        organization: current!.id, name: form.name, priority: Number(form.priority),
-        action: form.action, tag: form.tag, redirect_url: form.redirect_url, conditions: form.conditions,
-      });
-      setOpen(false);
-      setForm({ name: "", priority: "100", action: "review", tag: "", redirect_url: "", conditions: [emptyCond()] });
-      load();
+      if (editingId) await ruleApi.update(editingId, payload);
+      else await ruleApi.create({ organization: current!.id, ...payload });
+      closeModal(); setForm(blank); load();
     } catch (e: any) { setErr(e.data?.detail || e.data?.conditions?.[0] || e.message); } finally { setBusy(false); }
+  }
+
+  // One-click starter protection for people who don't know where to begin.
+  // With a redirect URL, fraud & bots are actually turned away in real time;
+  // without one they're labeled as blocked. Suspicious traffic is flagged.
+  async function applyRecommended() {
+    if (!current) return;
+    setPresetBusy(true); setErr("");
+    const badAction: RuleAction = presetUrl ? "redirect" : "block";
+    const mk = (name: string, cls: string, priority: number, action: RuleAction) =>
+      ruleApi.create({
+        organization: current.id, name, priority, action, tag: "",
+        redirect_url: action === "redirect" ? presetUrl : "",
+        conditions: [{ field: "classification", operator: "eq", value: cls }],
+      });
+    try {
+      await mk("Turn away fraud", "fraud", 10, badAction);
+      await mk("Turn away bots", "bot", 20, badAction);
+      await mk("Flag suspicious for review", "suspicious", 30, "review");
+      setPresetUrl(""); load();
+    } catch (e: any) { setErr(e.data?.detail || e.message); } finally { setPresetBusy(false); }
   }
 
   async function toggle(r: TrafficRule) {
@@ -146,7 +184,7 @@ export default function TrafficRules() {
           <h1 className="text-2xl font-extrabold tracking-tight">Traffic Rules</h1>
           <p className="mt-1 text-sm text-fg-muted">Filter by risk, country, device, OS, browser, JA3 and more — or manage IP allow/deny lists.</p>
         </div>
-        {canManage && tab === "rules" && <Button onClick={() => setOpen(true)}>+ New rule</Button>}
+        {canManage && tab === "rules" && <Button onClick={openCreate}>+ New rule</Button>}
       </div>
 
       <div className="mt-5 flex gap-6 border-b border-line">
@@ -159,10 +197,37 @@ export default function TrafficRules() {
       ) : loading ? (
         <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
       ) : rules.length === 0 ? (
-        <div className="card shadow-soft mt-6 p-10 text-center">
-          <h2 className="text-lg font-bold">No rules yet</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-fg-muted">Create a rule to automatically allow, review, block or tag traffic.</p>
-          {canManage && <Button className="mt-4" onClick={() => setOpen(true)}>+ New rule</Button>}
+        <div className="mt-6 space-y-4">
+          {canManage && (
+            <div className="card shadow-soft border-brand/30 bg-brand/5 p-6">
+              <h2 className="text-lg font-bold">Protect this workspace in one click</h2>
+              <p className="mt-1.5 max-w-xl text-sm text-fg-muted">
+                Not sure where to start? We'll add three recommended rules: <b>fraud</b> and <b>bots</b> are
+                turned away, and <b>suspicious</b> visitors are flagged so you can review them.
+              </p>
+              <label className="mt-4 block max-w-md">
+                <span className="mb-1.5 block text-sm font-semibold">Where should we send fraud &amp; bots? <span className="font-normal text-fg-dim">(optional)</span></span>
+                <input type="url" value={presetUrl} onChange={(e) => setPresetUrl(e.target.value)}
+                  placeholder="https://your-site.com/blocked"
+                  className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+              </label>
+              <p className="mt-1.5 max-w-md text-xs text-fg-dim">
+                With a page here, bad visitors are <b>redirected away in real time</b>. Leave it blank and they're
+                just <b>labeled</b> in your reports (they still see your page).
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button onClick={applyRecommended} disabled={presetBusy}>{presetBusy ? "Setting up…" : "Add recommended protection"}</Button>
+                <Button variant="ghost" onClick={openCreate}>Build my own rule</Button>
+              </div>
+              {err && <div className="mt-3 rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
+            </div>
+          )}
+          {!canManage && (
+            <div className="card shadow-soft p-10 text-center">
+              <h2 className="text-lg font-bold">No rules yet</h2>
+              <p className="mx-auto mt-2 max-w-sm text-sm text-fg-muted">An owner or admin can set up traffic protection here.</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-6 space-y-3">
@@ -183,7 +248,8 @@ export default function TrafficRules() {
                   </span>
                   {canManage && (
                     <>
-                      <button onClick={() => toggle(r)} title={r.active ? "Active" : "Inactive"}
+                      <button onClick={() => openEdit(r)} className="text-sm font-medium text-brand hover:underline">Edit</button>
+                      <button onClick={() => toggle(r)} title={r.active ? "Active — click to pause" : "Paused — click to activate"}
                         className={`h-6 w-11 rounded-full p-0.5 transition ${r.active ? "bg-brand" : "bg-bg-mute"}`}>
                         <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${r.active ? "translate-x-5" : ""}`} />
                       </button>
@@ -208,8 +274,8 @@ export default function TrafficRules() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New traffic rule">
-        <form onSubmit={create} className="space-y-4">
+      <Modal open={open} onClose={closeModal} title={editingId ? "Edit traffic rule" : "New traffic rule"}>
+        <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Rule name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Block mobile bots" />
             <Field label="Priority" type="number" value={form.priority} onChange={(v) => setForm({ ...form, priority: v })} />
@@ -268,7 +334,9 @@ export default function TrafficRules() {
           </div>
 
           {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
-          <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Create rule"}</Button>
+          <Button type="submit" className="w-full" disabled={busy}>
+            {busy ? (editingId ? "Saving…" : "Creating…") : (editingId ? "Save changes" : "Create rule")}
+          </Button>
         </form>
       </Modal>
     </div>

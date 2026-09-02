@@ -77,6 +77,15 @@ export default function WebsiteDetail() {
           </dl>
         </div>
       </div>
+
+      {/* Step 2: nudge new sites to set up protection so bad traffic doesn't just flood in. */}
+      <div className="card shadow-soft mt-5 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-brand/5 p-5">
+        <div>
+          <h2 className="font-bold">Next: protect this traffic</h2>
+          <p className="mt-1 max-w-xl text-sm text-fg-muted">Detection alone won't turn bad visitors away. Set up Traffic Rules to redirect fraud &amp; bots and flag suspicious visitors — one click applies our recommended protection.</p>
+        </div>
+        <Button to="/dashboard/traffic-rules">Set up protection →</Button>
+      </div>
     </div>
   );
 }

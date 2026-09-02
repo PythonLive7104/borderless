@@ -69,7 +69,7 @@ export default function Landing() {
               <Button to="/signup" size="lg">Start Free <IArrow width={18} /></Button>
               <Button href="#demo" variant="light" size="lg">View Demo</Button>
             </div>
-            <p className="mt-4 text-sm text-slate-400">No credit card required · 14-day trial · Cancel anytime</p>
+            <p className="mt-4 text-sm text-slate-400">No credit card required · 7-day trial · Cancel anytime</p>
           </div>
           <div id="demo" className="fade-up lg:pl-4"><DashboardPreview /></div>
         </div>

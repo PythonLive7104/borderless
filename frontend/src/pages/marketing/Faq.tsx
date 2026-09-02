@@ -9,7 +9,7 @@ const QA = [
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],
-  ["Is there a free trial?", "Every plan includes a 14-day free trial with no credit card required."],
+  ["Is there a free trial?", "Every plan includes a 7-day free trial with no credit card required."],
 ];
 
 export default function Faq() {
