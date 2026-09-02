@@ -5,7 +5,7 @@ import LogoStrip from "../../components/marketing/LogoStrip";
 import DashboardPreview from "../../components/marketing/DashboardPreview";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
 import { BRAND } from "../../lib/brand";
-import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow } from "../../components/ui/icons";
+import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock } from "../../components/ui/icons";
 
 const FEATURES = [
   { icon: IRadar, title: "Traffic Intelligence", desc: "See every visitor and session with rich device, network and geo signals in real time." },
@@ -14,6 +14,8 @@ const FEATURES = [
   { icon: IChart, title: "Campaign Analytics", desc: "Break down quality, sources, geos and devices with fast, filterable reports." },
   { icon: ITarget, title: "Conversion Tracking", desc: "Attribute conversions and revenue back to campaigns and traffic quality." },
   { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
+  { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
+  { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
 ];
 
 const STEPS = [

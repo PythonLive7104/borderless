@@ -1,6 +1,6 @@
 import { useSeo } from "../../lib/seo";
 import FeaturePage from "../../components/marketing/FeaturePage";
-import { IRadar, IShield, IGauge, IChart, ITarget, IBolt } from "../../components/ui/icons";
+import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IServer, ILock } from "../../components/ui/icons";
 export default function Features() {
   useSeo("Features", "Real-time scoring, JS + TLS/JA3 fingerprinting, traffic rules, IP allow/deny, A/B testing and more.");
   return <FeaturePage eyebrow="Features"
@@ -11,6 +11,8 @@ export default function Features() {
       { icon: IShield, title: "Bot & fraud detection", desc: "Datacenter IPs, proxies, VPNs, headless browsers and automation caught in real time." },
       { icon: IGauge, title: "Explainable risk scores", desc: "A 0–100 score per visitor with the exact contributing signals — never a black box." },
       { icon: IBolt, title: "Traffic rules engine", desc: "Allow, review, block or tag traffic with a visual IF/THEN rule builder." },
+      { icon: IServer, title: "Server-side shield", desc: "Block bots before your page loads — enforce rules at your server or edge with drop-in PHP, Django, nginx, Cloudflare or Node snippets." },
+      { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive paths like /admin, /wp-login or /downloads from bots and fraud." },
       { icon: IChart, title: "Analytics & reports", desc: "Filterable reports across campaigns, geos, devices and sources with CSV export." },
       { icon: ITarget, title: "Conversion attribution", desc: "Tie revenue back to campaigns and traffic quality to see what actually converts." },
     ]}

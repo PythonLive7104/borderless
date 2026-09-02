@@ -15,3 +15,5 @@ export const ICheck = (p: SVGProps<SVGSVGElement>) => (<svg {...s(p)}><path d="M
 export const IArrow = (p: SVGProps<SVGSVGElement>) => (<svg {...s(p)}><path d="M5 12h14M13 6l6 6-6 6"/></svg>);
 export const IGlobe = (p: SVGProps<SVGSVGElement>) => (<svg {...s(p)}><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>);
 export const ICode = (p: SVGProps<SVGSVGElement>) => (<svg {...s(p)}><path d="M8 9l-3 3 3 3M16 9l3 3-3 3M13 6l-2 12"/></svg>);
+export const IServer = (p: SVGProps<SVGSVGElement>) => (<svg {...s(p)}><rect x="4" y="4" width="16" height="7" rx="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></svg>);
+export const ILock = (p: SVGProps<SVGSVGElement>) => (<svg {...s(p)}><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 15v2"/></svg>);
