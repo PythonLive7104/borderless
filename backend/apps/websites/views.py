@@ -33,8 +33,8 @@ class WebsiteViewSet(viewsets.ModelViewSet):
         from rest_framework.exceptions import ValidationError
         if is_on_trial(org.id) and Website.objects.filter(organization=org).count() >= TRIAL_MAX_WEBSITES:
             raise ValidationError(
-                f"Your free trial can protect {TRIAL_MAX_WEBSITES} website. "
-                "Upgrade to a paid plan to add more.")
+                f"You're on the free trial, which can protect {TRIAL_MAX_WEBSITES} website. "
+                "To add and protect more websites, upgrade to a paid plan on the Billing page.")
         website = serializer.save()
         from apps.rules.sync import publish_org
         publish_org(website.organization_id)

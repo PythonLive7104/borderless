@@ -12,11 +12,27 @@ export const tokens = {
   clear() { localStorage.removeItem(ACCESS); localStorage.removeItem(REFRESH); },
 };
 
+// Pull a human message out of whatever shape DRF returned: a plain string,
+// {detail: "..."}, a bare list ["..."] (ValidationError with a string), or
+// field errors {field: ["..."]} / {non_field_errors: ["..."]}.
+export function errText(data: any, fallback = "Something went wrong. Please try again."): string {
+  if (data == null) return fallback;
+  if (typeof data === "string") return data;
+  if (typeof data.detail === "string") return data.detail;
+  if (Array.isArray(data)) return typeof data[0] === "string" ? data[0] : fallback;
+  for (const k of Object.keys(data)) {
+    const v = data[k];
+    if (typeof v === "string") return v;
+    if (Array.isArray(v) && typeof v[0] === "string") return v[0];
+  }
+  return fallback;
+}
+
 export class ApiError extends Error {
   status: number;
   data: any;
   constructor(status: number, data: any) {
-    super(typeof data === "string" ? data : data?.detail || "Request failed");
+    super(errText(data, "Request failed"));
     this.status = status;
     this.data = data;
   }

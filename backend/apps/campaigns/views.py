@@ -36,8 +36,8 @@ class CampaignViewSet(viewsets.ModelViewSet):
         from rest_framework.exceptions import ValidationError
         if is_on_trial(org_id) and Campaign.objects.filter(website__organization_id=org_id).count() >= TRIAL_MAX_CAMPAIGNS:
             raise ValidationError(
-                f"Your free trial can track {TRIAL_MAX_CAMPAIGNS} campaign. "
-                "Upgrade to a paid plan to add more.")
+                f"You're on the free trial, which can track {TRIAL_MAX_CAMPAIGNS} campaign. "
+                "To create more campaigns, upgrade to a paid plan on the Billing page.")
         serializer.save()
 
     def perform_update(self, serializer):
