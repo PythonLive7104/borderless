@@ -289,6 +289,12 @@ export default function TrafficRules() {
               <span className="text-xs font-bold uppercase tracking-wide text-fg-dim">IF all conditions match</span>
               <button type="button" onClick={addCond} className="text-xs font-semibold text-brand hover:underline">+ condition</button>
             </div>
+            <p className="mb-2.5 rounded-lg bg-brand/5 px-3 py-2 text-[11px] leading-relaxed text-fg-muted">
+              A visitor must match <b>every</b> condition below for this rule to act. Each condition you add makes the
+              rule <b>stricter</b> — it catches <b>fewer</b> visitors, not more. To cover a lot of traffic, use just
+              one condition (e.g. only <b>Country is United States</b>). Add a second only to narrow it down further
+              (e.g. United States <b>and</b> Bot detected is Yes).
+            </p>
             <div className="space-y-2">
               {form.conditions.map((c, i) => (
                 <div key={i} className="flex items-center gap-1.5">
