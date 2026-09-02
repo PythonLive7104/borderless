@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { billingApi, type Plan, type Subscription } from "../../lib/api";
 import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
 import PageNote from "../../components/dashboard/PageNote";
 
 const statusTone: Record<string, string> = {
@@ -45,6 +46,10 @@ export default function Billing() {
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   const canManage = current?.role === "owner" || current?.role === "admin";
 
   async function load() {
@@ -57,19 +62,27 @@ export default function Billing() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
-  async function change(slug: string) {
-    if (!confirm(`Switch to the ${slug} plan?`)) return;
-    const res = await billingApi.checkout(current!.id, slug);
-    if (res.checkout_url) {
-      window.location.href = res.checkout_url;  // redirect to Bachs hosted checkout
-      return;
-    }
-    // activated instantly (free plan or dev without a payment key)
-    setSub(await billingApi.subscription(current!.id));
+  async function doChange() {
+    if (!target) return;
+    setBusy(true); setErr("");
+    try {
+      const res = await billingApi.checkout(current!.id, target.slug);
+      if (res.checkout_url) {
+        window.location.href = res.checkout_url;  // redirect to Bachs hosted checkout
+        return;
+      }
+      // activated instantly (free plan or no live payment key configured yet)
+      setSub(await billingApi.subscription(current!.id));
+      setTarget(null);
+    } catch (e: any) { setErr(e.data?.detail || e.message || "Could not change plan. Please try again."); }
+    finally { setBusy(false); }
   }
-  async function cancel() {
-    if (!confirm("Cancel your subscription?")) return;
-    setSub(await billingApi.cancel(current!.id));
+  async function doCancel() {
+    setBusy(true); setErr("");
+    try {
+      setSub(await billingApi.cancel(current!.id));
+      setCancelOpen(false);
+    } catch (e: any) { setErr(e.data?.detail || e.message); } finally { setBusy(false); }
   }
 
   if (loading || !sub) return <div className="grid place-items-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>;
@@ -91,7 +104,7 @@ export default function Billing() {
           </div>
           <div className="mt-1 text-sm text-fg-muted">${sub.plan.price}/month · renews {new Date(sub.period_end).toLocaleDateString()}</div>
         </div>
-        {canManage && sub.status !== "canceled" && <Button variant="outline" onClick={cancel}>Cancel subscription</Button>}
+        {canManage && sub.status !== "canceled" && <Button variant="outline" onClick={() => setCancelOpen(true)}>Cancel subscription</Button>}
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
@@ -126,7 +139,7 @@ export default function Billing() {
               {isCurrent ? (
                 <div className="mt-5 rounded-full bg-bg-mute py-2 text-center text-sm font-semibold text-fg-muted">Current plan</div>
               ) : canManage ? (
-                <Button onClick={() => change(p.slug)} variant={p.price > sub.plan.price ? "primary" : "outline"} className="mt-5 w-full">
+                <Button onClick={() => { setErr(""); setTarget(p); }} variant={p.price > sub.plan.price ? "primary" : "outline"} className="mt-5 w-full">
                   {p.price > sub.plan.price ? "Upgrade" : "Switch"}
                 </Button>
               ) : <div className="mt-5 text-center text-xs text-fg-dim">Ask an admin to change plans</div>}
@@ -134,6 +147,43 @@ export default function Billing() {
           );
         })}
       </div>
+
+      {/* Plan-switch confirmation (replaces the browser confirm popup) */}
+      <Modal open={!!target} onClose={() => !busy && setTarget(null)} title={target && sub && target.price > sub.plan.price ? "Upgrade your plan" : "Switch plan"}>
+        {target && sub && (
+          <div className="space-y-4">
+            <p className="text-sm text-fg-muted">
+              Move to the <b>{target.name}</b> plan at <b>${target.price}/month</b>
+              {" "}({target.monthly_events.toLocaleString()} events/mo, {target.retention_days}-day retention).
+            </p>
+            <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
+              You'll be taken to our secure checkout (Bachs) to pay — card, mobile money or crypto. Your plan
+              activates as soon as payment succeeds. You can change or cancel anytime.
+            </p>
+            {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setTarget(null)} disabled={busy}>Cancel</Button>
+              <Button className="flex-1" onClick={doChange} disabled={busy}>
+                {busy ? "Starting…" : (target.price > sub.plan.price ? "Continue to payment" : "Switch plan")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Cancel-subscription confirmation */}
+      <Modal open={cancelOpen} onClose={() => !busy && setCancelOpen(false)} title="Cancel subscription">
+        <div className="space-y-4">
+          <p className="text-sm text-fg-muted">
+            Your workspace will lose paid access at the end of the current billing period. You can resubscribe anytime.
+          </p>
+          {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCancelOpen(false)} disabled={busy}>Keep my plan</Button>
+            <Button className="flex-1" onClick={doCancel} disabled={busy}>{busy ? "Cancelling…" : "Cancel subscription"}</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
