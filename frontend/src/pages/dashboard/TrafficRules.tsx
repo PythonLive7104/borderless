@@ -285,7 +285,7 @@ export default function TrafficRules() {
         </div>
       )}
 
-      <Modal open={open} onClose={closeModal} title={editingId ? "Edit traffic rule" : "New traffic rule"}>
+      <Modal open={open} onClose={closeModal} size="xl" title={editingId ? "Edit traffic rule" : "New traffic rule"}>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Rule name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Block mobile bots" />
