@@ -22,6 +22,15 @@ class ShortLink(models.Model):
     title = models.CharField(max_length=120, blank=True)
     active = models.BooleanField(default=True)
 
+    class BotAction(models.TextChoices):
+        DESTINATION = "off", "Send them to the destination too"
+        DECOY = "decoy", "A decoy page"
+        NOTFOUND = "notfound", "A 404 page"
+        BLANK = "blank", "A blank page"
+
+    # What automated traffic gets. Real visitors always go to the destination.
+    bot_action = models.CharField(max_length=10, choices=BotAction.choices, default=BotAction.DECOY)
+
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)

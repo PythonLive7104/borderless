@@ -156,16 +156,17 @@ export const websiteApi = {
 };
 
 // ---- short links ----
+export type BotAction = "off" | "decoy" | "notfound" | "blank";
 export interface ShortLink {
   id: number; organization: number; website: number | null; slug: string;
-  destination_url: string; title: string; active: boolean;
+  destination_url: string; title: string; active: boolean; bot_action: BotAction;
   clicks: number; human_clicks: number; bot_clicks: number;
   url_safe: boolean | null; url_threats: string[]; url_scanned_at: string | null;
   short_url: string; quality: number; created_at: string;
 }
 export const linkApi = {
   list: (orgId: number) => http.get<{ results: ShortLink[] }>(`/links/?organization=${orgId}`),
-  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; website?: number | null }) =>
+  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; bot_action?: BotAction }) =>
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
   remove: (id: number) => http.del(`/links/${id}/`),

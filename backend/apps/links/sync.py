@@ -1,8 +1,13 @@
 """Publish short links to Redis (read by the Go engine's /l/ redirect) and scan
 their destinations for threats."""
 import json
+from django.conf import settings
 from django.utils import timezone
 from apps.rules.sync import _r
+
+
+def _bot_base() -> str:
+    return (getattr(settings, "SHORTLINK_BASE", "") or settings.FRONTEND_URL).rstrip("/")
 
 
 def _payload(link) -> str:
@@ -11,6 +16,8 @@ def _payload(link) -> str:
         "destination": link.destination_url,
         "tid": tid,
         "slug": link.slug,
+        "bot_action": link.bot_action,          # off | decoy | notfound | blank
+        "decoy_url": _bot_base() + "/decoy.html",
         # a link that's inactive OR flagged unsafe stops redirecting
         "active": bool(link.active and link.url_safe is not False),
     })

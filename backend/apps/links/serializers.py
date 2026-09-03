@@ -12,8 +12,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShortLink
         fields = ["id", "organization", "website", "slug", "destination_url", "title",
-                  "active", "clicks", "human_clicks", "bot_clicks", "url_safe", "url_threats",
-                  "url_scanned_at", "short_url", "quality", "created_at"]
+                  "active", "bot_action", "clicks", "human_clicks", "bot_clicks", "url_safe",
+                  "url_threats", "url_scanned_at", "short_url", "quality", "created_at"]
         read_only_fields = ["clicks", "human_clicks", "bot_clicks", "url_safe", "url_threats",
                             "url_scanned_at", "created_at"]
 

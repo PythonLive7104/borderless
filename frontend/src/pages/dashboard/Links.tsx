@@ -1,34 +1,45 @@
 import { useEffect, useState } from "react";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, websiteApi, type ShortLink, type Website } from "../../lib/api";
+import { linkApi, type ShortLink, type BotAction } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import NoData from "../../components/dashboard/NoData";
 
+const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
+const randSlug = () => Math.random().toString(36).slice(2, 10);
+
+const BOT_OPTIONS: { value: BotAction; label: string; desc: string }[] = [
+  { value: "decoy", label: "A decoy page", desc: "Looks like a real page and wastes their time." },
+  { value: "notfound", label: "Nothing — a 404", desc: "Looks like the link doesn't exist." },
+  { value: "blank", label: "A blank page", desc: "Quietly gives them nothing." },
+  { value: "off", label: "Send them through too", desc: "No filtering — bots also reach your destination." },
+];
+const BOT_LABEL: Record<BotAction, string> = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
+
 export default function Links() {
   const { current } = useWorkspace();
   const [rows, setRows] = useState<ShortLink[]>([]);
-  const [sites, setSites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
-  const [form, setForm] = useState({ destination_url: "", title: "", slug: "", website: "" });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy" });
   const canManage = current?.role === "owner" || current?.role === "admin";
 
   async function load() {
     if (!current) return;
     setLoading(true);
-    try {
-      const [l, w] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id)]);
-      setRows(l.results); setSites(w.results);
-    } finally { setLoading(false); }
+    try { setRows((await linkApi.list(current.id)).results); } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
+  function openCreate() {
+    setErr(""); setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy" }); setOpen(true);
+  }
   async function create(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
     try {
@@ -37,9 +48,9 @@ export default function Links() {
         destination_url: form.destination_url,
         title: form.title || undefined,
         slug: form.slug || undefined,
-        website: form.website ? Number(form.website) : null,
+        bot_action: form.bot_action,
       });
-      setOpen(false); setForm({ destination_url: "", title: "", slug: "", website: "" }); load();
+      setOpen(false); load();
     } catch (e: any) { setErr(e.data?.slug?.[0] || e.data?.destination_url?.[0] || e.data?.detail || e.message); }
     finally { setBusy(false); }
   }
@@ -54,16 +65,16 @@ export default function Links() {
   return (
     <div>
       <PageNote id="links">
-        Create short, branded links for your ads and campaigns. Every click is <b>scored by the bot engine</b> —
-        real people go to your destination, and bots follow your <b>Traffic Rules</b>. Attach a website to a link
-        so its rules apply. Destinations are <b>scanned for malware/phishing</b> and unsafe links are auto-disabled.
+        Create short, branded links for your ads and campaigns. Every click is <b>screened by the bot engine</b> —
+        <b> real people always go to your destination</b>, and you choose what <b>bots</b> get (a decoy page, a 404,
+        or nothing). Destinations are <b>scanned for malware/phishing</b> and unsafe links are auto-disabled.
       </PageNote>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Links</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Link Shortener</h1>
           <p className="mt-1 text-sm text-fg-muted">Short links with built-in bot filtering &amp; click analytics.</p>
         </div>
-        {canManage && <Button onClick={() => { setErr(""); setOpen(true); }}>+ New link</Button>}
+        {canManage && <Button onClick={openCreate}>+ New link</Button>}
       </div>
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
@@ -84,6 +95,7 @@ export default function Links() {
                     <span className="text-xs text-fg-dim">{copied === l.id ? "Copied ✓" : "Copy"}</span>
                   </button>
                   <div className="mt-1 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
+                  <div className="mt-1 text-xs text-fg-dim">Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b></div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                   <div className="text-center"><div className="font-bold tabular-nums">{l.clicks}</div><div className="text-[11px] text-fg-dim">clicks</div></div>
@@ -105,22 +117,43 @@ export default function Links() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New short link">
+      <Modal open={open} onClose={() => setOpen(false)} title="Create a short link" size="lg">
         <form onSubmit={create} className="space-y-4">
-          <Field label="Destination URL" type="url" value={form.destination_url} onChange={(v) => setForm({ ...form, destination_url: v })} placeholder="https://your-offer.com/landing" />
-          <Field label="Title (optional)" required={false} value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Summer promo" />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Custom slug (optional)" required={false} value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="auto" />
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold">Apply rules from (optional)</span>
-              <select value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
-                className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
-                <option value="">No rules — send all clicks through</option>
-                {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
+          {/* live preview */}
+          <div className="rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
+            <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Your link</div>
+            <div className="mt-0.5 break-all font-mono text-sm font-semibold text-brand">{ORIGIN}/l/{form.slug || "…"}</div>
           </div>
-          <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">Attach a website to filter bots with its Traffic Rules (e.g. send bots to a block page). Leave it as "No rules" to just shorten &amp; track clicks.</p>
+
+          <Field label="Where should it send people?" type="url" value={form.destination_url} onChange={(v) => setForm({ ...form, destination_url: v })} placeholder="https://your-offer.com/landing" />
+          <Field label="Title (optional)" required={false} value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Summer promo" />
+
+          <div>
+            <span className="mb-1.5 block text-sm font-semibold">Link ending</span>
+            <div className="flex gap-2">
+              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="offer"
+                className="min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+              <Button type="button" variant="outline" onClick={() => setForm({ ...form, slug: randSlug() })}>Regenerate</Button>
+            </div>
+            <p className="mt-1 text-xs text-fg-dim">Type your own, or Regenerate for a random one. Longer is harder to guess.</p>
+          </div>
+
+          <div>
+            <span className="mb-1.5 block text-sm font-semibold">What should bots get instead?</span>
+            <p className="mb-2 text-xs text-fg-dim">Real visitors always go to your destination. This only affects traffic we flag as automated.</p>
+            <div className="space-y-2">
+              {BOT_OPTIONS.map((o) => (
+                <label key={o.value} className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${form.bot_action === o.value ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
+                  <input type="radio" name="bot_action" checked={form.bot_action === o.value} onChange={() => setForm({ ...form, bot_action: o.value })} className="mt-0.5" />
+                  <span>
+                    <span className="block text-sm font-semibold">{o.label}</span>
+                    <span className="block text-xs text-fg-muted">{o.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Create link"}</Button>
         </form>
