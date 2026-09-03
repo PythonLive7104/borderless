@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { linkApi, type ShortLink, type BotAction } from "../../lib/api";
+import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
@@ -30,12 +31,12 @@ export default function Links() {
     { destination_url: "", title: "", slug: "", bot_action: "decoy" });
   const canManage = current?.role === "owner" || current?.role === "admin";
 
-  async function load() {
+  async function load(silent = false) {
     if (!current) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try { setRows((await linkApi.list(current.id)).results); } finally { setLoading(false); }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
+  useLivePoll(load, [current?.id]);
 
   function openCreate() {
     setErr(""); setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy" }); setOpen(true);

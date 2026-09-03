@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useLivePoll } from "../../lib/useLivePoll";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -30,9 +31,9 @@ export default function Overview() {
   const [data, setData] = useState<OverviewT | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useLivePoll((silent) => {
     if (!current) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     analyticsApi.overview(current.id, range).then(setData).finally(() => setLoading(false));
   }, [current?.id, range]);
 
