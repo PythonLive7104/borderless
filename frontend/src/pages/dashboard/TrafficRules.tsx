@@ -331,10 +331,11 @@ export default function TrafficRules() {
 
             {form.action === "redirect" && (
               <label className="mt-3 block">
-                <span className="mb-1.5 block text-sm font-semibold">Send them to this URL</span>
+                <span className="mb-1.5 block text-sm font-semibold">Send them to this page</span>
                 <input type="url" value={form.redirect_url} onChange={(e) => setForm({ ...form, redirect_url: e.target.value })}
-                  placeholder="https://example.com/safe-page" required
+                  placeholder="https://yoursite.com/unauthorized" required
                   className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                <p className="mt-1.5 text-xs text-fg-dim">Any page you like — e.g. an <b>"Unauthorised access"</b> page, your <b>404</b> page, or a blank page. Make a simple page for it if you don't have one, then paste its full link here.</p>
               </label>
             )}
             {form.action === "tag" && (
