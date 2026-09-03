@@ -56,6 +56,18 @@ class Command(BaseCommand):
                     r.xack(STREAM, GROUP, entry_id)
 
     def _ingest(self, f: dict):
+        # Short-link click: bump the link's counters (works even without a site).
+        slug = f.get("slug")
+        if slug:
+            from apps.links.models import ShortLink
+            from django.db.models import F
+            is_human = f.get("classification") == "human"
+            ShortLink.objects.filter(slug=slug).update(
+                clicks=F("clicks") + 1,
+                human_clicks=F("human_clicks") + (1 if is_human else 0),
+                bot_clicks=F("bot_clicks") + (0 if is_human else 1),
+            )
+
         site = Website.objects.filter(tracking_id=f.get("site_id")).first()
         if not site:
             return  # unknown site — drop

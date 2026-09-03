@@ -22,6 +22,7 @@ const NAV: Group[] = [
     { label: "Campaigns", to: "/dashboard/campaigns" },
     { label: "Traffic Rules", to: "/dashboard/traffic-rules" },
     { label: "Shield", to: "/dashboard/shield" },
+    { label: "Links", to: "/dashboard/links" },
     { label: "Bot Scanner", to: "/dashboard/scanner" },
     { label: "Visitors", to: "/dashboard/visitors" },
     { label: "Click Log", to: "/dashboard/click-log" },

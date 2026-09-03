@@ -37,6 +37,7 @@ server {
     location /static/ { set $up http://backend:8000;  proxy_pass $up; include /etc/nginx/proxy.inc; }
     location = /bl.js { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
     location /v1/     { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
+    location /l/      { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
 
     location /assets/ { root /usr/share/nginx/html; expires 1y; add_header Cache-Control "public, immutable"; }
     # Marketing routes resolve to their own pre-rendered index.html (via $uri/).

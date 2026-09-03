@@ -33,6 +33,7 @@ const Campaigns = lazy(() => import("./pages/dashboard/Campaigns"));
 const CampaignDetail = lazy(() => import("./pages/dashboard/CampaignDetail"));
 const TrafficRules = lazy(() => import("./pages/dashboard/TrafficRules"));
 const Shield = lazy(() => import("./pages/dashboard/Shield"));
+const Links = lazy(() => import("./pages/dashboard/Links"));
 const BotScanner = lazy(() => import("./pages/dashboard/BotScanner"));
 const Visitors = lazy(() => import("./pages/dashboard/Visitors"));
 const VisitorDetail = lazy(() => import("./pages/dashboard/VisitorDetail"));
@@ -93,6 +94,7 @@ export default function AppRoutes() {
           <Route path="campaigns/:id" element={<CampaignDetail />} />
           <Route path="traffic-rules" element={<TrafficRules />} />
           <Route path="shield" element={<Shield />} />
+          <Route path="links" element={<Links />} />
           <Route path="scanner" element={<BotScanner />} />
           <Route path="visitors" element={<Visitors />} />
           <Route path="visitors/:id" element={<VisitorDetail />} />

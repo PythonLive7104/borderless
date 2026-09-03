@@ -155,6 +155,22 @@ export const websiteApi = {
   verifyShield: (id: number) => http.post<{ active: boolean; last_check_at: string | null; message: string }>(`/websites/${id}/verify-shield/`),
 };
 
+// ---- short links ----
+export interface ShortLink {
+  id: number; organization: number; website: number | null; slug: string;
+  destination_url: string; title: string; active: boolean;
+  clicks: number; human_clicks: number; bot_clicks: number;
+  url_safe: boolean | null; url_threats: string[]; url_scanned_at: string | null;
+  short_url: string; quality: number; created_at: string;
+}
+export const linkApi = {
+  list: (orgId: number) => http.get<{ results: ShortLink[] }>(`/links/?organization=${orgId}`),
+  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; website?: number | null }) =>
+    http.post<ShortLink>("/links/", p),
+  update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
+  remove: (id: number) => http.del(`/links/${id}/`),
+};
+
 // ---- campaigns ----
 export type CampaignStatus = "active" | "paused";
 export type TrafficSource = "facebook" | "google" | "tiktok" | "bing" | "native" | "organic" | "direct" | "other";

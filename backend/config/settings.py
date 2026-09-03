@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.staff",
     "apps.analytics",
     "apps.intelligence",
+    "apps.links",
 ]
 
 MIDDLEWARE = [
@@ -191,3 +192,7 @@ GOOGLE_SAFE_BROWSING_KEY = os.getenv("GOOGLE_SAFE_BROWSING_KEY", "")
 VIRUSTOTAL_KEY = os.getenv("VIRUSTOTAL_KEY", "")
 
 TRACKER_URL = os.getenv("TRACKER_URL", "https://cdn.borderless.local/bl.js")
+
+# Base for short links (/l/<slug>). Set this to a separate short domain to keep
+# link traffic off the main domain; falls back to FRONTEND_URL when unset.
+SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")

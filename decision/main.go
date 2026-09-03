@@ -88,6 +88,7 @@ func main() {
 	mux.HandleFunc("/v1/collect", h.collect)
 	mux.HandleFunc("/v1/decide", h.decide)
 	mux.HandleFunc("/v1/guard", h.guard)
+	mux.HandleFunc("/l/", h.shortlink)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -417,6 +418,96 @@ func (h *handler) guard(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	default:
 		w.WriteHeader(http.StatusNoContent) // allow
+	}
+}
+
+// GET /l/<slug> — branded short link. Scores the click (using the linked site's
+// rules when set), records it, then sends real humans to the destination and
+// bots to the rule's block/redirect. Unknown/inactive links 404.
+func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
+	slug := strings.Trim(strings.TrimPrefix(r.URL.Path, "/l/"), "/")
+	if slug == "" {
+		http.NotFound(w, r)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+
+	raw := h.st.GetStr(ctx, "shortlink:"+slug)
+	if raw == "" {
+		http.NotFound(w, r)
+		return
+	}
+	var link struct {
+		Destination string `json:"destination"`
+		TID         string `json:"tid"`
+		Active      bool   `json:"active"`
+	}
+	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Score the real visitor (direct hit — read IP/UA from the request).
+	fp := fingerprint.Extract(r)
+	if fp.Country == "" {
+		fp.Country = geo.Country(fp.IP)
+	}
+	ja3 := firstHeader(r, "CF-JA3-Hash", "X-JA3-Hash", "X-JA3")
+	rate := h.st.RateIncr(ctx, "lrate:"+slug+":"+fp.IP, time.Minute)
+	result := risk.Evaluate(risk.Input{
+		KnownBot:      fp.IsBot,
+		Automation:    fp.IsHeadless,
+		Datacenter:    h.st.InSet(ctx, "ipintel:datacenter", fp.IP),
+		Proxy:         h.st.InSet(ctx, "ipintel:proxy", fp.IP),
+		NoFingerprint: false,
+		AbnormalRate:  rate > 40,
+		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+	})
+
+	action, tag, redirect := "allow", "", ""
+	if link.TID != "" { // apply the linked site's Traffic Rules + IP filter
+		ruleSet := rules.Parse(h.st.GetRules(ctx, link.TID))
+		action, tag, redirect = rules.Evaluate(ruleSet, rules.Event{
+			RiskScore: result.Score, Rate: int(rate),
+			Fields: map[string]string{
+				"classification": result.Classification, "country": fp.Country,
+				"device": fp.Device, "browser": fp.Browser, "os": fp.OS,
+				"is_bot": boolStr(fp.IsBot),
+				"is_proxy": boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
+				"ja3": ja3,
+			},
+		})
+		switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, link.TID)), fp.IP) {
+		case ipfilter.Allow:
+			action, redirect = "allow", ""
+		case ipfilter.Deny:
+			action, redirect = "block", ""
+		}
+	}
+	sigJSON, _ := json.Marshal(result.Signals)
+
+	// Record the click — drives per-link stats (worker reads "slug") and shows
+	// in the linked site's Click Log.
+	go h.st.EmitTraffic(context.Background(), map[string]any{
+		"site_id": link.TID, "visitor_id": "click:" + fp.IP, "session_id": "",
+		"type": "click", "slug": slug, "url": link.Destination,
+		"ip": fp.IP, "country": fp.Country, "device": fp.Device, "browser": fp.Browser, "os": fp.OS,
+		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
+		"risk_score": result.Score, "classification": result.Classification,
+		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
+		"ja3": ja3, "action": action, "tag": tag, "redirect_url": redirect,
+	})
+
+	// Route the click: bots follow the rule; everyone else gets the destination.
+	switch {
+	case action == "block":
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Access denied"))
+	case action == "redirect" && redirect != "":
+		http.Redirect(w, r, redirect, http.StatusFound)
+	default:
+		http.Redirect(w, r, link.Destination, http.StatusFound)
 	}
 }
 
