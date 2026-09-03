@@ -33,6 +33,13 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only Owners and Admins can manage links.")
         return org
 
+    def validate(self, attrs):
+        website = attrs.get("website")
+        org = attrs.get("organization") or getattr(self.instance, "organization", None)
+        if website and org and website.organization_id != org.id:
+            raise serializers.ValidationError({"website": "That website isn't in this workspace."})
+        return attrs
+
     def create(self, validated_data):
         if not validated_data.get("slug"):
             validated_data["slug"] = gen_slug()

@@ -467,17 +467,50 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 	})
 
-	// Real visitors always go to the destination. For a link we filter more
-	// eagerly than a page: known-bot UAs, automation tools (curl/python/headless),
-	// and anything suspicious+ (risk >= 40 — datacenter/proxy/bad-JA3/abnormal rate).
+	// A link filters more eagerly than a page: known-bot UAs, automation tools,
+	// and anything suspicious+ (risk >= 40).
 	isBot := fp.IsBot || fp.IsHeadless || result.Score >= 40
-	sigJSON, _ := json.Marshal(result.Signals)
 
-	label := "allow"
-	if isBot && link.BotAction != "" && link.BotAction != "off" {
-		label = link.BotAction
+	// Decide the outcome. Default: humans -> destination; bots -> the link's
+	// bot handling (decoy / 404 / blank / through).
+	dest := link.Destination
+	mode := "allow" // allow | decoy | notfound | blank | redirect | block
+	if isBot {
+		switch link.BotAction {
+		case "decoy", "notfound", "blank":
+			mode = link.BotAction
+		}
 	}
-	// Record the click — drives per-link stats (worker reads "slug").
+	// If a website is attached, its Traffic Rules + IP allow/deny take precedence
+	// — granular control (country/device/OS/risk/JA3). Falls back to bot handling.
+	if link.TID != "" {
+		action, _, redirect := rules.Evaluate(rules.Parse(h.st.GetRules(ctx, link.TID)), rules.Event{
+			RiskScore: result.Score, Rate: int(rate),
+			Fields: map[string]string{
+				"classification": result.Classification, "country": fp.Country,
+				"device": fp.Device, "browser": fp.Browser, "os": fp.OS,
+				"is_bot": boolStr(fp.IsBot),
+				"is_proxy": boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
+				"ja3": ja3,
+			},
+		})
+		switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, link.TID)), fp.IP) {
+		case ipfilter.Allow:
+			action, redirect = "allow", ""
+		case ipfilter.Deny:
+			action, redirect = "block", ""
+		}
+		switch action {
+		case "block":
+			mode = "block"
+		case "redirect":
+			if redirect != "" {
+				mode, dest = "redirect", redirect
+			}
+		}
+	}
+
+	sigJSON, _ := json.Marshal(result.Signals)
 	go h.st.EmitTraffic(context.Background(), map[string]any{
 		"site_id": link.TID, "visitor_id": "click:" + fp.IP, "session_id": "",
 		"type": "click", "slug": slug, "url": link.Destination,
@@ -485,26 +518,25 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
 		"risk_score": result.Score, "classification": result.Classification,
 		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
-		"ja3": ja3, "action": label, "tag": "", "redirect_url": "",
+		"ja3": ja3, "action": mode, "tag": "", "redirect_url": "",
 	})
 
-	if !isBot {
-		http.Redirect(w, r, link.Destination, http.StatusFound)
-		return
-	}
-	switch link.BotAction {
-	case "decoy":
-		if link.DecoyURL != "" {
-			http.Redirect(w, r, link.DecoyURL, http.StatusFound)
-			return
-		}
-		http.NotFound(w, r)
+	switch mode {
+	case "block":
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Access denied"))
 	case "notfound":
 		http.NotFound(w, r)
 	case "blank":
 		w.WriteHeader(http.StatusOK) // quietly nothing
-	default: // "off" or unset — bots go through to the destination too
-		http.Redirect(w, r, link.Destination, http.StatusFound)
+	case "decoy":
+		if link.DecoyURL != "" {
+			http.Redirect(w, r, link.DecoyURL, http.StatusFound)
+		} else {
+			http.NotFound(w, r)
+		}
+	default: // "allow" (human -> destination) or "redirect"
+		http.Redirect(w, r, dest, http.StatusFound)
 	}
 }
 

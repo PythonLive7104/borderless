@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, type ShortLink, type BotAction } from "../../lib/api";
+import { linkApi, websiteApi, type ShortLink, type BotAction, type Website } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -27,19 +27,24 @@ export default function Links() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy" });
+  const [sites, setSites] = useState<Website[]>([]);
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
+  const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
 
   async function load(silent = false) {
     if (!current) return;
     if (!silent) setLoading(true);
-    try { setRows((await linkApi.list(current.id)).results); } finally { setLoading(false); }
+    try {
+      const [l, w] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id)]);
+      setRows(l.results); setSites(w.results);
+    } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);
 
   function openCreate() {
-    setErr(""); setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy" }); setOpen(true);
+    setErr(""); setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "" }); setOpen(true);
   }
   async function create(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
@@ -50,6 +55,7 @@ export default function Links() {
         title: form.title || undefined,
         slug: form.slug || undefined,
         bot_action: form.bot_action,
+        website: form.website ? Number(form.website) : null,
       });
       setOpen(false); load();
     } catch (e: any) { setErr(e.data?.slug?.[0] || e.data?.destination_url?.[0] || e.data?.detail || e.message); }
@@ -96,7 +102,10 @@ export default function Links() {
                     <span className="text-xs text-fg-dim">{copied === l.id ? "Copied ✓" : "Copy"}</span>
                   </button>
                   <div className="mt-1 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
-                  <div className="mt-1 text-xs text-fg-dim">Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b></div>
+                  <div className="mt-1 text-xs text-fg-dim">
+                    Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
+                    {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
+                  </div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                   <div className="text-center"><div className="font-bold tabular-nums">{l.clicks}</div><div className="text-[11px] text-fg-dim">clicks</div></div>
@@ -154,6 +163,16 @@ export default function Links() {
               ))}
             </div>
           </div>
+
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold">Apply a website's Traffic Rules? <span className="font-normal text-fg-dim">(optional, advanced)</span></span>
+            <select value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
+              className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+              <option value="">No — just use the bot handling above</option>
+              {sites.map((s) => <option key={s.id} value={s.id}>Use {s.name}'s Traffic Rules</option>)}
+            </select>
+            <p className="mt-1 text-xs text-fg-dim">For tighter control, run a website's Traffic Rules on each click (block by country, device, risk, IP allow/deny, etc.). Those rules win; the bot handling above is the fallback.</p>
+          </label>
 
           {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Create link"}</Button>

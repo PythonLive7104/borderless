@@ -166,7 +166,7 @@ export interface ShortLink {
 }
 export const linkApi = {
   list: (orgId: number) => http.get<{ results: ShortLink[] }>(`/links/?organization=${orgId}`),
-  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; bot_action?: BotAction }) =>
+  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; bot_action?: BotAction; website?: number | null }) =>
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
   remove: (id: number) => http.del(`/links/${id}/`),
