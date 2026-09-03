@@ -24,7 +24,7 @@ const TABS: { id: Lang; label: string }[] = [
 
 // Plain-English, step-by-step install help for non-technical users — shown when
 // they click "How do I install this?" under the snippet.
-const HINTS: Record<Lang, { title: string; steps: string[] }> = {
+const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
   cpanel: {
     title: "Install on a cPanel / Apache site (most shared hosting)",
     steps: [
@@ -49,6 +49,7 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     ],
   },
   django: {
+    dev: true,
     title: "Install on a Django site",
     steps: [
       "Save the snippet as trynobot_shield.py inside one of your Django apps (next to views.py). Your site ID is already in it.",
@@ -58,6 +59,7 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     ],
   },
   nginx: {
+    dev: true,
     title: "Install on your own nginx server (VPS) — hard server-side blocking",
     steps: [
       "Find your site's nginx config — usually /etc/nginx/sites-available/YOURDOMAIN or /etc/nginx/conf.d/YOURDOMAIN.conf.",
@@ -80,6 +82,7 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     ],
   },
   node: {
+    dev: true,
     title: "Install on a Node / Express site",
     steps: [
       "Add the snippet as middleware in your Express app (before your routes). Your site ID is already in it.",
@@ -195,40 +198,46 @@ class TryNoBotShield:
 
 # settings.py:
 # MIDDLEWARE = ["yourapp.trackaudit_shield.TryNoBotShield", *MIDDLEWARE]`,
-    nginx: `# TryNoBot shield via nginx auth_request — self-hosted, no Cloudflare.
-# Best for a React build served statically by nginx. Add to your server { } block.
-# (Behind Cloudflare? use $http_cf_connecting_ip instead of $remote_addr for X-TA-IP.)
+// This is a COMPLETE example server block. Compare it with your own config —
+// you already have a "server { }" with a "location / { }". Just add the 3 parts
+// marked with a star (★). Everything else below mirrors what you already have.
 
-# 1) Guard the location that serves your site — add the first 4 lines:
-location / {
-    auth_request /_ta_guard;
-    auth_request_set $ta_action   $upstream_http_x_ta_action;
-    auth_request_set $ta_redirect $upstream_http_x_ta_redirect;
-    error_page 403 = @ta_denied;
+server {
+    listen 443 ssl;
+    server_name yourdomain.com;         # ← your domain (leave your real config)
+    # ... your ssl_certificate / root / etc. stay exactly as they are ...
 
-    try_files $uri $uri/ /index.html;   # <- your existing page-serving line
+    location / {
+        # ★ PART 1 — add these 4 lines at the TOP of your existing "location /"
+        auth_request /_ta_guard;
+        auth_request_set $ta_action   $upstream_http_x_ta_action;
+        auth_request_set $ta_redirect $upstream_http_x_ta_redirect;
+        error_page 403 = @ta_denied;
+
+        try_files $uri $uri/ /index.html;   # ← your existing line — keep it
+    }
+
+    # ★ PART 2 — add this whole block (it asks TryNoBot about each visitor)
+    location = /_ta_guard {
+        internal;
+        resolver 1.1.1.1 ipv6=off;
+        proxy_pass ${GUARD};
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${HOST};
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-TA-Site "${S}";       # your site ID (already filled in)
+        proxy_set_header X-TA-IP   $remote_addr; # (behind Cloudflare? use $http_cf_connecting_ip)
+        proxy_set_header X-TA-UA   $http_user_agent;
+    }
+
+    # ★ PART 3 — add this whole block (what a blocked visitor gets)
+    location @ta_denied {
+        if ($ta_action = "redirect") { return 302 $ta_redirect; }
+        return 403 "Access denied";
+    }
 }
-
-# 2) The internal check — asks TryNoBot about this visitor:
-location = /_ta_guard {
-    internal;
-    resolver 1.1.1.1 ipv6=off;
-    proxy_pass ${GUARD};
-    proxy_ssl_server_name on;
-    proxy_set_header Host ${HOST};
-    proxy_pass_request_body off;
-    proxy_set_header Content-Length "";
-    proxy_set_header X-TA-Site "${S}";
-    proxy_set_header X-TA-IP   $remote_addr;
-    proxy_set_header X-TA-UA   $http_user_agent;
-}
-
-# 3) What happens to blocked visitors:
-location @ta_denied {
-    if ($ta_action = "redirect") { return 302 $ta_redirect; }
-    return 403 "Access denied";
-}
-# Reload nginx after editing:  nginx -t && systemctl reload nginx`,
+// Save, then:  sudo nginx -t  &&  sudo systemctl reload nginx`,
     cloudflare: `// TryNoBot shield as a Cloudflare Worker — runs at the edge, before your origin.
 export default {
   async fetch(request, env, ctx) {
@@ -405,6 +414,13 @@ export default function Shield() {
           <span className="text-sm font-bold text-brand">💡 How do I install this? — {HINTS[tab].title}</span>
           <span className="text-fg-dim">{showHint ? "▲" : "▼"}</span>
         </button>
+        {showHint && HINTS[tab].dev && (
+          <div className="border-t border-line bg-warning/10 px-5 py-3 text-xs text-amber-800">
+            ⚙️ <b>This option is for a developer or server admin</b> — it means editing server config, which can't be made click-simple.
+            Not technical? You don't need it. Most sites just add the <b>cPanel / PHP</b> script (that's the "drop-in script" model), and the
+            no-code <Link to="/dashboard/traffic-rules" className="font-semibold underline">Redirect rule</Link> works everywhere with zero setup.
+          </div>
+        )}
         {showHint && (
           <ol className="space-y-1.5 border-t border-line px-5 py-4 text-sm text-fg-muted">
             {HINTS[tab].steps.map((s, i) => (
