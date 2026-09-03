@@ -17,7 +17,7 @@ class ShortLink(models.Model):
     website = models.ForeignKey(Website, on_delete=models.SET_NULL, null=True, blank=True,
                                 related_name="short_links",
                                 help_text="Optional — which site's Traffic Rules apply to clicks.")
-    slug = models.SlugField(max_length=16, unique=True, default=gen_slug)
+    slug = models.SlugField(max_length=64, unique=True, default=gen_slug)
     destination_url = models.URLField(max_length=2000)
     title = models.CharField(max_length=120, blank=True)
     active = models.BooleanField(default=True)

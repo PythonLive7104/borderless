@@ -7,7 +7,7 @@ from .models import ShortLink, gen_slug
 class ShortLinkSerializer(serializers.ModelSerializer):
     short_url = serializers.SerializerMethodField()
     quality = serializers.SerializerMethodField()
-    slug = serializers.SlugField(max_length=16, required=False)
+    slug = serializers.SlugField(max_length=64, required=False)
 
     class Meta:
         model = ShortLink
