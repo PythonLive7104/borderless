@@ -11,6 +11,14 @@ import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 
 const ACTIONS: RuleAction[] = ["allow", "redirect", "block", "review", "tag"];
+
+// Ready-made pages we host, so users don't have to build their own "blocked" page.
+const REDIRECT_ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
+const REDIRECT_PRESETS: { label: string; path: string }[] = [
+  { label: "Access denied", path: "/blocked.html" },
+  { label: "Unauthorised access", path: "/unauthorized.html" },
+  { label: "404 Not found", path: "/not-found.html" },
+];
 const actionTone: Record<RuleAction, string> = {
   allow: "bg-success/10 text-emerald-700",
   redirect: "bg-indigo-500/10 text-indigo-600",
@@ -332,10 +340,23 @@ export default function TrafficRules() {
             {form.action === "redirect" && (
               <label className="mt-3 block">
                 <span className="mb-1.5 block text-sm font-semibold">Send them to this page</span>
+                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-fg-dim">Use a ready-made page:</span>
+                  {REDIRECT_PRESETS.map((p) => {
+                    const url = REDIRECT_ORIGIN + p.path;
+                    const active = form.redirect_url === url;
+                    return (
+                      <button type="button" key={p.path} onClick={() => setForm({ ...form, redirect_url: url })}
+                        className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${active ? "border-brand bg-brand/10 text-brand" : "border-line hover:border-brand hover:text-brand"}`}>
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <input type="url" value={form.redirect_url} onChange={(e) => setForm({ ...form, redirect_url: e.target.value })}
-                  placeholder="https://yoursite.com/unauthorized" required
+                  placeholder="…or paste your own page URL, e.g. https://yoursite.com/unauthorized" required
                   className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                <p className="mt-1.5 text-xs text-fg-dim">Any page you like — e.g. an <b>"Unauthorised access"</b> page, your <b>404</b> page, or a blank page. Make a simple page for it if you don't have one, then paste its full link here.</p>
+                <p className="mt-1.5 text-xs text-fg-dim">Pick one of our hosted pages above (nothing to build), or paste a link to your own page.</p>
               </label>
             )}
             {form.action === "tag" && (

@@ -58,11 +58,17 @@ const HINTS: Record<Lang, { title: string; steps: string[] }> = {
     ],
   },
   nginx: {
-    title: "Install on your own nginx server (VPS)",
+    title: "Install on your own nginx server (VPS) — hard server-side blocking",
     steps: [
-      "This is a job for whoever manages your server. Open your site's nginx config (the server { } block).",
-      "Add the three blocks from the snippet — your site ID is already filled in.",
-      "Test and reload: nginx -t && systemctl reload nginx.",
+      "Find your site's nginx config — usually /etc/nginx/sites-available/YOURDOMAIN or /etc/nginx/conf.d/YOURDOMAIN.conf.",
+      "Open it: sudo nano /etc/nginx/sites-available/YOURDOMAIN",
+      "Inside you'll see 'server { ... }' and, within it, a 'location / { ... }' that serves your pages.",
+      "PART 1 — inside that existing 'location / { }', add the first 4 lines from the snippet (the auth_request / auth_request_set / error_page lines). Keep your existing lines (like try_files).",
+      "PART 2 — paste the whole 'location = /_ta_guard { }' block AND the 'location @ta_denied { }' block inside the same 'server { }', just after your 'location /'.",
+      "Your site ID is already filled in — there's nothing to edit.",
+      "Save (in nano: Ctrl+O, Enter, then Ctrl+X), then check for typos: sudo nginx -t",
+      "If it says 'syntax is ok' and 'test is successful', reload: sudo systemctl reload nginx. Bots are now blocked BEFORE your pages load.",
+      "Want blocked bots sent to a page (not a plain 'Access denied')? Don't touch nginx — just add a Redirect rule in Traffic Rules and pick a ready-made page. The shield sends them there automatically.",
     ],
   },
   cloudflare: {
