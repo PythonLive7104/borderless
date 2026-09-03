@@ -3,8 +3,8 @@ import PageNote from "../../components/dashboard/PageNote";
 import IPFilters from "../../components/dashboard/IPFilters";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import {
-  ruleApi, RULE_FIELDS, RULE_OPS, FIELD_VALUE_OPTIONS, COUNTRIES,
-  type TrafficRule, type RuleAction, type RuleCondition,
+  ruleApi, RULE_FIELDS, RULE_OPS, FIELD_VALUE_OPTIONS, COUNTRIES, websiteApi,
+  type TrafficRule, type RuleAction, type RuleCondition, type Website,
 } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -94,14 +94,19 @@ export default function TrafficRules() {
   const [busy, setBusy] = useState(false);
   const [presetUrl, setPresetUrl] = useState("");
   const [presetBusy, setPresetBusy] = useState(false);
-  const blank = { name: "", priority: "100", action: "review" as RuleAction, tag: "", redirect_url: "", conditions: [emptyCond()] };
-  const [form, setForm] = useState<{ name: string; priority: string; action: RuleAction; tag: string; redirect_url: string; conditions: RuleCondition[] }>(blank);
+  const [sites, setSites] = useState<Website[]>([]);
+  const blank = { name: "", priority: "100", action: "review" as RuleAction, tag: "", redirect_url: "", website: "", conditions: [emptyCond()] };
+  const [form, setForm] = useState<{ name: string; priority: string; action: RuleAction; tag: string; redirect_url: string; website: string; conditions: RuleCondition[] }>(blank);
   const canManage = current?.role === "owner" || current?.role === "admin";
+  const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
 
   async function load() {
     if (!current) return;
     setLoading(true);
-    try { setRules((await ruleApi.list(current.id)).results); } finally { setLoading(false); }
+    try {
+      const [r, w] = await Promise.all([ruleApi.list(current.id), websiteApi.list(current.id)]);
+      setRules(r.results); setSites(w.results);
+    } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
@@ -129,7 +134,7 @@ export default function TrafficRules() {
     setEditingId(r.id);
     setForm({
       name: r.name, priority: String(r.priority), action: r.action, tag: r.tag || "",
-      redirect_url: r.redirect_url || "",
+      redirect_url: r.redirect_url || "", website: r.website ? String(r.website) : "",
       conditions: r.conditions.length
         ? r.conditions.map((c) => ({ field: c.field, operator: c.operator, value: c.value }))
         : [emptyCond()],
@@ -143,6 +148,7 @@ export default function TrafficRules() {
     const payload = {
       name: form.name, priority: Number(form.priority), action: form.action,
       tag: form.tag, redirect_url: form.redirect_url, conditions: form.conditions,
+      website: form.website ? Number(form.website) : null,
     };
     try {
       if (editingId) await ruleApi.update(editingId, payload);
@@ -248,7 +254,12 @@ export default function TrafficRules() {
                 <div className="flex items-center gap-3">
                   <span className="grid h-7 w-9 place-items-center rounded-lg bg-bg-mute text-xs font-bold text-fg-muted" title="Priority">{r.priority}</span>
                   <div>
-                    <div className="font-bold">{r.name}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold">{r.name}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.website ? "bg-brand/10 text-brand" : "bg-bg-mute text-fg-dim"}`}>
+                        {r.website ? siteName(r.website) || "One website" : "All websites"}
+                      </span>
+                    </div>
                     <div className="text-xs text-fg-dim">{r.conditions.length} condition{r.conditions.length === 1 ? "" : "s"}</div>
                   </div>
                 </div>
@@ -291,6 +302,16 @@ export default function TrafficRules() {
             <Field label="Rule name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Block mobile bots" />
             <Field label="Priority" type="number" value={form.priority} onChange={(v) => setForm({ ...form, priority: v })} />
           </div>
+
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold">Applies to</span>
+            <select value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
+              className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+              <option value="">All websites in this workspace</option>
+              {sites.map((s) => <option key={s.id} value={s.id}>Only: {s.name}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-fg-dim">Pick a website to make this rule apply to it only, or keep "All websites" to share it across every site you add.</p>
+          </label>
 
           <div className="rounded-xl border border-line bg-bg-soft p-3">
             <div className="mb-2 flex items-center justify-between">

@@ -15,8 +15,12 @@ def _r():
     return _client
 
 
-def build_payload(org_id) -> str:
+def build_payload(org_id, website_id=None) -> str:
+    """Rules that apply to one website: its own rules PLUS workspace-wide rules
+    (website is null), ordered by priority."""
+    from django.db.models import Q
     rules = (TrafficRule.objects.filter(organization_id=org_id, active=True)
+             .filter(Q(website__isnull=True) | Q(website_id=website_id))
              .prefetch_related("conditions").order_by("priority", "id"))
     out = []
     for r in rules:
@@ -39,11 +43,10 @@ def build_ipfilter_payload(org_id) -> str:
 def publish_org(org_id):
     """Write the org's active rules + IP filter to every website it owns."""
     try:
-        rules_data = build_payload(org_id)
         ip_data = build_ipfilter_payload(org_id)
         c = _r()
-        for tid in Website.objects.filter(organization_id=org_id).values_list("tracking_id", flat=True):
-            c.set(f"rules:{tid}", rules_data)
+        for wid, tid in Website.objects.filter(organization_id=org_id).values_list("id", "tracking_id"):
+            c.set(f"rules:{tid}", build_payload(org_id, wid))  # per-website: global + its own
             c.set(f"ipfilter:{tid}", ip_data)
             c.set(f"site:{tid}", str(org_id))  # binds API keys to this site on the shield
     except Exception:

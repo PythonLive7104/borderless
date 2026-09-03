@@ -14,7 +14,7 @@ class RuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrafficRule
-        fields = ["id", "organization", "name", "priority", "action", "tag", "redirect_url",
+        fields = ["id", "organization", "website", "name", "priority", "action", "tag", "redirect_url",
                   "active", "conditions", "created_at"]
         read_only_fields = ["created_at"]
 
@@ -31,6 +31,13 @@ class RuleSerializer(serializers.ModelSerializer):
         if not conditions:
             raise serializers.ValidationError("A rule needs at least one condition.")
         return conditions
+
+    def validate(self, attrs):
+        website = attrs.get("website")
+        org = attrs.get("organization") or getattr(self.instance, "organization", None)
+        if website and org and website.organization_id != org.id:
+            raise serializers.ValidationError({"website": "That website isn't in this workspace."})
+        return attrs
 
     def create(self, validated_data):
         conditions = validated_data.pop("conditions")

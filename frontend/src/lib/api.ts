@@ -222,7 +222,7 @@ export const variantApi = {
 export type RuleAction = "allow" | "redirect" | "block" | "review" | "tag";
 export interface RuleCondition { id?: number; field: string; operator: string; value: string; }
 export interface TrafficRule {
-  id: number; organization: number; name: string; priority: number;
+  id: number; organization: number; website: number | null; name: string; priority: number;
   action: RuleAction; tag: string; redirect_url: string; active: boolean;
   conditions: RuleCondition[]; created_at: string;
 }

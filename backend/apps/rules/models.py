@@ -24,6 +24,9 @@ class TrafficRule(models.Model):
         TAG = "tag", "Tag"
 
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="rules")
+    website = models.ForeignKey("websites.Website", on_delete=models.CASCADE, null=True, blank=True,
+                                related_name="site_rules",
+                                help_text="Which website this rule applies to. Empty = all websites in the workspace.")
     name = models.CharField(max_length=120)
     priority = models.IntegerField(default=100, help_text="Lower runs first; first match wins")
     action = models.CharField(max_length=8, choices=Action.choices, default=Action.REVIEW)
