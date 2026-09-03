@@ -467,9 +467,10 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 	})
 
-	// Real visitors always go to the destination; only clearly-automated traffic
-	// (bot/fraud) gets the chosen bot handling.
-	isBot := result.Classification == "bot" || result.Classification == "fraud"
+	// Real visitors always go to the destination. For a link we filter more
+	// eagerly than a page: known-bot UAs, automation tools (curl/python/headless),
+	// and anything suspicious+ (risk >= 40 — datacenter/proxy/bad-JA3/abnormal rate).
+	isBot := fp.IsBot || fp.IsHeadless || result.Score >= 40
 	sigJSON, _ := json.Marshal(result.Signals)
 
 	label := "allow"
