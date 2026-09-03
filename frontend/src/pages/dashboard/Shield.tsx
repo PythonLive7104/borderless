@@ -198,9 +198,9 @@ class TryNoBotShield:
 
 # settings.py:
 # MIDDLEWARE = ["yourapp.trackaudit_shield.TryNoBotShield", *MIDDLEWARE]`,
-// This is a COMPLETE example server block. Compare it with your own config —
-// you already have a "server { }" with a "location / { }". Just add the 3 parts
-// marked with a star (★). Everything else below mirrors what you already have.
+    nginx: `# This is a COMPLETE example server block. Compare it with your own config —
+# you already have a "server { }" with a "location / { }". Just add the 3 parts
+# marked with a star (★). Everything else below mirrors what you already have.
 
 server {
     listen 443 ssl;
@@ -237,7 +237,7 @@ server {
         return 403 "Access denied";
     }
 }
-// Save, then:  sudo nginx -t  &&  sudo systemctl reload nginx`,
+# Save, then:  sudo nginx -t  &&  sudo systemctl reload nginx`,
     cloudflare: `// TryNoBot shield as a Cloudflare Worker — runs at the edge, before your origin.
 export default {
   async fetch(request, env, ctx) {
