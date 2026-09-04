@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, websiteApi, type ShortLink, type BotAction, type Website } from "../../lib/api";
+import { linkApi, websiteApi, billingApi, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -34,17 +34,19 @@ export default function Links() {
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
+  const [sub, setSub] = useState<Subscription | null>(null);
   const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string }>(
     { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
+  const linkEnabled = !!sub && sub.status === "active" && ["growth", "business"].includes(sub.plan.slug);
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
 
   async function load(silent = false) {
     if (!current) return;
     if (!silent) setLoading(true);
     try {
-      const [l, w] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id)]);
-      setRows(l.results); setSites(w.results);
+      const [l, w, s] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id), billingApi.subscription(current.id)]);
+      setRows(l.results); setSites(w.results); setSub(s);
     } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);
@@ -87,11 +89,23 @@ export default function Links() {
           <h1 className="text-2xl font-extrabold tracking-tight">Link Shortener</h1>
           <p className="mt-1 text-sm text-fg-muted">Short links with built-in bot filtering &amp; click analytics.</p>
         </div>
-        {canManage && <Button onClick={openCreate}>+ New link</Button>}
+        {canManage && linkEnabled && <Button onClick={openCreate}>+ New link</Button>}
       </div>
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
-       : rows.length === 0 ? <div className="card shadow-soft mt-6"><NoData msg="No links yet. Create one to start filtering clicks." /></div>
+       : !linkEnabled ? (
+        <div className="card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl">🔗</div>
+          <h2 className="mt-3 text-lg font-bold">The Link Shortener is a Growth feature</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
+            Create short, bot-filtered campaign links with click analytics. It's available on the
+            <b> Growth</b> plan and above{sub ? <> — you're on <b>{sub.plan.name}</b>.</> : "."}
+          </p>
+          {canManage
+            ? <Button to="/dashboard/billing" className="mt-4">Upgrade to unlock →</Button>
+            : <p className="mt-3 text-xs text-fg-dim">Ask an owner or admin to upgrade the workspace.</p>}
+        </div>
+       ) : rows.length === 0 ? <div className="card shadow-soft mt-6"><NoData msg="No links yet. Create one to start filtering clicks." /></div>
        : (
         <div className="mt-6 space-y-3">
           {rows.map((l) => (

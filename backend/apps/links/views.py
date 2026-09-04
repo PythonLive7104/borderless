@@ -24,6 +24,13 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only Owners and Admins can manage links.")
 
     def perform_create(self, serializer):
+        org = serializer.validated_data["organization"]
+        from apps.billing.models import link_shortener_enabled
+        if not link_shortener_enabled(org.id):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(
+                "The Link Shortener is available on the Growth plan and above. "
+                "Upgrade on the Billing page to unlock it.")
         link = serializer.save()
         scan_and_flag(link)   # threat scan; auto-disables if the destination is unsafe
         publish_link(link)

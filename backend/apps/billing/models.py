@@ -84,6 +84,17 @@ def is_on_trial(organization_id) -> bool:
     return bool(sub and sub.status == Subscription.Status.TRIALING)
 
 
+# Plans on which the Link Shortener is available (active subscription required).
+LINK_SHORTENER_PLANS = {"growth", "business"}
+
+
+def link_shortener_enabled(organization_id) -> bool:
+    """The Link Shortener is a paid feature (Growth and above, active) — gated to
+    deter abuse and keep it off free/trial accounts."""
+    sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
+    return bool(sub and sub.status == Subscription.Status.ACTIVE and sub.plan.slug in LINK_SHORTENER_PLANS)
+
+
 def website_limit(organization_id) -> int:
     """Effective website cap for an org (0 = unlimited). Trial caps at 1; a paid
     plan uses its max_websites."""
