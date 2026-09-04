@@ -25,12 +25,15 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         org = serializer.validated_data["organization"]
-        from apps.billing.models import link_shortener_enabled
+        from apps.billing.models import link_shortener_enabled, redirect_limit
         if not link_shortener_enabled(org.id):
-            from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied(
-                "The Link Shortener is available on the Growth plan and above. "
-                "Upgrade on the Billing page to unlock it.")
+                "Short links are a paid feature. Start a plan on the Billing page to create them.")
+        limit = redirect_limit(org.id)
+        if limit and ShortLink.objects.filter(organization_id=org.id).count() >= limit:
+            raise PermissionDenied(
+                f"You've reached your plan's short-link limit ({limit}). "
+                "Upgrade your plan on the Billing page for more redirects.")
         link = serializer.save()
         scan_and_flag(link)   # threat scan; auto-disables if the destination is unsafe
         publish_link(link)

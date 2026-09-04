@@ -88,7 +88,8 @@ func main() {
 	mux.HandleFunc("/v1/collect", h.collect)
 	mux.HandleFunc("/v1/decide", h.decide)
 	mux.HandleFunc("/v1/guard", h.guard)
-	mux.HandleFunc("/l/", h.shortlink)
+	mux.HandleFunc("/l/", h.shortlink)         // legacy /l/<slug>
+	mux.HandleFunc("/", h.shortlink)           // bare /<slug> (short domain)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -421,11 +422,18 @@ func (h *handler) guard(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GET /l/<slug> — branded short link. Scores the click (using the linked site's
-// rules when set), records it, then sends real humans to the destination and
-// bots to the rule's block/redirect. Unknown/inactive links 404.
+// GET /<slug> (and legacy /l/<slug>) — branded short link. Scores the click
+// (using the linked site's rules when set), records it, then sends real humans
+// to the destination and bots to the rule's block/redirect. Unknown/inactive
+// links 404. Registered as the root catch-all so the short domain can serve
+// bare-slug links (nobot.link/<slug>); on the main domain nginx only routes
+// /l/, /v1/ and /bl.js here, so this never shadows the SPA.
 func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
-	slug := strings.Trim(strings.TrimPrefix(r.URL.Path, "/l/"), "/")
+	path := r.URL.Path
+	if strings.HasPrefix(path, "/l/") {
+		path = path[len("/l"):] // "/l/<slug>" -> "/<slug>"
+	}
+	slug := strings.Trim(path, "/")
 	if slug == "" {
 		http.NotFound(w, r)
 		return

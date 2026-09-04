@@ -9,55 +9,52 @@ type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
   name: string; price: number; tag: string; cta: string;
   highlight?: boolean; ribbon?: string; warning?: string;
-  websiteLimit: string; campaignLimit: string; clickLimit: string;
+  redirects: string; domains: string; access: string;
   groups: Group[];
 };
 
 const BASE: string[] = [
-  "Real-time bot & fraud scoring",
-  "JS + TLS/JA3 fingerprinting",
-  "Traffic rules: country, device, OS, browser",
-  "IP allow / deny lists",
+  "Smart redirects with bot detection on every click",
+  "Full anti-bot engine included",
+  "Smart shortlinks + custom domain redirects",
+  "IP allow / deny rules",
+  "Domain health + ownership checks",
 ];
-const GROWTH_ADD: string[] = [
-  "A/B split testing with per-variant conversion rates",
-  "Destination URL threat scanning",
-  "Webhooks & full REST API",
-  "Priority email support",
+const PLUS_ADD: string[] = [
+  "More redirects & domains",
+  "Priority support",
 ];
-const ADVANCED: string[] = [
-  "Guest access to statistics",
-  "Higher rate limits",
-  "Dedicated onboarding",
+const PRO_ADD: string[] = [
+  "Highest redirect & domain limits",
+  "Dedicated support",
 ];
 
 const PLANS: Plan[] = [
   {
-    name: "Starter", price: 29, tag: "Detect click fraud in contextual & display ads",
-    cta: "Buy this tariff", websiteLimit: "5", campaignLimit: "20", clickLimit: "no limit",
+    name: "Basic", price: 25, tag: "Smart redirects with bot detection, for solo buyers",
+    cta: "Get Basic", redirects: "2", domains: "5", access: "7 days of access",
     groups: [{ items: BASE }],
   },
   {
-    name: "Growth", price: 99, tag: "For scaling media buyers & teams",
-    cta: "Buy this tariff", highlight: true, websiteLimit: "20", campaignLimit: "50", clickLimit: "no limit",
-    groups: [{ items: BASE }, { label: "Everything in Starter, plus:", items: GROWTH_ADD, added: true }],
+    name: "Plus", price: 40, tag: "More links & domains for growing campaigns",
+    cta: "Get Plus", highlight: true, redirects: "5", domains: "10", access: "7 days of access",
+    groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }],
   },
   {
-    name: "Business", price: 299, tag: "Advanced protection & API for agencies",
-    cta: "Buy this tariff", ribbon: "TOP VALUE", websiteLimit: "unlimited", campaignLimit: "unlimited", clickLimit: "no limit",
+    name: "Pro", price: 70, tag: "Top limits & dedicated support for agencies",
+    cta: "Get Pro", ribbon: "TOP VALUE", redirects: "10", domains: "20", access: "7 days of access",
     groups: [
       { items: BASE },
-      { label: "Everything in Growth, plus:", items: GROWTH_ADD, added: true },
-      { label: "Plus advanced:", items: ADVANCED, added: true },
+      { label: "Everything in Plus, plus:", items: PRO_ADD, added: true },
     ],
   },
 ];
 
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies (BTC, ETH, USDT, USDC, TON) as well as cards. Crypto keeps billing private and borderless."],
-  ["What are campaign and click limits?", "Each plan allows a number of concurrent campaigns; clicks processed through the traffic engine are unlimited on every tier."],
-  ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Changes are prorated to your current billing cycle."],
-  ["What happens if I exceed my limit?", "You'll get usage alerts at 70%, 85% and 100%. We prompt you to upgrade rather than cut you off mid-campaign."],
+  ["What are redirects and domains?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
+  ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
+  ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
 ];
 
 function Cart() {
@@ -88,16 +85,16 @@ function PlusDivider() {
 }
 
 export default function Pricing() {
-  useSeo("Pricing", "Simple plans for real-time bot and fraud detection. Start free, upgrade as you grow. Pay by card, mobile money or crypto.");
+  useSeo("Pricing", "Simple weekly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
   return (
     <>
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
         <div className="container-page relative py-16 text-center">
-          <Badge tone="light">Simple, transparent pricing</Badge>
+          <Badge tone="light">Simple, weekly pricing</Badge>
           <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Tariffs & payment</h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-300">
-            Pay with crypto or card. Every plan includes real-time filtering, scoring and analytics.
+            7 days of access on every plan — renew when it runs out, and unused days roll over. Pay with crypto or card.
           </p>
         </div>
       </section>
@@ -132,8 +129,9 @@ export default function Pricing() {
               <p className="mt-1 text-sm text-fg-muted">{p.tag}</p>
               <div className="mt-5 flex items-end gap-1">
                 <span className="text-4xl font-extrabold tracking-tight">${p.price}</span>
-                <span className="pb-1 text-sm text-fg-dim">/month</span>
+                <span className="pb-1 text-sm text-fg-dim">/week</span>
               </div>
+              <div className="mt-0.5 text-xs text-fg-dim">{p.access}</div>
 
               <div className="mt-6 text-xs font-bold uppercase tracking-wider text-fg-dim">Key features</div>
               <div className="mt-3">
@@ -148,19 +146,12 @@ export default function Pricing() {
                 ))}
               </div>
 
-              {p.warning && (
-                <div className="mt-5 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 px-3 py-2.5 text-xs font-medium text-red-600">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-                  {p.warning}
-                </div>
-              )}
-
               {/* limits + CTA pinned to bottom for card alignment */}
               <div className="mt-6 flex-1" />
               <div className="border-t border-line pt-5 text-sm">
-                <div className="flex justify-between"><span className="text-fg-dim">Website limit</span><span className="font-semibold">{p.websiteLimit}</span></div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Campaign limit</span><span className="font-semibold">{p.campaignLimit}</span></div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Click limit</span><span className="font-semibold">{p.clickLimit}</span></div>
+                <div className="flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{p.redirects}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Domains</span><span className="font-semibold">{p.domains}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold">Weekly</span></div>
               </div>
               <Button to="/signup" variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {p.cta}</Button>
             </div>

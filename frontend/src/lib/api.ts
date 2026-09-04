@@ -368,10 +368,11 @@ export const webhookApi = {
 };
 
 // ---- billing ----
-export interface Plan { id: number; slug: string; name: string; price: number; monthly_events: number; retention_days: number; team_members: number; }
+export interface Plan { id: number; slug: string; name: string; price: number; monthly_events: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; }
 export interface AccessState {
   locked: boolean;
-  reason: "active" | "trialing" | "trial_expired" | "canceled";
+  reason: "active" | "trialing" | "trial_expired" | "period_ended" | "canceled";
+  deadline?: string | null;
   trial_end: string | null;
   days_left: number | null;
 }

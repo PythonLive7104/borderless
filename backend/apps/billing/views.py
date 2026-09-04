@@ -15,9 +15,9 @@ def _membership(user, org_id):
 def _get_subscription(org_id):
     sub = Subscription.objects.filter(organization_id=org_id).select_related("plan").first()
     if not sub:  # lazily create for orgs that predate billing
-        starter = Plan.objects.filter(slug="starter").first()
-        if starter:
-            sub = Subscription.objects.create(organization_id=org_id, plan=starter)
+        basic = Plan.objects.filter(slug="basic").first()
+        if basic:
+            sub = Subscription.objects.create(organization_id=org_id, plan=basic)
     return sub
 
 
@@ -45,9 +45,8 @@ class ChangePlanView(views.APIView):
         if not plan:
             return Response({"detail": "Unknown plan."}, status=400)
         sub = _get_subscription(org_id)
-        sub.plan = plan
-        sub.status = Subscription.Status.ACTIVE  # payment is stubbed for the MVP
-        sub.save(update_fields=["plan", "status"])
+        sub.start_period(plan)  # rollover-aware; payment stubbed for the MVP
+        sub.save(update_fields=["plan", "status", "period_start", "period_end", "pending_plan_slug"])
         return Response(SubscriptionSerializer(sub).data)
 
 
@@ -79,10 +78,12 @@ class UsageView(views.APIView):
         # plans are uncapped here (limit 0 = unlimited, same convention as team).
         from apps.websites.models import Website
         from apps.campaigns.models import Campaign
-        from .models import is_on_trial, website_limit, campaign_limit
+        from apps.links.models import ShortLink
+        from .models import is_on_trial, website_limit, campaign_limit, redirect_limit
         on_trial = is_on_trial(org_id)
         n_sites = Website.objects.filter(organization_id=org_id).count()
         n_campaigns = Campaign.objects.filter(website__organization_id=org_id).count()
+        n_redirects = ShortLink.objects.filter(organization_id=org_id).count()
 
         level = "ok"
         if pct >= 1.0:
@@ -97,7 +98,9 @@ class UsageView(views.APIView):
             "events": {"used": used, "limit": limit, "pct": pct, "remaining": max(limit - used, 0), "level": level},
             "team": {"used": members, "limit": sub.plan.team_members},
             "websites": {"used": n_sites, "limit": website_limit(org_id)},
+            "domains": {"used": n_sites, "limit": website_limit(org_id)},
             "campaigns": {"used": n_campaigns, "limit": campaign_limit(org_id)},
+            "redirects": {"used": n_redirects, "limit": redirect_limit(org_id) or sub.plan.max_redirects},
             "on_trial": on_trial,
             "retention_days": sub.plan.retention_days,
             "plan": PlanSerializer(sub.plan).data,
@@ -126,13 +129,13 @@ def _notify_activation(sub, plan):
         return
     start, end = sub.current_period()
     send_mail(
-        f"Your {plan.name} subscription is active",
+        f"Your {plan.name} plan is active",
         (
             f"Thanks for subscribing to {settings.BRAND_NAME}.\n\n"
-            f"Plan: {plan.name} (${plan.price}/month)\n"
-            f"Included: {plan.monthly_events:,} events/month, "
-            f"{plan.retention_days}-day data retention.\n"
-            f"Current period: {start:%b %d, %Y} – {end:%b %d, %Y}\n\n"
+            f"Plan: {plan.name} (${plan.price}/week)\n"
+            f"Included: {plan.max_redirects or '∞'} short links, "
+            f"{plan.max_websites or '∞'} domains.\n"
+            f"Access through: {end:%b %d, %Y} (7-day access; unused days roll over when you renew)\n\n"
             f"Manage your subscription any time at {settings.FRONTEND_URL}/dashboard/billing"
         ),
         settings.DEFAULT_FROM_EMAIL,
@@ -142,11 +145,8 @@ def _notify_activation(sub, plan):
 
 
 def _activate(sub, plan):
-    sub.plan = plan
-    sub.status = Subscription.Status.ACTIVE
-    sub.period_start = timezone.now()
-    sub.pending_plan_slug = ""
-    sub.save(update_fields=["plan", "status", "period_start", "pending_plan_slug"])
+    sub.start_period(plan)  # applies the plan + rolls unused days into the new period
+    sub.save(update_fields=["plan", "status", "period_start", "period_end", "pending_plan_slug"])
     _notify_activation(sub, plan)
 
 

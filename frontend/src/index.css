@@ -54,11 +54,20 @@
     border-radius: var(--radius-xl2);
   }
   .card-hover { transition: border-color .2s, transform .2s, box-shadow .2s; }
+  .card-hover { transition: border-color .25s, transform .25s cubic-bezier(.2,.7,.2,1), box-shadow .25s; }
   .card-hover:hover {
-    border-color: color-mix(in oklab, var(--color-brand) 45%, var(--color-line));
-    transform: translateY(-3px);
-    box-shadow: 0 18px 40px -20px rgba(37,99,235,.35);
+    border-color: color-mix(in oklab, var(--color-brand) 55%, var(--color-line));
+    transform: translateY(-4px);
+    box-shadow: 0 22px 50px -22px rgba(37,99,235,.42);
   }
+  /* Feature cards: a soft brand glow that fades in on hover. */
+  .feature-card .feature-glow {
+    position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    transition: opacity .35s ease;
+    background: radial-gradient(260px 130px at 85% -15%,
+      color-mix(in oklab, var(--color-brand) 22%, transparent), transparent 70%);
+  }
+  .feature-card:hover .feature-glow { opacity: 1; }
   .shadow-soft { box-shadow: 0 1px 2px rgba(15,22,38,.04), 0 8px 30px -18px rgba(15,22,38,.18); }
   /* dark binary/grid backdrop for the hero band */
   .hero-band {
@@ -75,4 +84,13 @@
   }
   .fade-up { animation: fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px);} to {opacity:1; transform:none;} }
+}
+
+@layer utilities {
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1); }
+  .reveal.is-in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .card-hover:hover { transform: none; }
+  }
 }

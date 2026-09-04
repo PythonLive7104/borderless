@@ -1,4 +1,4 @@
-"""Publish short links to Redis (read by the Go engine's /l/ redirect) and scan
+"""Publish short links to Redis (read by the Go engine redirect) and scan
 their destinations for threats."""
 import json
 from django.conf import settings

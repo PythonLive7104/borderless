@@ -18,8 +18,13 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                             "url_scanned_at", "created_at"]
 
     def get_short_url(self, obj) -> str:
-        base = (getattr(settings, "SHORTLINK_BASE", "") or settings.FRONTEND_URL).rstrip("/")
-        return f"{base}/l/{obj.slug}"
+        # A dedicated short domain serves bare-slug links at the root
+        # (nobot.link/<slug>). Without one, fall back to the main app domain,
+        # which only routes /l/ to the engine — so keep the /l/ prefix there.
+        base = getattr(settings, "SHORTLINK_BASE", "").rstrip("/")
+        if base:
+            return f"{base}/{obj.slug}"
+        return f"{settings.FRONTEND_URL.rstrip('/')}/l/{obj.slug}"
 
     def get_quality(self, obj) -> float:
         return round(obj.human_clicks / obj.clicks, 4) if obj.clicks else 0.0

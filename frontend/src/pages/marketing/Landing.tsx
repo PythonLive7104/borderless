@@ -1,11 +1,12 @@
 import { useSeo } from "../../lib/seo";
+import { useReveal } from "../../lib/useReveal";
 import Button from "../../components/ui/Button";
 import { Section, SectionHead } from "../../components/ui/Section";
 import LogoStrip from "../../components/marketing/LogoStrip";
 import DashboardPreview from "../../components/marketing/DashboardPreview";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
 import { BRAND } from "../../lib/brand";
-import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock } from "../../components/ui/icons";
+import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock, ILink } from "../../components/ui/icons";
 
 const FEATURES = [
   { icon: IRadar, title: "Traffic Intelligence", desc: "See every visitor and session with rich device, network and geo signals in real time." },
@@ -16,6 +17,7 @@ const FEATURES = [
   { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
   { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
   { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
+  { icon: ILink, title: "Link Shortener", desc: "Branded short links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." },
 ];
 
 const STEPS = [
@@ -59,6 +61,7 @@ const SLIDES: Slide[] = [
 
 export default function Landing() {
   useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot.");
+  useReveal();
   return (
     <>
       {/* HERO BAND */}
@@ -83,9 +86,9 @@ export default function Landing() {
       {/* METRICS */}
       <Section className="!py-16">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {METRICS.map(([v, k]) => (
-            <div key={k} className="card shadow-soft px-6 py-7 text-center">
-              <div className="text-3xl font-extrabold tracking-tight text-fg">{v}</div>
+          {METRICS.map(([v, k], i) => (
+            <div key={k} className="card card-hover shadow-soft reveal group px-6 py-7 text-center" style={{ transitionDelay: `${i * 60}ms` }}>
+              <div className="text-3xl font-extrabold tracking-tight text-fg transition-colors group-hover:text-brand">{v}</div>
               <div className="mt-1 text-sm text-fg-muted">{k}</div>
             </div>
           ))}
@@ -97,13 +100,14 @@ export default function Landing() {
         <SectionHead eyebrow="Platform" title="Everything you need to trust your traffic"
           sub="One platform to analyze, score, protect and measure the traffic hitting your campaigns." />
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="card card-hover shadow-soft p-6">
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand/10 text-brand">
+          {FEATURES.map((f, i) => (
+            <div key={f.title} className="feature-card card card-hover shadow-soft reveal group relative overflow-hidden p-6" style={{ transitionDelay: `${i * 60}ms` }}>
+              <span className="feature-glow" aria-hidden="true" />
+              <div className="relative grid h-12 w-12 place-items-center rounded-xl bg-brand/10 text-brand transition-all duration-300 group-hover:scale-110 group-hover:bg-brand group-hover:text-white group-hover:shadow-lg group-hover:shadow-brand/30">
                 <f.icon width={22} />
               </div>
-              <h3 className="mt-4 text-lg font-bold">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-fg-muted">{f.desc}</p>
+              <h3 className="relative mt-4 text-lg font-bold transition-colors group-hover:text-brand">{f.title}</h3>
+              <p className="relative mt-2 text-sm leading-relaxed text-fg-muted">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -115,8 +119,8 @@ export default function Landing() {
           sub="Go live in minutes. No infrastructure to run, no data pipelines to build." />
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {STEPS.map(([t, d], i) => (
-            <div key={t} className="card shadow-soft relative p-6">
-              <div className="absolute right-5 top-5 text-4xl font-black text-line">{String(i + 1).padStart(2, "0")}</div>
+            <div key={t} className="card card-hover shadow-soft reveal group relative p-6" style={{ transitionDelay: `${i * 60}ms` }}>
+              <div className="absolute right-5 top-5 text-4xl font-black text-line transition-colors group-hover:text-brand/30">{String(i + 1).padStart(2, "0")}</div>
               <div className="text-sm font-bold text-brand">Step {i + 1}</div>
               <h3 className="mt-2 text-lg font-bold">{t}</h3>
               <p className="mt-2 text-sm leading-relaxed text-fg-muted">{d}</p>
