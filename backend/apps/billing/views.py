@@ -134,7 +134,7 @@ def _notify_activation(sub, plan):
         (
             f"Thanks for subscribing to {settings.BRAND_NAME}.\n\n"
             f"Plan: {plan.name} (${plan.price}/week)\n"
-            f"Included: {plan.max_redirects or '∞'} short links, "
+            f"Included: {plan.max_redirects or '∞'} redirects, "
             f"{plan.max_websites or '∞'} domains.\n"
             f"Access through: {end:%b %d, %Y} (7-day access; unused days roll over when you renew)\n\n"
             f"Manage your subscription any time at {settings.FRONTEND_URL}/dashboard/billing"

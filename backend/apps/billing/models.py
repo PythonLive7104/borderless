@@ -116,7 +116,7 @@ def _paid_active(sub) -> bool:
 
 
 def link_shortener_enabled(organization_id) -> bool:
-    """The Link Shortener (redirects) is included on every paid tier, but NOT on
+    """Redirection (short links) is included on every paid tier, but NOT on
     the free trial — payment gates it to deter abuse. The count of links is then
     capped per tier (see redirect_limit)."""
     sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()

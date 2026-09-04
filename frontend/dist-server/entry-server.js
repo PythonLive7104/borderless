@@ -823,7 +823,7 @@ const FEATURES = [
   { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
   { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
   { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
-  { icon: ILink, title: "Link Shortener", desc: "Branded short links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." }
+  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." }
 ];
 const STEPS = [
   ["Connect your website", "Add a site and get a unique tracking ID in seconds."],
@@ -1041,7 +1041,7 @@ const PLANS = [
 ];
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies (BTC, ETH, USDT, USDC, TON) as well as cards. Crypto keeps billing private and borderless."],
-  ["What are redirects and domains?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
+  ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."]
 ];
@@ -1669,7 +1669,7 @@ function ReportAbuse() {
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
       /* @__PURE__ */ jsxs("div", { className: "container-page relative py-16 text-center", children: [
         /* @__PURE__ */ jsx(Badge, { tone: "light", children: "Abuse" }),
-        /* @__PURE__ */ jsx("h1", { className: "mt-5 text-4xl font-extrabold tracking-tight text-white sm:text-5xl", children: "Report a short link" }),
+        /* @__PURE__ */ jsx("h1", { className: "mt-5 text-4xl font-extrabold tracking-tight text-white sm:text-5xl", children: "Report a redirect link" }),
         /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-xl text-slate-300", children: "Received a link from us that looks like phishing, malware or spam? Tell us here. We re-check the destination the moment you submit, disable it straight away if the threat is confirmed, and put everything else in front of a human." })
       ] })
     ] }),
@@ -1755,7 +1755,7 @@ const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"))
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
-const DashboardLayout = lazy(() => import("./assets/DashboardLayout-BvdFpFbJ.js"));
+const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CPQLHsof.js"));
 const Overview = lazy(() => import("./assets/Overview-DStCz6du.js"));
 const Websites = lazy(() => import("./assets/Websites-B5z4yjqn.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-C-t6Ji6i.js"));
@@ -1763,7 +1763,7 @@ const Campaigns = lazy(() => import("./assets/Campaigns-BMNy-AYa.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-B_aaSU2-.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-CG8Jc1A0.js"));
 const Shield = lazy(() => import("./assets/Shield-DtLeBreS.js"));
-const Links = lazy(() => import("./assets/Links-BrlvZpnZ.js"));
+const Links = lazy(() => import("./assets/Links-f85fXEQ1.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-DiCJQKpT.js"));
 const Visitors = lazy(() => import("./assets/Visitors-VEcRqY-5.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-CPPQkGaU.js"));

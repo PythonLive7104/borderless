@@ -143,9 +143,9 @@ def _notify_owner(report, link):
     if not email:
         return
     send_mail(
-        f"A short link in your workspace was disabled",
+        f"A redirect in your workspace was disabled",
         (
-            f"We received an abuse report about one of your short links and have "
+            f"We received an abuse report about one of your redirects and have "
             f"disabled it while we review.\n\n"
             f"Link:        /{link.slug}\n"
             f"Destination: {link.destination_url}\n"

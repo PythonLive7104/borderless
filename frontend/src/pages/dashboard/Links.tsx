@@ -88,20 +88,20 @@ export default function Links() {
       </PageNote>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Link Shortener</h1>
-          <p className="mt-1 text-sm text-fg-muted">Short links with built-in bot filtering &amp; click analytics.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Redirection</h1>
+          <p className="mt-1 text-sm text-fg-muted">Redirect links with built-in bot filtering &amp; click analytics.</p>
         </div>
-        {canManage && linkEnabled && <Button onClick={openCreate}>+ New link</Button>}
+        {canManage && linkEnabled && <Button onClick={openCreate}>+ New redirect</Button>}
       </div>
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : !linkEnabled ? (
         <div className="card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl">🔗</div>
-          <h2 className="mt-3 text-lg font-bold">The Link Shortener is a Growth feature</h2>
+          <h2 className="mt-3 text-lg font-bold">Redirection is a paid feature</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
-            Create short, bot-filtered campaign links with click analytics. It's available on the
-            <b> Growth</b> plan and above{sub ? <> — you're on <b>{sub.plan.name}</b>.</> : "."}
+            Create bot-filtered campaign redirects with click analytics. It's included on every
+            paid plan{sub ? <> — you're on <b>{sub.plan.name}</b>.</> : "."}
           </p>
           {canManage
             ? <Button to="/dashboard/billing" className="mt-4">Upgrade to unlock →</Button>
@@ -149,7 +149,7 @@ export default function Links() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Create a short link" size="lg">
+      <Modal open={open} onClose={() => setOpen(false)} title="Create a redirect" size="lg">
         <form onSubmit={create} className="space-y-4">
           {/* live preview */}
           <div className="rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">

@@ -114,18 +114,16 @@ function Links() {
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Link Shortener" }),
-        /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Short links with built-in bot filtering & click analytics." })
+        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Redirection" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Redirect links with built-in bot filtering & click analytics." })
       ] }),
-      canManage && linkEnabled && /* @__PURE__ */ jsx(Button, { onClick: openCreate, children: "+ New link" })
+      canManage && linkEnabled && /* @__PURE__ */ jsx(Button, { onClick: openCreate, children: "+ New redirect" })
     ] }),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !linkEnabled ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl", children: "🔗" }),
-      /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "The Link Shortener is a Growth feature" }),
+      /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirection is a paid feature" }),
       /* @__PURE__ */ jsxs("p", { className: "mx-auto mt-2 max-w-md text-sm text-fg-muted", children: [
-        "Create short, bot-filtered campaign links with click analytics. It's available on the",
-        /* @__PURE__ */ jsx("b", { children: " Growth" }),
-        " plan and above",
+        "Create bot-filtered campaign redirects with click analytics. It's included on every paid plan",
         sub ? /* @__PURE__ */ jsxs(Fragment, { children: [
           " — you're on ",
           /* @__PURE__ */ jsx("b", { children: sub.plan.name }),
@@ -184,7 +182,7 @@ function Links() {
         ] })
       ] })
     ] }) }, l.id)) }),
-    /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: "Create a short link", size: "lg", children: /* @__PURE__ */ jsxs("form", { onSubmit: create, className: "space-y-4", children: [
+    /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: "Create a redirect", size: "lg", children: /* @__PURE__ */ jsxs("form", { onSubmit: create, className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 px-4 py-3", children: [
         /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "Your link" }),
         /* @__PURE__ */ jsxs("div", { className: "mt-0.5 break-all font-mono text-sm font-semibold text-brand", children: [

@@ -33,11 +33,11 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         from apps.billing.models import link_shortener_enabled, redirect_limit
         if not link_shortener_enabled(org.id):
             raise PermissionDenied(
-                "Short links are a paid feature. Start a plan on the Billing page to create them.")
+                "Redirects are a paid feature. Start a plan on the Billing page to create them.")
         limit = redirect_limit(org.id)
         if limit and ShortLink.objects.filter(organization_id=org.id).count() >= limit:
             raise PermissionDenied(
-                f"You've reached your plan's short-link limit ({limit}). "
+                f"You've reached your plan's redirect limit ({limit}). "
                 "Upgrade your plan on the Billing page for more redirects.")
         link = serializer.save()
         scan_and_flag(link)   # threat scan; auto-disables if the destination is unsafe
@@ -101,7 +101,7 @@ class AbuseReportView(views.APIView):
 
         reported_url = (request.data.get("url") or "").strip()[:2000]
         if not reported_url:
-            return Response({"detail": "Paste the short link you're reporting."}, status=400)
+            return Response({"detail": "Paste the redirect link you're reporting."}, status=400)
 
         reason = (request.data.get("reason") or "").strip()
         if reason not in AbuseReport.Reason.values:

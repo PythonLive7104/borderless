@@ -52,7 +52,7 @@ export default function ReportAbuse() {
         <div className="container-page relative py-16 text-center">
           <Badge tone="light">Abuse</Badge>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
-            Report a short link
+            Report a redirect link
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-300">
             Received a link from us that looks like phishing, malware or spam? Tell us here.

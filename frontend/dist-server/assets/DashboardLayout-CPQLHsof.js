@@ -521,7 +521,7 @@ const NAV = [
     { label: "Campaigns", to: "/dashboard/campaigns", icon: ITarget },
     { label: "Traffic Rules", to: "/dashboard/traffic-rules", icon: IFilter },
     { label: "Shield", to: "/dashboard/shield", icon: IShieldGold },
-    { label: "Link Shortener", to: "/dashboard/links", icon: ILink },
+    { label: "Redirection", to: "/dashboard/links", icon: ILink },
     { label: "Bot Scanner", to: "/dashboard/scanner", icon: IRadar },
     { label: "Visitors", to: "/dashboard/visitors", icon: IUsers },
     { label: "Click Log", to: "/dashboard/click-log", icon: IList }

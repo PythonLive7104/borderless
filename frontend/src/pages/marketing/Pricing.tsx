@@ -52,7 +52,7 @@ const PLANS: Plan[] = [
 
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies (BTC, ETH, USDT, USDC, TON) as well as cards. Crypto keeps billing private and borderless."],
-  ["What are redirects and domains?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
+  ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
 ];

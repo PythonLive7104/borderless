@@ -17,7 +17,7 @@ const FEATURES = [
   { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
   { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
   { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
-  { icon: ILink, title: "Link Shortener", desc: "Branded short links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." },
+  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." },
 ];
 
 const STEPS = [
