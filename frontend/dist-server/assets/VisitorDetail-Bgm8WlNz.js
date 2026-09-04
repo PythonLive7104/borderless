@@ -22,6 +22,7 @@ function VisitorDetail() {
       /* @__PURE__ */ jsxs("div", { className: "card shadow-soft p-6 lg:col-span-1", children: [
         /* @__PURE__ */ jsx("h2", { className: "text-sm font-bold uppercase tracking-wide text-fg-dim", children: "Profile" }),
         /* @__PURE__ */ jsx("dl", { className: "mt-4 space-y-3 text-sm", children: [
+          ["IP", v.ip || "—"],
           ["Country", v.country || "—"],
           ["Device", v.device || "—"],
           ["Browser", v.browser || "—"],

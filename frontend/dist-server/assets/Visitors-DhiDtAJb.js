@@ -76,6 +76,7 @@ function Visitors() {
       /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-5 overflow-hidden", children: /* @__PURE__ */ jsx("div", { className: "overflow-x-auto", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
         /* @__PURE__ */ jsx("thead", { className: "border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim", children: /* @__PURE__ */ jsxs("tr", { children: [
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Visitor" }),
+          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "IP" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Country" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Device" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Browser / OS" }),
@@ -85,6 +86,7 @@ function Visitors() {
         ] }) }),
         /* @__PURE__ */ jsx("tbody", { className: "divide-y divide-line", children: rows.map((v) => /* @__PURE__ */ jsxs("tr", { className: "hover:bg-bg-soft", children: [
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsx(Link, { to: `/dashboard/visitors/${v.id}`, className: "font-mono font-semibold hover:text-brand", children: v.visitor_id.slice(0, 14) }) }),
+          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 font-mono text-xs", children: v.ip || "—" }),
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.country || "—" }),
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3 capitalize", children: v.device || "—" }),
           /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 text-fg-muted", children: [

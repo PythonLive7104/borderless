@@ -291,7 +291,7 @@ export interface Overview {
   breakdowns: { countries: KV[]; devices: KV[]; classifications: KV[]; sources: KV[] };
 }
 export interface VisitorRow {
-  id: number; visitor_id: string; country: string; device: string; browser: string; os: string;
+  id: number; visitor_id: string; ip: string | null; country: string; device: string; browser: string; os: string;
   first_seen: string; last_seen: string; events: number; max_risk: number | null; fingerprint: string;
 }
 export interface EventRow {

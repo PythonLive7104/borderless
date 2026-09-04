@@ -19,5 +19,5 @@ class VisitorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Visitor
-        fields = ["id", "visitor_id", "country", "device", "browser", "os", "fingerprint",
+        fields = ["id", "visitor_id", "ip", "country", "device", "browser", "os", "fingerprint",
                   "first_seen", "last_seen", "events", "max_risk"]

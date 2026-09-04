@@ -21,7 +21,7 @@ export default function VisitorDetail() {
         <div className="card shadow-soft p-6 lg:col-span-1">
           <h2 className="text-sm font-bold uppercase tracking-wide text-fg-dim">Profile</h2>
           <dl className="mt-4 space-y-3 text-sm">
-            {[["Country", v.country || "—"], ["Device", v.device || "—"], ["Browser", v.browser || "—"], ["OS", v.os || "—"], ["Fingerprint", v.fingerprint || "—"],
+            {[["IP", v.ip || "—"], ["Country", v.country || "—"], ["Device", v.device || "—"], ["Browser", v.browser || "—"], ["OS", v.os || "—"], ["Fingerprint", v.fingerprint || "—"],
               ["Sessions", String(data.sessions)], ["Events", String(v.events)], ["Max risk", v.max_risk ?? "—"],
               ["First seen", new Date(v.first_seen).toLocaleString()], ["Last seen", new Date(v.last_seen).toLocaleString()]].map(([k, val]) => (
               <div key={k} className="flex justify-between gap-3"><dt className="text-fg-muted">{k}</dt><dd className="text-right capitalize">{val as string}</dd></div>

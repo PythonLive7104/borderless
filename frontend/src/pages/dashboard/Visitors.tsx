@@ -54,12 +54,13 @@ export default function Visitors() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
-                <tr><th className="px-4 py-3">Visitor</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">Device</th><th className="px-4 py-3">Browser / OS</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Max risk</th><th className="px-4 py-3">Last seen</th></tr>
+                <tr><th className="px-4 py-3">Visitor</th><th className="px-4 py-3">IP</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">Device</th><th className="px-4 py-3">Browser / OS</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Max risk</th><th className="px-4 py-3">Last seen</th></tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.map((v) => (
                   <tr key={v.id} className="hover:bg-bg-soft">
                     <td className="px-4 py-3"><Link to={`/dashboard/visitors/${v.id}`} className="font-mono font-semibold hover:text-brand">{v.visitor_id.slice(0, 14)}</Link></td>
+                    <td className="px-4 py-3 font-mono text-xs">{v.ip || "—"}</td>
                     <td className="px-4 py-3">{v.country || "—"}</td>
                     <td className="px-4 py-3 capitalize">{v.device || "—"}</td>
                     <td className="px-4 py-3 text-fg-muted">{v.browser} · {v.os}</td>
