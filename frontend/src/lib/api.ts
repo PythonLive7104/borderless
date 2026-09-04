@@ -368,7 +368,8 @@ export const webhookApi = {
 };
 
 // ---- billing ----
-export interface Plan { id: number; slug: string; name: string; price: number; monthly_events: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; }
+export type BillingInterval = "weekly" | "monthly";
+export interface Plan { id: number; slug: string; name: string; price: number; price_monthly: number; monthly_events: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; }
 export interface AccessState {
   locked: boolean;
   reason: "active" | "trialing" | "trial_expired" | "period_ended" | "canceled";
@@ -376,7 +377,7 @@ export interface AccessState {
   trial_end: string | null;
   days_left: number | null;
 }
-export interface Subscription { id: number; plan: Plan; status: "trialing" | "active" | "canceled"; period_start: string; period_end: string; trial_end: string | null; access: AccessState; created_at: string; }
+export interface Subscription { id: number; plan: Plan; status: "trialing" | "active" | "canceled"; interval: BillingInterval; period_start: string; period_end: string; trial_end: string | null; access: AccessState; created_at: string; }
 export interface Usage {
   period: { start: string; end: string };
   events: { used: number; limit: number; pct: number; remaining: number; level: "ok" | "notice" | "warning" | "critical" };
@@ -389,9 +390,10 @@ export interface Usage {
 export const billingApi = {
   plans: () => http.get<Plan[]>("/billing/plans/"),
   subscription: (orgId: number) => http.get<Subscription>(`/billing/subscription/?organization=${orgId}`),
-  changePlan: (orgId: number, plan: string) => http.post<Subscription>("/billing/subscription/change/", { organization: orgId, plan }),
-  checkout: (orgId: number, plan: string) =>
-    http.post<{ checkout_url?: string; activated?: boolean } & Partial<Subscription>>("/billing/checkout/", { organization: orgId, plan }),
+  changePlan: (orgId: number, plan: string, interval?: BillingInterval) =>
+    http.post<Subscription>("/billing/subscription/change/", { organization: orgId, plan, interval }),
+  checkout: (orgId: number, plan: string, interval: BillingInterval = "weekly") =>
+    http.post<{ checkout_url?: string; activated?: boolean } & Partial<Subscription>>("/billing/checkout/", { organization: orgId, plan, interval }),
   cancel: (orgId: number) => http.post<Subscription>("/billing/subscription/cancel/", { organization: orgId }),
   usage: (orgId: number) => http.get<Usage>(`/billing/usage/?organization=${orgId}`),
 };

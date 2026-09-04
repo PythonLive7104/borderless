@@ -27,6 +27,8 @@ class Command(BaseCommand):
                             help="Organization id or slug.")
         parser.add_argument("--plan", required=True,
                             help="Plan slug: basic | plus | pro.")
+        parser.add_argument("--interval", choices=["weekly", "monthly"], default=None,
+                            help="Billing interval to grant (default: keep what they're on).")
         parser.add_argument("--days", type=int, default=None,
                             help="Override the access window length (default: the plan's 7-day period).")
 
@@ -43,10 +45,11 @@ class Command(BaseCommand):
             raise CommandError(f"No plan {opts['plan']!r}. Available: {available}")
 
         sub, _ = Subscription.objects.get_or_create(organization=org, defaults={"plan": plan})
-        sub.start_period(plan)            # ACTIVE + a real future period_end, with rollover
+        sub.start_period(plan, opts["interval"])   # ACTIVE + a real future period_end
         if opts["days"]:
             sub.period_end = timezone.now() + timedelta(days=opts["days"])
-        sub.save(update_fields=["plan", "status", "period_start", "period_end", "pending_plan_slug"])
+        sub.save(update_fields=["plan", "status", "interval", "period_start", "period_end",
+                                "pending_plan_slug", "pending_interval"])
 
         # Republish rules/site/apikey/shortlink keys so the engine starts
         # protecting and redirecting again straight away.
@@ -54,5 +57,5 @@ class Command(BaseCommand):
 
         state = sub.access_state()
         self.stdout.write(self.style.SUCCESS(
-            f"[{org.slug}] {plan.name} active until {sub.period_end:%Y-%m-%d %H:%M} UTC "
+            f"[{org.slug}] {plan.name} ({sub.interval}) active until {sub.period_end:%Y-%m-%d %H:%M} UTC "
             f"— locked={state['locked']} ({state['reason']}), {state['days_left']} day(s) left."))

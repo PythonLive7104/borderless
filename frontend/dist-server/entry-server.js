@@ -268,8 +268,8 @@ const webhookApi = {
 const billingApi = {
   plans: () => http.get("/billing/plans/"),
   subscription: (orgId) => http.get(`/billing/subscription/?organization=${orgId}`),
-  changePlan: (orgId, plan) => http.post("/billing/subscription/change/", { organization: orgId, plan }),
-  checkout: (orgId, plan) => http.post("/billing/checkout/", { organization: orgId, plan }),
+  changePlan: (orgId, plan, interval) => http.post("/billing/subscription/change/", { organization: orgId, plan, interval }),
+  checkout: (orgId, plan, interval = "weekly") => http.post("/billing/checkout/", { organization: orgId, plan, interval }),
   cancel: (orgId) => http.post("/billing/subscription/cancel/", { organization: orgId }),
   usage: (orgId) => http.get(`/billing/usage/?organization=${orgId}`)
 };
@@ -1109,6 +1109,25 @@ function Landing() {
     ] }) })
   ] });
 }
+function IntervalToggle({ value, onChange, savings, dark = false }) {
+  const track = dark ? "border-white/20 bg-white/10" : "border-line bg-bg-mute";
+  const on = dark ? "bg-white text-navy-900" : "bg-white text-fg shadow-soft";
+  const off = dark ? "text-slate-300 hover:text-white" : "text-fg-muted hover:text-fg";
+  return /* @__PURE__ */ jsxs("div", { className: "inline-flex items-center gap-3", children: [
+    /* @__PURE__ */ jsx("div", { className: `inline-flex rounded-full border p-1 ${track}`, role: "group", "aria-label": "Billing interval", children: ["weekly", "monthly"].map((v) => /* @__PURE__ */ jsx(
+      "button",
+      {
+        type: "button",
+        onClick: () => onChange(v),
+        "aria-pressed": value === v,
+        className: `rounded-full px-4 py-1.5 text-sm font-semibold capitalize transition ${value === v ? on : off}`,
+        children: v
+      },
+      v
+    )) }),
+    savings && value === "monthly" && /* @__PURE__ */ jsx("span", { className: "rounded-full border border-success/25 bg-success/10 px-2.5 py-1 text-xs font-bold text-success", children: savings })
+  ] });
+}
 function Badge({ children, tone = "brand" }) {
   const tones = {
     brand: "border-brand/20 bg-brand/8 text-brand",
@@ -1156,6 +1175,7 @@ const PLANS = [
   {
     name: "Basic",
     price: 25,
+    priceMonthly: 50,
     tag: "Smart redirects with bot detection, for solo buyers",
     cta: "Get Basic",
     redirects: "2",
@@ -1166,6 +1186,7 @@ const PLANS = [
   {
     name: "Plus",
     price: 40,
+    priceMonthly: 100,
     tag: "More links & domains for growing campaigns",
     cta: "Get Plus",
     highlight: true,
@@ -1177,6 +1198,7 @@ const PLANS = [
   {
     name: "Pro",
     price: 70,
+    priceMonthly: 150,
     tag: "Top limits & dedicated support for agencies",
     cta: "Get Pro",
     ribbon: "TOP VALUE",
@@ -1216,7 +1238,9 @@ function PlusDivider() {
   ] });
 }
 function Pricing() {
-  useSeo("Pricing", "Simple weekly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
+  useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
+  const [interval, setInterval2] = useState("weekly");
+  const monthly = interval === "monthly";
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
@@ -1231,6 +1255,7 @@ function Pricing() {
       /* @__PURE__ */ jsx("div", { className: "mt-5", children: /* @__PURE__ */ jsx(CryptoIcons, {}) })
     ] }) }),
     /* @__PURE__ */ jsxs(Section, { className: "!pt-20", children: [
+      /* @__PURE__ */ jsx("div", { className: "mb-10 flex justify-center", children: /* @__PURE__ */ jsx(IntervalToggle, { value: interval, onChange: setInterval2, savings: "Save up to 46%" }) }),
       /* @__PURE__ */ jsx("div", { className: "grid items-stretch gap-6 lg:grid-cols-3", children: PLANS.map((p) => /* @__PURE__ */ jsxs(
         "div",
         {
@@ -1243,11 +1268,21 @@ function Pricing() {
             /* @__PURE__ */ jsxs("div", { className: "mt-5 flex items-end gap-1", children: [
               /* @__PURE__ */ jsxs("span", { className: "text-4xl font-extrabold tracking-tight", children: [
                 "$",
-                p.price
+                monthly ? p.priceMonthly : p.price
               ] }),
-              /* @__PURE__ */ jsx("span", { className: "pb-1 text-sm text-fg-dim", children: "/week" })
+              /* @__PURE__ */ jsxs("span", { className: "pb-1 text-sm text-fg-dim", children: [
+                "/",
+                monthly ? "month" : "week"
+              ] })
             ] }),
-            /* @__PURE__ */ jsx("div", { className: "mt-0.5 text-xs text-fg-dim", children: p.access }),
+            /* @__PURE__ */ jsxs("div", { className: "mt-0.5 text-xs text-fg-dim", children: [
+              monthly ? "30 days of access" : p.access,
+              monthly && /* @__PURE__ */ jsxs("span", { className: "ml-1 font-semibold text-success", children: [
+                "· save $",
+                p.price * 4 - p.priceMonthly,
+                "/mo vs weekly"
+              ] })
+            ] }),
             /* @__PURE__ */ jsx("div", { className: "mt-6 text-xs font-bold uppercase tracking-wider text-fg-dim", children: "Key features" }),
             /* @__PURE__ */ jsx("div", { className: "mt-3", children: p.groups.map((g, gi) => /* @__PURE__ */ jsxs("div", { children: [
               gi > 0 && /* @__PURE__ */ jsx(PlusDivider, {}),
@@ -1266,7 +1301,7 @@ function Pricing() {
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
                 /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Access" }),
-                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: "Weekly" })
+                /* @__PURE__ */ jsx("span", { className: "font-semibold capitalize", children: interval })
               ] })
             ] }),
             /* @__PURE__ */ jsxs(Button, { to: "/signup", variant: p.highlight ? "primary" : "outline", className: "mt-5 w-full", children: [
@@ -1923,17 +1958,17 @@ const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
 const ApiKeys = lazy(() => import("./assets/ApiKeys-H3AxfYYu.js"));
 const Webhooks = lazy(() => import("./assets/Webhooks-D8L6DdRq.js"));
-const Billing = lazy(() => import("./assets/Billing-Cdss7Sgd.js"));
+const Billing = lazy(() => import("./assets/Billing-DKky7JhT.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
 const Team = lazy(() => import("./assets/Team-D2c6g8rK.js"));
 const Settings = lazy(() => import("./assets/Settings-A9nqqFl4.js"));
-const Reports = lazy(() => import("./assets/Reports-D2MVz91p.js"));
+const Reports = lazy(() => import("./assets/Reports-COUlwmuS.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
-const AdminOverview = lazy(() => import("./assets/AdminOverview-CDbKn7IW.js"));
-const AdminUsers = lazy(() => import("./assets/AdminUsers-DxQichc9.js"));
-const AdminOrgs = lazy(() => import("./assets/AdminOrgs-OwEQSpRL.js"));
-const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-Bx4Rlcj6.js"));
-const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-BGAgjTi7.js"));
+const AdminOverview = lazy(() => import("./assets/AdminOverview-Bi8GBsOo.js"));
+const AdminUsers = lazy(() => import("./assets/AdminUsers-BS8Mquko.js"));
+const AdminOrgs = lazy(() => import("./assets/AdminOrgs-9suuwPPk.js"));
+const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-DNAUNrmg.js"));
+const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-BOhqnnXn.js"));
 const spinner = /* @__PURE__ */ jsx("div", { className: "grid min-h-screen place-items-center", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
 function AppRoutes() {
   return /* @__PURE__ */ jsx(Suspense, { fallback: spinner, children: /* @__PURE__ */ jsxs(Routes, { children: [
@@ -2017,9 +2052,10 @@ export {
   conversionsApi as M,
   keysApi as N,
   webhookApi as O,
-  downloadReportCsv as P,
-  adminApi as Q,
+  IntervalToggle as P,
+  downloadReportCsv as Q,
   RULE_FIELDS as R,
+  adminApi as S,
   authApi as a,
   BRAND$1 as b,
   useWorkspace as c,

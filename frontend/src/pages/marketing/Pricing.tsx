@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { useSeo } from "../../lib/seo";
+import IntervalToggle from "../../components/ui/IntervalToggle";
+import type { BillingInterval } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
@@ -7,7 +10,7 @@ import CryptoIcons from "../../components/marketing/CryptoIcons";
 
 type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
-  name: string; price: number; tag: string; cta: string;
+  name: string; price: number; priceMonthly: number; tag: string; cta: string;
   highlight?: boolean; ribbon?: string; warning?: string;
   redirects: string; domains: string; access: string;
   groups: Group[];
@@ -31,17 +34,17 @@ const PRO_ADD: string[] = [
 
 const PLANS: Plan[] = [
   {
-    name: "Basic", price: 25, tag: "Smart redirects with bot detection, for solo buyers",
+    name: "Basic", price: 25, priceMonthly: 50, tag: "Smart redirects with bot detection, for solo buyers",
     cta: "Get Basic", redirects: "2", domains: "5", access: "7 days of access",
     groups: [{ items: BASE }],
   },
   {
-    name: "Plus", price: 40, tag: "More links & domains for growing campaigns",
+    name: "Plus", price: 40, priceMonthly: 100, tag: "More links & domains for growing campaigns",
     cta: "Get Plus", highlight: true, redirects: "5", domains: "10", access: "7 days of access",
     groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }],
   },
   {
-    name: "Pro", price: 70, tag: "Top limits & dedicated support for agencies",
+    name: "Pro", price: 70, priceMonthly: 150, tag: "Top limits & dedicated support for agencies",
     cta: "Get Pro", ribbon: "TOP VALUE", redirects: "10", domains: "20", access: "7 days of access",
     groups: [
       { items: BASE },
@@ -85,7 +88,9 @@ function PlusDivider() {
 }
 
 export default function Pricing() {
-  useSeo("Pricing", "Simple weekly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
+  useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
+  const [interval, setInterval] = useState<BillingInterval>("weekly");
+  const monthly = interval === "monthly";
   return (
     <>
       <section className="hero-band relative overflow-hidden">
@@ -107,6 +112,9 @@ export default function Pricing() {
       </div>
 
       <Section className="!pt-20">
+        <div className="mb-10 flex justify-center">
+          <IntervalToggle value={interval} onChange={setInterval} savings="Save up to 46%" />
+        </div>
         <div className="grid items-stretch gap-6 lg:grid-cols-3">
           {PLANS.map((p) => (
             <div key={p.name}
@@ -128,10 +136,17 @@ export default function Pricing() {
               <h3 className="text-lg font-bold">{p.name}</h3>
               <p className="mt-1 text-sm text-fg-muted">{p.tag}</p>
               <div className="mt-5 flex items-end gap-1">
-                <span className="text-4xl font-extrabold tracking-tight">${p.price}</span>
-                <span className="pb-1 text-sm text-fg-dim">/week</span>
+                <span className="text-4xl font-extrabold tracking-tight">
+                  ${monthly ? p.priceMonthly : p.price}
+                </span>
+                <span className="pb-1 text-sm text-fg-dim">/{monthly ? "month" : "week"}</span>
               </div>
-              <div className="mt-0.5 text-xs text-fg-dim">{p.access}</div>
+              <div className="mt-0.5 text-xs text-fg-dim">
+                {monthly ? "30 days of access" : p.access}
+                {monthly && <span className="ml-1 font-semibold text-success">
+                  · save ${p.price * 4 - p.priceMonthly}/mo vs weekly
+                </span>}
+              </div>
 
               <div className="mt-6 text-xs font-bold uppercase tracking-wider text-fg-dim">Key features</div>
               <div className="mt-3">
@@ -151,7 +166,7 @@ export default function Pricing() {
               <div className="border-t border-line pt-5 text-sm">
                 <div className="flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{p.redirects}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Domains</span><span className="font-semibold">{p.domains}</span></div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold">Weekly</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>
               <Button to="/signup" variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {p.cta}</Button>
             </div>

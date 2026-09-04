@@ -44,9 +44,13 @@ class ChangePlanView(views.APIView):
         plan = Plan.objects.filter(slug=request.data.get("plan")).first()
         if not plan:
             return Response({"detail": "Unknown plan."}, status=400)
+        interval = (request.data.get("interval") or "").lower() or None
+        if interval and interval not in INTERVAL_DAYS:
+            return Response({"detail": "Interval must be 'weekly' or 'monthly'."}, status=400)
         sub = _get_subscription(org_id)
-        sub.start_period(plan)  # rollover-aware; payment stubbed for the MVP
-        sub.save(update_fields=["plan", "status", "period_start", "period_end", "pending_plan_slug"])
+        sub.start_period(plan, interval)  # rollover-aware; payment stubbed for the MVP
+        sub.save(update_fields=["plan", "status", "interval", "period_start", "period_end",
+                                "pending_plan_slug", "pending_interval"])
         return Response(SubscriptionSerializer(sub).data)
 
 
@@ -119,6 +123,7 @@ from django.core.mail import send_mail
 
 from . import bachs
 from .entitlements import restore_org
+from .models import INTERVAL_DAYS, MONTHLY, WEEKLY
 
 
 def _notify_activation(sub, plan):
@@ -133,10 +138,10 @@ def _notify_activation(sub, plan):
         f"Your {plan.name} plan is active",
         (
             f"Thanks for subscribing to {settings.BRAND_NAME}.\n\n"
-            f"Plan: {plan.name} (${plan.price}/week)\n"
+            f"Plan: {plan.name} (${plan.price_for(sub.interval)}/{'month' if sub.interval == MONTHLY else 'week'})\n"
             f"Included: {plan.max_redirects or '∞'} redirects, "
             f"{plan.max_websites or '∞'} domains.\n"
-            f"Access through: {end:%b %d, %Y} (7-day access; unused days roll over when you renew)\n\n"
+            f"Access through: {end:%b %d, %Y} ({sub.period_days}-day access; unused days roll over when you renew)\n\n"
             f"Manage your subscription any time at {settings.FRONTEND_URL}/dashboard/billing"
         ),
         settings.DEFAULT_FROM_EMAIL,
@@ -145,9 +150,10 @@ def _notify_activation(sub, plan):
     )
 
 
-def _activate(sub, plan):
-    sub.start_period(plan)  # applies the plan + rolls unused days into the new period
-    sub.save(update_fields=["plan", "status", "period_start", "period_end", "pending_plan_slug"])
+def _activate(sub, plan, interval=None):
+    sub.start_period(plan, interval)  # plan + interval, rolling unused days over
+    sub.save(update_fields=["plan", "status", "interval", "period_start", "period_end",
+                            "pending_plan_slug", "pending_interval"])
     # Put the engine keys back immediately — a renewal shouldn't wait for the
     # hourly enforce_access run to start protecting traffic again.
     restore_org(sub.organization_id)
@@ -168,13 +174,18 @@ class CheckoutView(views.APIView):
         plan = Plan.objects.filter(slug=request.data.get("plan")).first()
         if not plan:
             return Response({"detail": "Unknown plan."}, status=400)
+
+        interval = (request.data.get("interval") or WEEKLY).lower()
+        if interval not in INTERVAL_DAYS:
+            return Response({"detail": "Interval must be 'weekly' or 'monthly'."}, status=400)
+        if not plan.offers(interval):
+            return Response({"detail": f"{plan.name} isn't available on {interval} billing."}, status=400)
+
         sub = _get_subscription(org_id)
+        product_id = plan.product_for(interval)
 
-        # product id comes from the DB field, falling back to the env mapping
-        product_id = plan.bachs_product_id or settings.BACHS_PRODUCTS.get(plan.slug, "")
-
-        if plan.price == 0 or not bachs.is_enabled() or not product_id:
-            _activate(sub, plan)  # dev stub / free plan
+        if plan.price_for(interval) == 0 or not bachs.is_enabled() or not product_id:
+            _activate(sub, plan, interval)  # dev stub / free plan
             return Response({"activated": True, **SubscriptionSerializer(sub).data})
 
         front = settings.FRONTEND_URL.rstrip("/")
@@ -183,7 +194,8 @@ class CheckoutView(views.APIView):
             email=request.user.email,
             return_url=f"{front}/dashboard/billing?checkout=success",
             cancel_url=f"{front}/dashboard/billing?checkout=cancelled",
-            metadata={"organization_id": str(org_id), "plan_slug": plan.slug},
+            metadata={"organization_id": str(org_id), "plan_slug": plan.slug,
+                      "interval": interval},
         )
         if err:
             return Response({"detail": err}, status=502)
@@ -193,7 +205,8 @@ class CheckoutView(views.APIView):
         # Bachs doesn't echo our metadata back.
         sub.bachs_session_id = session_id
         sub.pending_plan_slug = plan.slug
-        sub.save(update_fields=["bachs_session_id", "pending_plan_slug"])
+        sub.pending_interval = interval
+        sub.save(update_fields=["bachs_session_id", "pending_plan_slug", "pending_interval"])
         if not checkout_url:
             return Response({"detail": "Bachs did not return a checkout URL.", "raw": data}, status=502)
         return Response({"checkout_url": checkout_url})
@@ -274,10 +287,14 @@ class BachsWebhookView(views.APIView):
             sub = Subscription.objects.filter(bachs_session_id=session_id).first()
         plan_slug = meta.get("plan_slug") or (sub.pending_plan_slug if sub else "")
         plan = Plan.objects.filter(slug=plan_slug).first() if plan_slug else None
+        interval = (meta.get("interval") or (sub.pending_interval if sub else "") or WEEKLY).lower()
+        if interval not in INTERVAL_DAYS:
+            interval = WEEKLY
 
         if sub and plan:
-            _activate(sub, plan)
-            log.info("bachs webhook: activated org=%s plan=%s (type=%s)", sub.organization_id, plan.slug, etype)
+            _activate(sub, plan, interval)
+            log.info("bachs webhook: activated org=%s plan=%s interval=%s (type=%s)",
+                     sub.organization_id, plan.slug, interval, etype)
         else:
             log.warning("bachs webhook: could NOT activate — type=%s sub_found=%s plan_slug=%r session=%r",
                         etype, bool(sub), plan_slug, session_id)

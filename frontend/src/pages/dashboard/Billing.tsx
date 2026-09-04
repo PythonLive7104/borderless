@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { billingApi, type Plan, type Subscription } from "../../lib/api";
+import { type BillingInterval, billingApi, type Plan, type Subscription } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
+import IntervalToggle from "../../components/ui/IntervalToggle";
 import PageNote from "../../components/dashboard/PageNote";
 import { ILink, IGlobe } from "../../components/ui/icons";
 
@@ -58,6 +59,11 @@ export default function Billing() {
   const { current } = useWorkspace();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
+  // Which interval the buy buttons purchase. Defaults to what they're already
+  // on, so "Renew" renews like-for-like instead of silently switching them.
+  const [interval, setBillingInterval] = useState<BillingInterval>("weekly");
+  const monthly = interval === "monthly";
+  const priceOf = (p: Plan) => (monthly ? p.price_monthly : p.price);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -72,6 +78,7 @@ export default function Billing() {
     setLoading(true);
     try {
       const [s, p] = await Promise.all([billingApi.subscription(current.id), billingApi.plans()]);
+      if (s.interval) setBillingInterval(s.interval);
       setSub(s); setPlans(p);
     } finally { setLoading(false); }
   }
@@ -109,7 +116,7 @@ export default function Billing() {
     if (!target) return;
     setBusy(true); setErr("");
     try {
-      const res = await billingApi.checkout(current!.id, target.slug);
+      const res = await billingApi.checkout(current!.id, target.slug, interval);
       if (res.checkout_url) {
         window.location.href = res.checkout_url;  // redirect to Bachs hosted checkout
         return;
@@ -160,10 +167,10 @@ export default function Billing() {
           <div className="mt-1 flex items-center gap-2">
             <span className="text-2xl font-extrabold">{sub.plan.name}</span>
             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${statusTone[sub.status]}`}>{sub.status}</span>
-            <span className="rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-muted">Weekly</span>
+            <span className="rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-muted">{sub.interval}</span>
           </div>
           <div className="mt-1 text-sm text-fg-muted">
-            ${sub.plan.price}/week · {daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} of access left` : "renew when it runs out"}
+            ${sub.interval === "monthly" ? sub.plan.price_monthly : sub.plan.price}/{sub.interval === "monthly" ? "month" : "week"} · {daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} of access left` : "renew when it runs out"}
             {sub.period_end && ` · access through ${new Date(sub.period_end).toLocaleDateString()}`}
           </div>
         </div>
@@ -171,6 +178,9 @@ export default function Billing() {
       </div>
 
       {/* pricing tiers */}
+      <div className="mt-8 flex justify-center">
+        <IntervalToggle value={interval} onChange={setBillingInterval} savings="Save up to 46%" />
+      </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
         {plans.map((p) => {
           const isCurrent = p.slug === isCurrentSlug;
@@ -182,10 +192,10 @@ export default function Billing() {
               )}
               <h3 className="text-lg font-bold">{p.name}</h3>
               <div className="mt-1 flex items-end gap-1">
-                <span className="text-3xl font-extrabold">${p.price}</span>
-                <span className="pb-1 text-sm text-fg-dim">/week</span>
+                <span className="text-3xl font-extrabold">${priceOf(p)}</span>
+                <span className="pb-1 text-sm text-fg-dim">/{monthly ? "month" : "week"}</span>
               </div>
-              <div className="mt-0.5 text-xs text-fg-dim">7 days of access</div>
+              <div className="mt-0.5 text-xs text-fg-dim">{monthly ? "30" : "7"} days of access</div>
 
               {/* redirects / domains caps */}
               <div className="mt-4 grid grid-cols-2 gap-3">
@@ -212,7 +222,7 @@ export default function Billing() {
                   <Link to="/dashboard/shield" className="mt-2 block text-center text-xs font-semibold text-fg-muted hover:text-brand">Configure anti-bot</Link>
                 </div>
               ) : canManage ? (
-                <Button onClick={() => { setErr(""); setTarget(p); }} variant={p.price > sub.plan.price ? "primary" : "outline"} className="mt-5 w-full">
+                <Button onClick={() => { setErr(""); setTarget(p); }} variant={p.price > sub.plan.price ? "primary" : "outline"}  /* tier order, not interval */ className="mt-5 w-full">
                   Switch to {p.name} (week)
                 </Button>
               ) : <div className="mt-5 text-center text-xs text-fg-dim">Ask an admin to change plans</div>}
@@ -226,12 +236,12 @@ export default function Billing() {
         {target && sub && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">
-              {target.slug === sub.plan.slug ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${target.price}/week</b>
+              {target.slug === sub.plan.slug ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
               {" "}({target.max_redirects || "∞"} redirects, {target.max_websites || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
               You'll be taken to our secure checkout (Bachs) — card, mobile money or crypto. Access starts as
-              soon as payment succeeds, for 7 days. Any days you have left are added on top, so you never lose time.
+              soon as payment succeeds, for {monthly ? 30 : 7} days. Any days you have left are added on top, so you never lose time.
             </p>
             {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
             <div className="flex gap-2">

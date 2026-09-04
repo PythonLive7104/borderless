@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -211,3 +211,94 @@ class GrantPlanCommandTest(TestCase):
         call_command("grant_plan", "--org", str(self.org.id), "--plan", "pro", verbosity=0)
         self.assertTrue(link_shortener_enabled(self.org.id))
         self.assertEqual(redirect_limit(self.org.id), 10)
+
+
+@override_settings(BACHS_PRODUCTS_MONTHLY={"basic": "", "plus": "", "pro": ""})
+class MonthlyIntervalTest(TestCase):
+    """Weekly and monthly are two prepaid window lengths on the same tier."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {"email": "iv@example.com", "password": "testpass123",
+                                            "first_name": "I"}, format="json")
+        access = self.c.post("/api/auth/token/", {"email": "iv@example.com", "password": "testpass123"},
+                             format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+
+    def _checkout(self, plan, interval=None):
+        body = {"organization": self.org, "plan": plan}
+        if interval:
+            body["interval"] = interval
+        with patch("apps.billing.bachs.is_enabled", return_value=False):
+            return self.c.post("/api/billing/checkout/", body, format="json")
+
+    def test_monthly_prices_are_seeded(self):
+        from apps.billing.models import Plan
+        self.assertEqual(
+            {p.slug: p.price_monthly for p in Plan.objects.all()},
+            {"basic": 50, "plus": 100, "pro": 150})
+
+    def test_monthly_is_cheaper_than_four_weeks(self):
+        # If this ever inverts, the toggle is advertising a discount that isn't one.
+        from apps.billing.models import Plan
+        for p in Plan.objects.all():
+            self.assertLess(p.price_monthly, p.price * 4, p.slug)
+
+    def test_weekly_checkout_gives_a_7_day_window(self):
+        self.assertEqual(self._checkout("plus").status_code, 200)
+        sub = Subscription.objects.get(organization_id=self.org)
+        self.assertEqual(sub.interval, "weekly")
+        self.assertEqual(sub.period_days, 7)
+
+    def test_monthly_checkout_gives_a_30_day_window(self):
+        self.assertEqual(self._checkout("plus", "monthly").status_code, 200)
+        sub = Subscription.objects.get(organization_id=self.org)
+        self.assertEqual(sub.interval, "monthly")
+        self.assertEqual(sub.period_days, 30)
+        # 30 days plus whatever trial time was left, thanks to rollover.
+        self.assertGreater(sub.period_end, timezone.now() + timedelta(days=29))
+
+    def test_defaults_to_weekly_when_no_interval_is_sent(self):
+        self._checkout("basic")
+        self.assertEqual(Subscription.objects.get(organization_id=self.org).interval, "weekly")
+
+    def test_bad_interval_is_rejected(self):
+        r = self._checkout("basic", "yearly")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("weekly", r.json()["detail"])
+
+    def test_switching_interval_keeps_the_tier_and_rolls_days_over(self):
+        self._checkout("pro", "weekly")
+        sub = Subscription.objects.get(organization_id=self.org)
+        weekly_end = sub.period_end
+        self._checkout("pro", "monthly")
+        sub.refresh_from_db()
+        self.assertEqual(sub.plan.slug, "pro")
+        self.assertEqual(sub.interval, "monthly")
+        self.assertGreater(sub.period_end, weekly_end)   # no time lost in the switch
+
+    def test_price_and_product_resolve_per_interval(self):
+        from apps.billing.models import Plan
+        pro = Plan.objects.get(slug="pro")
+        self.assertEqual(pro.price_for("weekly"), 70)
+        self.assertEqual(pro.price_for("monthly"), 150)
+        pro.bachs_product_id = "prod_weekly"
+        pro.bachs_product_id_monthly = "prod_monthly"
+        self.assertEqual(pro.product_for("weekly"), "prod_weekly")
+        self.assertEqual(pro.product_for("monthly"), "prod_monthly")
+
+    def test_monthly_is_refused_while_the_tier_has_no_monthly_price(self):
+        from apps.billing.models import Plan
+        Plan.objects.filter(slug="basic").update(price_monthly=0)
+        r = self._checkout("basic", "monthly")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("monthly", r.json()["detail"])
+
+    def test_grant_plan_can_grant_monthly(self):
+        call_command("grant_plan", "--org", str(self.org), "--plan", "pro",
+                     "--interval", "monthly", verbosity=0)
+        sub = Subscription.objects.get(organization_id=self.org)
+        self.assertEqual(sub.interval, "monthly")
+        self.assertEqual(sub.period_days, 30)

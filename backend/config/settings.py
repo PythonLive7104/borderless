@@ -190,6 +190,15 @@ BACHS_PRODUCTS = {
     "plus": os.getenv("BACHS_PRODUCT_GROWTH", ""),
     "pro": os.getenv("BACHS_PRODUCT_BUSINESS", ""),
 }
+# Monthly is a SEPARATE Bachs product per tier (different price), so it needs its
+# own ids. Leave blank until the monthly products exist in the Bachs dashboard —
+# checkout then reports monthly as unavailable rather than charging the weekly
+# price by mistake.
+BACHS_PRODUCTS_MONTHLY = {
+    "basic": os.getenv("BACHS_PRODUCT_BASIC_MONTHLY", ""),
+    "plus": os.getenv("BACHS_PRODUCT_PLUS_MONTHLY", ""),
+    "pro": os.getenv("BACHS_PRODUCT_PRO_MONTHLY", ""),
+}
 
 # Threat scanning (destination-URL safety). Optional; scan no-ops when unset.
 GOOGLE_SAFE_BROWSING_KEY = os.getenv("GOOGLE_SAFE_BROWSING_KEY", "")

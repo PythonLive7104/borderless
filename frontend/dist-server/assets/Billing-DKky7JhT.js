@@ -1,7 +1,7 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { c as useWorkspace, d as billingApi, B as Button, i as ILink, e as IGlobe } from "../entry-server.js";
+import { c as useWorkspace, d as billingApi, B as Button, P as IntervalToggle, i as ILink, e as IGlobe } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import "react-dom/server";
@@ -51,6 +51,9 @@ function Billing() {
   const { current } = useWorkspace();
   const [sub, setSub] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [interval, setBillingInterval] = useState("weekly");
+  const monthly = interval === "monthly";
+  const priceOf = (p) => monthly ? p.price_monthly : p.price;
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -64,6 +67,7 @@ function Billing() {
     setLoading(true);
     try {
       const [s, p] = await Promise.all([billingApi.subscription(current.id), billingApi.plans()]);
+      if (s.interval) setBillingInterval(s.interval);
       setSub(s);
       setPlans(p);
     } finally {
@@ -115,7 +119,7 @@ function Billing() {
     setBusy(true);
     setErr("");
     try {
-      const res = await billingApi.checkout(current.id, target.slug);
+      const res = await billingApi.checkout(current.id, target.slug, interval);
       if (res.checkout_url) {
         window.location.href = res.checkout_url;
         return;
@@ -167,18 +171,21 @@ function Billing() {
         /* @__PURE__ */ jsxs("div", { className: "mt-1 flex items-center gap-2", children: [
           /* @__PURE__ */ jsx("span", { className: "text-2xl font-extrabold", children: sub.plan.name }),
           /* @__PURE__ */ jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${statusTone[sub.status]}`, children: sub.status }),
-          /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-muted", children: "Weekly" })
+          /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-muted", children: sub.interval })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "mt-1 text-sm text-fg-muted", children: [
           "$",
-          sub.plan.price,
-          "/week · ",
+          sub.interval === "monthly" ? sub.plan.price_monthly : sub.plan.price,
+          "/",
+          sub.interval === "monthly" ? "month" : "week",
+          " · ",
           daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} of access left` : "renew when it runs out",
           sub.period_end && ` · access through ${new Date(sub.period_end).toLocaleDateString()}`
         ] })
       ] }),
       canManage && sub.status !== "canceled" && /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setCancelOpen(true), children: "Cancel subscription" })
     ] }),
+    /* @__PURE__ */ jsx("div", { className: "mt-8 flex justify-center", children: /* @__PURE__ */ jsx(IntervalToggle, { value: interval, onChange: setBillingInterval, savings: "Save up to 46%" }) }),
     /* @__PURE__ */ jsx("div", { className: "mt-6 grid gap-5 lg:grid-cols-3", children: plans.map((p) => {
       const isCurrent = p.slug === isCurrentSlug;
       const feats = PLAN_FEATURES[p.slug] || [];
@@ -188,11 +195,17 @@ function Billing() {
         /* @__PURE__ */ jsxs("div", { className: "mt-1 flex items-end gap-1", children: [
           /* @__PURE__ */ jsxs("span", { className: "text-3xl font-extrabold", children: [
             "$",
-            p.price
+            priceOf(p)
           ] }),
-          /* @__PURE__ */ jsx("span", { className: "pb-1 text-sm text-fg-dim", children: "/week" })
+          /* @__PURE__ */ jsxs("span", { className: "pb-1 text-sm text-fg-dim", children: [
+            "/",
+            monthly ? "month" : "week"
+          ] })
         ] }),
-        /* @__PURE__ */ jsx("div", { className: "mt-0.5 text-xs text-fg-dim", children: "7 days of access" }),
+        /* @__PURE__ */ jsxs("div", { className: "mt-0.5 text-xs text-fg-dim", children: [
+          monthly ? "30" : "7",
+          " days of access"
+        ] }),
         /* @__PURE__ */ jsxs("div", { className: "mt-4 grid grid-cols-2 gap-3", children: [
           /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(ILink, { width: 13 }), label: "Redirects", value: p.max_redirects }),
           /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(IGlobe, { width: 13 }), label: "Domains", value: p.max_websites })
@@ -228,8 +241,9 @@ function Billing() {
         " plan at ",
         /* @__PURE__ */ jsxs("b", { children: [
           "$",
-          target.price,
-          "/week"
+          priceOf(target),
+          "/",
+          monthly ? "month" : "week"
         ] }),
         " ",
         "(",
@@ -238,7 +252,11 @@ function Billing() {
         target.max_websites || "∞",
         " domains)."
       ] }),
-      /* @__PURE__ */ jsx("p", { className: "rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted", children: "You'll be taken to our secure checkout (Bachs) — card, mobile money or crypto. Access starts as soon as payment succeeds, for 7 days. Any days you have left are added on top, so you never lose time." }),
+      /* @__PURE__ */ jsxs("p", { className: "rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted", children: [
+        "You'll be taken to our secure checkout (Bachs) — card, mobile money or crypto. Access starts as soon as payment succeeds, for ",
+        monthly ? 30 : 7,
+        " days. Any days you have left are added on top, so you never lose time."
+      ] }),
       err && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600", children: err }),
       /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
         /* @__PURE__ */ jsx(Button, { variant: "outline", className: "flex-1", onClick: () => setTarget(null), disabled: busy, children: "Cancel" }),
