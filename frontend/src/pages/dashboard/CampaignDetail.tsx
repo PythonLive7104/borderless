@@ -6,8 +6,10 @@ import CampaignVariants from "../../components/dashboard/CampaignVariants";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import Button from "../../components/ui/Button";
 import ClassBadge from "../../components/ui/ClassBadge";
+import { useDialog } from "../../context/DialogContext";
 
 export default function CampaignDetail() {
+  const { confirm } = useDialog();
   const { id } = useParams();
   const nav = useNavigate();
   const { current } = useWorkspace();
@@ -27,7 +29,11 @@ export default function CampaignDetail() {
     setC(updated);
   }
   async function remove() {
-    if (!confirm("Delete this campaign?")) return;
+    if (!(await confirm({
+      title: "Delete this campaign?",
+      message: "Its variants and click data go with it. This can't be undone.",
+      confirmLabel: "Delete campaign",
+    }))) return;
     await campaignApi.remove(Number(id)); nav("/dashboard/campaigns");
   }
 

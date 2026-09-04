@@ -5,8 +5,10 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import PageNote from "../../components/dashboard/PageNote";
+import { useDialog } from "../../context/DialogContext";
 
 export default function Webhooks() {
+  const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
   const [rows, setRows] = useState<Webhook[]>([]);
   const [events, setEvents] = useState<string[]>([]);
@@ -35,9 +37,21 @@ export default function Webhooks() {
     try { await webhookApi.create({ organization: current!.id, url, events: sel }); setOpen(false); setUrl(""); setSel([]); load(); }
     catch (e: any) { setErr(e.data?.url?.[0] || e.data?.events?.[0] || e.data?.detail || e.message); }
   }
-  async function test(id: number) { await webhookApi.test(id); alert("Test delivery sent — check the deliveries log."); }
+  async function test(id: number) {
+    await webhookApi.test(id);
+    notify("Test delivery sent — check the deliveries log.");
+  }
   async function showDeliveries(id: number) { setDeliv({ id, rows: await webhookApi.deliveries(id) }); }
-  async function remove(id: number) { if (!confirm("Delete this webhook?")) return; await webhookApi.remove(id); load(); }
+  async function remove(id: number) {
+    if (!(await confirm({
+      title: "Delete this webhook?",
+      message: "We'll stop delivering events to this endpoint.",
+      confirmLabel: "Delete webhook",
+    }))) return;
+    await webhookApi.remove(id);
+    notify("Webhook deleted.");
+    load();
+  }
 
   return (
     <div>

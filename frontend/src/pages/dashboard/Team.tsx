@@ -6,12 +6,14 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import PageNote from "../../components/dashboard/PageNote";
+import { useDialog } from "../../context/DialogContext";
 
 const roleTone: Record<string, string> = {
   owner: "bg-brand/10 text-brand", admin: "bg-violet/10 text-violet", analyst: "bg-bg-mute text-fg-muted",
 };
 
 export default function Team() {
+  const { confirm } = useDialog();
   const { current, reload } = useWorkspace();
   const { user } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
@@ -44,7 +46,11 @@ export default function Team() {
   }
   async function changeRole(m: Member, r: Role) { await orgApi.changeRole(current!.id, m.id, r); load(); reload(); }
   async function removeMember(m: Member) {
-    if (!confirm(`Remove ${m.email} from the workspace?`)) return;
+    if (!(await confirm({
+      title: "Remove this member?",
+      message: `${m.email} will lose access to this workspace immediately.`,
+      confirmLabel: "Remove member",
+    }))) return;
     await orgApi.removeMember(current!.id, m.id); load();
   }
 

@@ -1,10 +1,10 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { jsx, Fragment, jsxs } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { renderToString } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server.mjs";
-import { createContext, useContext, useState, useEffect, lazy, Suspense } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useLocation, Navigate, Link, NavLink, Outlet, useSearchParams, Routes, Route } from "react-router-dom";
 const ACCESS = "bl_access";
 const REFRESH = "bl_refresh";
@@ -373,6 +373,156 @@ function WorkspaceProvider({ children }) {
   }, [currentId]);
   const current = orgs.find((o) => o.id === currentId) ?? null;
   return /* @__PURE__ */ jsx(Ctx.Provider, { value: { orgs, current, loading, switchTo: setCurrentId, reload }, children });
+}
+const DialogContext = createContext(null);
+function useDialog() {
+  const ctx = useContext(DialogContext);
+  return ctx ?? {
+    confirm: async (o) => typeof window === "undefined" ? false : window.confirm(o.title),
+    notify: (m) => {
+      if (typeof window !== "undefined") window.alert(m);
+    }
+  };
+}
+const TONES = {
+  danger: {
+    btn: "bg-danger text-white hover:bg-red-700",
+    ring: "focus-visible:ring-danger/40",
+    icon: "bg-danger/10 text-danger"
+  },
+  brand: {
+    btn: "bg-brand text-white hover:bg-brand-600",
+    ring: "focus-visible:ring-brand/40",
+    icon: "bg-brand/10 text-brand"
+  }
+};
+function DialogProvider({ children }) {
+  const [pending, setPending] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const confirmRef = useRef(null);
+  const restoreFocus = useRef(null);
+  const toastId = useRef(0);
+  const confirm = useCallback((opts) => new Promise((resolve) => {
+    restoreFocus.current = typeof document !== "undefined" ? document.activeElement : null;
+    setPending({ ...opts, resolve });
+  }), []);
+  const notify = useCallback((message, tone2 = "success") => {
+    const id = ++toastId.current;
+    setToasts((t) => [...t, { id, message, tone: tone2 }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4e3);
+  }, []);
+  const close = useCallback((result) => {
+    setPending((p) => {
+      p == null ? void 0 : p.resolve(result);
+      return null;
+    });
+    const el = restoreFocus.current;
+    if (el == null ? void 0 : el.focus) setTimeout(() => el.focus(), 0);
+  }, []);
+  useEffect(() => {
+    var _a;
+    if (!pending) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(false);
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        close(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    (_a = confirmRef.current) == null ? void 0 : _a.focus();
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [pending, close]);
+  const api = useMemo(() => ({ confirm, notify }), [confirm, notify]);
+  const tone = TONES[(pending == null ? void 0 : pending.tone) ?? "danger"];
+  return /* @__PURE__ */ jsxs(DialogContext.Provider, { value: api, children: [
+    children,
+    pending && /* @__PURE__ */ jsxs(
+      "div",
+      {
+        className: "fixed inset-0 z-[100] grid place-items-center p-4",
+        role: "alertdialog",
+        "aria-modal": "true",
+        "aria-labelledby": "dialog-title",
+        children: [
+          /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-navy-950/50 backdrop-blur-sm", onClick: () => close(false) }),
+          /* @__PURE__ */ jsxs("div", { className: "relative w-full max-w-sm rounded-2xl border border-line bg-card p-6 text-center shadow-xl", children: [
+            /* @__PURE__ */ jsx("div", { className: `mx-auto grid h-12 w-12 place-items-center rounded-2xl ${tone.icon}`, children: /* @__PURE__ */ jsx(
+              "svg",
+              {
+                width: "24",
+                height: "24",
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                "aria-hidden": "true",
+                children: /* @__PURE__ */ jsx("path", { d: "M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" })
+              }
+            ) }),
+            /* @__PURE__ */ jsx("h3", { id: "dialog-title", className: "mt-4 text-lg font-bold tracking-tight", children: pending.title }),
+            pending.message && /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm leading-relaxed text-fg-muted", children: pending.message }),
+            /* @__PURE__ */ jsxs("div", { className: "mt-6 flex gap-3", children: [
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => close(false),
+                  className: "flex-1 rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-fg transition hover:bg-bg-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+                  children: pending.cancelLabel ?? "Cancel"
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  ref: confirmRef,
+                  onClick: () => close(true),
+                  className: `flex-1 rounded-full px-5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 ${tone.btn} ${tone.ring}`,
+                  children: pending.confirmLabel ?? "Delete"
+                }
+              )
+            ] })
+          ] })
+        ]
+      }
+    ),
+    toasts.length > 0 && /* @__PURE__ */ jsx("div", { className: "fixed bottom-5 left-5 z-[110] flex flex-col gap-2", "aria-live": "polite", children: toasts.map((t) => /* @__PURE__ */ jsxs(
+      "div",
+      {
+        className: `flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${t.tone === "success" ? "border-success/25 bg-white text-fg" : "border-danger/25 bg-white text-fg"}`,
+        children: [
+          /* @__PURE__ */ jsx("span", { className: `grid h-5 w-5 shrink-0 place-items-center rounded-full ${t.tone === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`, children: /* @__PURE__ */ jsx(
+            "svg",
+            {
+              width: "12",
+              height: "12",
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: "3",
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              "aria-hidden": "true",
+              children: t.tone === "success" ? /* @__PURE__ */ jsx("path", { d: "M20 6 9 17l-5-5" }) : /* @__PURE__ */ jsx("path", { d: "M18 6 6 18M6 6l12 12" })
+            }
+          ) }),
+          t.message
+        ]
+      },
+      t.id
+    )) })
+  ] });
 }
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -1755,35 +1905,35 @@ const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"))
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
-const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CPQLHsof.js"));
+const DashboardLayout = lazy(() => import("./assets/DashboardLayout-DMJmGTu9.js"));
 const Overview = lazy(() => import("./assets/Overview-DStCz6du.js"));
-const Websites = lazy(() => import("./assets/Websites-B5z4yjqn.js"));
-const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-C-t6Ji6i.js"));
-const Campaigns = lazy(() => import("./assets/Campaigns-BMNy-AYa.js"));
-const CampaignDetail = lazy(() => import("./assets/CampaignDetail-B_aaSU2-.js"));
-const TrafficRules = lazy(() => import("./assets/TrafficRules-CG8Jc1A0.js"));
-const Shield = lazy(() => import("./assets/Shield-DtLeBreS.js"));
-const Links = lazy(() => import("./assets/Links-f85fXEQ1.js"));
-const BotScanner = lazy(() => import("./assets/BotScanner-DiCJQKpT.js"));
+const Websites = lazy(() => import("./assets/Websites-XHYX3eSb.js"));
+const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-Cmjxd7_P.js"));
+const Campaigns = lazy(() => import("./assets/Campaigns-DykPDxn4.js"));
+const CampaignDetail = lazy(() => import("./assets/CampaignDetail-D9lXYNA8.js"));
+const TrafficRules = lazy(() => import("./assets/TrafficRules-CLRgQvJU.js"));
+const Shield = lazy(() => import("./assets/Shield-BS8-t9gx.js"));
+const Links = lazy(() => import("./assets/Links-Bw75krVR.js"));
+const BotScanner = lazy(() => import("./assets/BotScanner-CPDeY5em.js"));
 const Visitors = lazy(() => import("./assets/Visitors-VEcRqY-5.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-CPPQkGaU.js"));
 const ClickLog = lazy(() => import("./assets/ClickLog-C_nX-TAV.js"));
 const TrafficSources = lazy(() => import("./assets/TrafficSources-y-tyDvXq.js"));
-const Conversions = lazy(() => import("./assets/Conversions-Co1i5was.js"));
+const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
-const ApiKeys = lazy(() => import("./assets/ApiKeys-BgRTYRFB.js"));
-const Webhooks = lazy(() => import("./assets/Webhooks-DFybJpm9.js"));
+const ApiKeys = lazy(() => import("./assets/ApiKeys-H3AxfYYu.js"));
+const Webhooks = lazy(() => import("./assets/Webhooks-D8L6DdRq.js"));
 const Billing = lazy(() => import("./assets/Billing-Cdss7Sgd.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
-const Team = lazy(() => import("./assets/Team-CwYl61NG.js"));
+const Team = lazy(() => import("./assets/Team-D2c6g8rK.js"));
 const Settings = lazy(() => import("./assets/Settings-A9nqqFl4.js"));
-const Reports = lazy(() => import("./assets/Reports-Bg-CpY8O.js"));
+const Reports = lazy(() => import("./assets/Reports-D2MVz91p.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
-const AdminOverview = lazy(() => import("./assets/AdminOverview-DeiGjSa1.js"));
-const AdminUsers = lazy(() => import("./assets/AdminUsers-DSj4p2x1.js"));
-const AdminOrgs = lazy(() => import("./assets/AdminOrgs-CHo9p4V4.js"));
-const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-CG6YY1bb.js"));
-const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-Btykmn1h.js"));
+const AdminOverview = lazy(() => import("./assets/AdminOverview-CDbKn7IW.js"));
+const AdminUsers = lazy(() => import("./assets/AdminUsers-DxQichc9.js"));
+const AdminOrgs = lazy(() => import("./assets/AdminOrgs-OwEQSpRL.js"));
+const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-Bx4Rlcj6.js"));
+const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-BGAgjTi7.js"));
 const spinner = /* @__PURE__ */ jsx("div", { className: "grid min-h-screen place-items-center", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
 function AppRoutes() {
   return /* @__PURE__ */ jsx(Suspense, { fallback: spinner, children: /* @__PURE__ */ jsxs(Routes, { children: [
@@ -1848,26 +1998,27 @@ function AppRoutes() {
 }
 function render(url) {
   return renderToString(
-    /* @__PURE__ */ jsx(AuthProvider, { children: /* @__PURE__ */ jsx(WorkspaceProvider, { children: /* @__PURE__ */ jsx(StaticRouter, { location: url, children: /* @__PURE__ */ jsx(AppRoutes, {}) }) }) })
+    /* @__PURE__ */ jsx(AuthProvider, { children: /* @__PURE__ */ jsx(WorkspaceProvider, { children: /* @__PURE__ */ jsx(DialogProvider, { children: /* @__PURE__ */ jsx(StaticRouter, { location: url, children: /* @__PURE__ */ jsx(AppRoutes, {}) }) }) }) })
   );
 }
 export {
-  variantApi as A,
+  campaignApi as A,
   Button as B,
-  ipFilterApi as C,
-  ruleApi as D,
-  RULE_OPS as E,
-  FIELD_VALUE_OPTIONS as F,
-  COUNTRIES as G,
-  linkApi as H,
+  variantApi as C,
+  ipFilterApi as D,
+  ruleApi as E,
+  RULE_OPS as F,
+  FIELD_VALUE_OPTIONS as G,
+  COUNTRIES as H,
   IHome as I,
-  botCheckApi as J,
-  conversionsApi as K,
+  linkApi as J,
+  botCheckApi as K,
   Logo as L,
-  keysApi as M,
-  webhookApi as N,
-  downloadReportCsv as O,
-  adminApi as P,
+  conversionsApi as M,
+  keysApi as N,
+  webhookApi as O,
+  downloadReportCsv as P,
+  adminApi as Q,
   RULE_FIELDS as R,
   authApi as a,
   BRAND$1 as b,
@@ -1894,6 +2045,6 @@ export {
   IGauge as v,
   IGear as w,
   analyticsApi as x,
-  websiteApi as y,
-  campaignApi as z
+  useDialog as y,
+  websiteApi as z
 };

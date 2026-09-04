@@ -1,6 +1,6 @@
 import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { c as useWorkspace, B as Button, N as webhookApi } from "../entry-server.js";
+import { y as useDialog, c as useWorkspace, B as Button, O as webhookApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
@@ -8,6 +8,7 @@ import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
 function Webhooks() {
+  const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
   const [rows, setRows] = useState([]);
   const [events, setEvents] = useState([]);
@@ -49,14 +50,19 @@ function Webhooks() {
   }
   async function test(id) {
     await webhookApi.test(id);
-    alert("Test delivery sent — check the deliveries log.");
+    notify("Test delivery sent — check the deliveries log.");
   }
   async function showDeliveries(id) {
     setDeliv({ id, rows: await webhookApi.deliveries(id) });
   }
   async function remove(id) {
-    if (!confirm("Delete this webhook?")) return;
+    if (!await confirm({
+      title: "Delete this webhook?",
+      message: "We'll stop delivering events to this endpoint.",
+      confirmLabel: "Delete webhook"
+    })) return;
     await webhookApi.remove(id);
+    notify("Webhook deleted.");
     load();
   }
   return /* @__PURE__ */ jsxs("div", { children: [

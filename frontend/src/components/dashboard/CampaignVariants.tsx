@@ -4,10 +4,12 @@ import {
   type CampaignVariant, type VariantStats,
 } from "../../lib/api";
 import Button from "../ui/Button";
+import { useDialog } from "../../context/DialogContext";
 
 type Props = { campaignId: number; canManage: boolean };
 
 export default function CampaignVariants({ campaignId, canManage }: Props) {
+  const { confirm } = useDialog();
   const [variants, setVariants] = useState<CampaignVariant[]>([]);
   const [stats, setStats] = useState<VariantStats | null>(null);
   const [adding, setAdding] = useState(false);
@@ -49,7 +51,11 @@ export default function CampaignVariants({ campaignId, canManage }: Props) {
     await variantApi.update(v.id, { weight: Math.max(0, w) }); await load();
   }
   async function del(v: CampaignVariant) {
-    if (!confirm(`Delete variant "${v.label}"?`)) return;
+    if (!(await confirm({
+      title: "Delete this variant?",
+      message: `"${v.label}" and its traffic split will be removed.`,
+      confirmLabel: "Delete variant",
+    }))) return;
     await variantApi.remove(v.id); await load();
   }
 

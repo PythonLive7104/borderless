@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { ruleApi, type TrafficRule } from "../../lib/api";
 import Button from "../ui/Button";
+import { useDialog } from "../../context/DialogContext";
 
 // Folder Guard is a friendly wrapper over path-based block rules: each guarded
 // path is a rule "IF path contains X THEN block", enforced by the Shield.
 export default function FolderGuard({ orgId, canManage }: { orgId: number; canManage: boolean }) {
+  const { confirm } = useDialog();
   const [rules, setRules] = useState<TrafficRule[]>([]);
   const [path, setPath] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,7 +35,11 @@ export default function FolderGuard({ orgId, canManage }: { orgId: number; canMa
   }
 
   async function remove(id: number) {
-    if (!confirm("Stop guarding this path?")) return;
+    if (!(await confirm({
+      title: "Stop guarding this path?",
+      message: "Requests to it will no longer be screened by the bot engine.",
+      confirmLabel: "Stop guarding",
+    }))) return;
     await ruleApi.remove(id); load();
   }
 

@@ -167,3 +167,47 @@ class ExpiryGatingTest(TestCase):
         restore.assert_called_once_with(self.org)
         self.sub.refresh_from_db()
         self.assertFalse(self.sub.access_state()["locked"])
+
+
+class GrantPlanCommandTest(TestCase):
+    """grant_plan must produce a subscription that actually reads as unlocked —
+    the trap when doing this by hand is leaving period_end in the past."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="grant@example.com", email="grant@example.com", password="testpass123")
+        self.org = create_workspace(user, "Grant Co")
+
+    def test_grants_an_active_plan_with_a_future_window(self):
+        call_command("grant_plan", "--org", str(self.org.id), "--plan", "pro", verbosity=0)
+        sub = Subscription.objects.get(organization=self.org)
+        self.assertEqual(sub.plan.slug, "pro")
+        self.assertEqual(sub.status, Subscription.Status.ACTIVE)
+        self.assertGreater(sub.period_end, timezone.now())
+        self.assertFalse(sub.access_state()["locked"])
+
+    def test_accepts_a_slug_and_clears_a_stale_pending_plan(self):
+        sub = Subscription.objects.get(organization=self.org)
+        sub.pending_plan_slug = "plus"
+        sub.save(update_fields=["pending_plan_slug"])
+        call_command("grant_plan", "--org", self.org.slug, "--plan", "pro", verbosity=0)
+        sub.refresh_from_db()
+        self.assertEqual(sub.pending_plan_slug, "")
+
+    def test_days_override(self):
+        call_command("grant_plan", "--org", str(self.org.id), "--plan", "basic",
+                     "--days", "30", verbosity=0)
+        sub = Subscription.objects.get(organization=self.org)
+        self.assertGreater(sub.period_end, timezone.now() + timedelta(days=29))
+
+    def test_unknown_plan_is_rejected(self):
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError):
+            call_command("grant_plan", "--org", str(self.org.id), "--plan", "enterprise", verbosity=0)
+
+    def test_granting_unlocks_the_redirect_feature(self):
+        from apps.billing.models import link_shortener_enabled, redirect_limit
+        self.assertFalse(link_shortener_enabled(self.org.id))   # trialing
+        call_command("grant_plan", "--org", str(self.org.id), "--plan", "pro", verbosity=0)
+        self.assertTrue(link_shortener_enabled(self.org.id))
+        self.assertEqual(redirect_limit(self.org.id), 10)

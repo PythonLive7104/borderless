@@ -1,6 +1,6 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { c as useWorkspace, u as useAuth, B as Button, o as orgApi } from "../entry-server.js";
+import { y as useDialog, c as useWorkspace, u as useAuth, B as Button, o as orgApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
@@ -13,6 +13,7 @@ const roleTone = {
   analyst: "bg-bg-mute text-fg-muted"
 };
 function Team() {
+  const { confirm } = useDialog();
   const { current, reload } = useWorkspace();
   const { user } = useAuth();
   const [members, setMembers] = useState([]);
@@ -59,7 +60,11 @@ function Team() {
     reload();
   }
   async function removeMember(m) {
-    if (!confirm(`Remove ${m.email} from the workspace?`)) return;
+    if (!await confirm({
+      title: "Remove this member?",
+      message: `${m.email} will lose access to this workspace immediately.`,
+      confirmLabel: "Remove member"
+    })) return;
     await orgApi.removeMember(current.id, m.id);
     load();
   }

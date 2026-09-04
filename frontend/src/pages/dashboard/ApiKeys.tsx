@@ -5,8 +5,10 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import PageNote from "../../components/dashboard/PageNote";
+import { useDialog } from "../../context/DialogContext";
 
 export default function ApiKeys() {
+  const { confirm } = useDialog();
   const { current } = useWorkspace();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,11 @@ export default function ApiKeys() {
     setCreated(res.key); setName(""); load();
   }
   async function revoke(id: number) {
-    if (!confirm("Revoke this key? Apps using it will stop working.")) return;
+    if (!(await confirm({
+      title: "Revoke this API key?",
+      message: "Any app or server still using it will start getting 401s straight away.",
+      confirmLabel: "Revoke key",
+    }))) return;
     await keysApi.revoke(id); load();
   }
   function copy() { navigator.clipboard?.writeText(created!); setCopied(true); setTimeout(() => setCopied(false), 1500); }

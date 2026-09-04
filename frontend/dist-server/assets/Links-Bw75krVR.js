@@ -1,7 +1,7 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { c as useWorkspace, B as Button, H as linkApi, y as websiteApi, d as billingApi } from "../entry-server.js";
+import { y as useDialog, c as useWorkspace, B as Button, J as linkApi, z as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
@@ -26,6 +26,7 @@ const BOT_OPTIONS = [
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 function Links() {
   var _a;
+  const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,9 @@ function Links() {
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const linkEnabled = !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
+  const used = rows.length;
+  const cap = (sub == null ? void 0 : sub.plan.max_redirects) ?? 0;
+  const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id) => {
     var _a2;
     return (_a2 = sites.find((s) => s.id === id)) == null ? void 0 : _a2.name;
@@ -89,10 +93,14 @@ function Links() {
     load();
   }
   async function remove(id) {
-    if (confirm("Delete this link?")) {
-      await linkApi.remove(id);
-      load();
-    }
+    if (!await confirm({
+      title: "Delete this redirect?",
+      message: "The short link stops working immediately. Anyone who already has it will get a 404. This can't be undone.",
+      confirmLabel: "Delete redirect"
+    })) return;
+    await linkApi.remove(id);
+    notify("Redirect deleted.");
+    load();
   }
   function copy(l) {
     var _a2;
@@ -114,10 +122,28 @@ function Links() {
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Redirection" }),
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-3", children: [
+          /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Redirection" }),
+          linkEnabled && /* @__PURE__ */ jsxs("span", { className: `rounded-full border px-2.5 py-1 text-xs font-semibold ${atCap ? "border-danger/30 bg-danger/10 text-danger" : "border-line bg-bg-mute text-fg-muted"}`, children: [
+            used,
+            " of ",
+            cap || "∞",
+            " used"
+          ] })
+        ] }),
         /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Redirect links with built-in bot filtering & click analytics." })
       ] }),
-      canManage && linkEnabled && /* @__PURE__ */ jsx(Button, { onClick: openCreate, children: "+ New redirect" })
+      canManage && linkEnabled && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+        /* @__PURE__ */ jsx(Button, { onClick: openCreate, disabled: atCap, children: "+ New redirect" }),
+        atCap && /* @__PURE__ */ jsxs("span", { className: "text-xs text-fg-muted", children: [
+          sub == null ? void 0 : sub.plan.name,
+          " includes ",
+          cap,
+          ". ",
+          /* @__PURE__ */ jsx("a", { href: "/dashboard/billing", className: "font-semibold text-brand hover:underline", children: "Upgrade" }),
+          " for more."
+        ] })
+      ] })
     ] }),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !linkEnabled ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl", children: "🔗" }),

@@ -2,7 +2,7 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { c as useWorkspace, B as Button, z as campaignApi, y as websiteApi, d as billingApi } from "../entry-server.js";
+import { c as useWorkspace, B as Button, A as campaignApi, z as websiteApi, d as billingApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import "react-dom/server";

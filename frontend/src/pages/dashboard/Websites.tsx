@@ -7,8 +7,10 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import StatusBadge from "../../components/ui/StatusBadge";
+import { useDialog } from "../../context/DialogContext";
 
 export default function Websites() {
+  const { confirm } = useDialog();
   const { current } = useWorkspace();
   const navigate = useNavigate();
   const [sites, setSites] = useState<Website[]>([]);
@@ -40,7 +42,11 @@ export default function Websites() {
   }
 
   async function remove(id: number) {
-    if (!confirm("Delete this website? Tracking will stop.")) return;
+    if (!(await confirm({
+      title: "Delete this website?",
+      message: "Tracking stops immediately and its traffic rules stop being applied.",
+      confirmLabel: "Delete website",
+    }))) return;
     await websiteApi.remove(id); load();
   }
 

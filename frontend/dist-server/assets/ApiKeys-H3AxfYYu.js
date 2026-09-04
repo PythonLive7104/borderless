@@ -1,6 +1,6 @@
 import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { c as useWorkspace, B as Button, M as keysApi } from "../entry-server.js";
+import { y as useDialog, c as useWorkspace, B as Button, N as keysApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
@@ -8,6 +8,7 @@ import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
 function ApiKeys() {
+  const { confirm } = useDialog();
   const { current } = useWorkspace();
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,11 @@ function ApiKeys() {
     load();
   }
   async function revoke(id) {
-    if (!confirm("Revoke this key? Apps using it will stop working.")) return;
+    if (!await confirm({
+      title: "Revoke this API key?",
+      message: "Any app or server still using it will start getting 401s straight away.",
+      confirmLabel: "Revoke key"
+    })) return;
     await keysApi.revoke(id);
     load();
   }

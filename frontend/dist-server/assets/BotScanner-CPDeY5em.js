@@ -1,7 +1,7 @@
 import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { c as useWorkspace, y as websiteApi, B as Button, J as botCheckApi } from "../entry-server.js";
+import { c as useWorkspace, z as websiteApi, B as Button, K as botCheckApi } from "../entry-server.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";

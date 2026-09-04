@@ -2,13 +2,14 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { c as useWorkspace, B as Button, y as websiteApi, d as billingApi } from "../entry-server.js";
+import { y as useDialog, c as useWorkspace, B as Button, z as websiteApi, d as billingApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { S as StatusBadge } from "./StatusBadge-DCCbwkdF.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 function Websites() {
+  const { confirm } = useDialog();
   const { current } = useWorkspace();
   const navigate = useNavigate();
   const [sites, setSites] = useState([]);
@@ -50,7 +51,11 @@ function Websites() {
     }
   }
   async function remove(id) {
-    if (!confirm("Delete this website? Tracking will stop.")) return;
+    if (!await confirm({
+      title: "Delete this website?",
+      message: "Tracking stops immediately and its traffic rules stop being applied.",
+      confirmLabel: "Delete website"
+    })) return;
     await websiteApi.remove(id);
     load();
   }

@@ -1,6 +1,6 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { c as useWorkspace, K as conversionsApi } from "../entry-server.js";
+import { c as useWorkspace, M as conversionsApi } from "../entry-server.js";
 import { R as RangeTabs } from "./RangeTabs-BPSt5JoP.js";
 import { S as StatCard } from "./StatCard-ChLtMs89.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";

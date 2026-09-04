@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import NoData from "../../components/dashboard/NoData";
+import { useDialog } from "../../context/DialogContext";
 
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -26,6 +27,7 @@ const BOT_OPTIONS: { value: BotAction; label: string; desc: string }[] = [
 const BOT_LABEL: Record<BotAction, string> = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 
 export default function Links() {
+  const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
   const [rows, setRows] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,11 @@ export default function Links() {
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
   const linkEnabled = !!sub && sub.status === "active" && !sub.access?.locked;
+  // Usage against the plan's cap. Mirrors redirect_limit() on the server, which
+  // is what actually refuses the create — 0 means the tier has no allowance.
+  const used = rows.length;
+  const cap = sub?.plan.max_redirects ?? 0;
+  const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
 
   async function load(silent = false) {
@@ -73,7 +80,16 @@ export default function Links() {
   }
 
   async function toggle(l: ShortLink) { await linkApi.update(l.id, { active: !l.active }); load(); }
-  async function remove(id: number) { if (confirm("Delete this link?")) { await linkApi.remove(id); load(); } }
+  async function remove(id: number) {
+    if (!(await confirm({
+      title: "Delete this redirect?",
+      message: "The short link stops working immediately. Anyone who already has it will get a 404. This can't be undone.",
+      confirmLabel: "Delete redirect",
+    }))) return;
+    await linkApi.remove(id);
+    notify("Redirect deleted.");
+    load();
+  }
   function copy(l: ShortLink) {
     navigator.clipboard?.writeText(l.short_url);
     setCopied(l.id); setTimeout(() => setCopied(null), 1500);
@@ -88,10 +104,28 @@ export default function Links() {
       </PageNote>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Redirection</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-extrabold tracking-tight">Redirection</h1>
+            {linkEnabled && (
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                atCap ? "border-danger/30 bg-danger/10 text-danger"
+                      : "border-line bg-bg-mute text-fg-muted"}`}>
+                {used} of {cap || "∞"} used
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-fg-muted">Redirect links with built-in bot filtering &amp; click analytics.</p>
         </div>
-        {canManage && linkEnabled && <Button onClick={openCreate}>+ New redirect</Button>}
+        {canManage && linkEnabled && (
+          <div className="flex flex-col items-end gap-1">
+            <Button onClick={openCreate} disabled={atCap}>+ New redirect</Button>
+            {atCap && (
+              <span className="text-xs text-fg-muted">
+                {sub?.plan.name} includes {cap}. <a href="/dashboard/billing" className="font-semibold text-brand hover:underline">Upgrade</a> for more.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>

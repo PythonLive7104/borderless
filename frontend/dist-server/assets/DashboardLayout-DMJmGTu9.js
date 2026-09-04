@@ -320,16 +320,17 @@ function AccessGate({ children }) {
   const onBilling = loc.pathname.startsWith(BILLING_PATH);
   if (access.locked && !onBilling) {
     const canceled = access.reason === "canceled";
+    const lapsed = access.reason === "period_ended";
     return /* @__PURE__ */ jsx("div", { className: "grid min-h-[60vh] place-items-center px-4", children: /* @__PURE__ */ jsxs("div", { className: "card shadow-soft max-w-md p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand/10 text-2xl", children: "🔒" }),
-      /* @__PURE__ */ jsx("h2", { className: "mt-4 text-xl font-extrabold tracking-tight", children: canceled ? "Subscription canceled" : "Your free trial has ended" }),
-      /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-fg-muted", children: canceled ? "Reactivate a plan to regain access to your workspace, traffic data and rules." : "Thanks for trying TryNoBot! Choose a plan to keep filtering traffic and unlock your dashboard again." }),
+      /* @__PURE__ */ jsx("h2", { className: "mt-4 text-xl font-extrabold tracking-tight", children: canceled ? "Subscription canceled" : lapsed ? "Your access period has ended" : "Your free trial has ended" }),
+      /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-fg-muted", children: canceled ? "Reactivate a plan to regain access to your workspace, traffic data and rules." : lapsed ? "Your weekly access period has run out. Renew to start filtering traffic again — your rules, sites and data are all still here." : "Thanks for trying TryNoBot! Choose a plan to keep filtering traffic and unlock your dashboard again." }),
       /* @__PURE__ */ jsx(
         Link,
         {
           to: BILLING_PATH,
           className: "mt-6 inline-flex items-center justify-center rounded-full bg-brand px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600",
-          children: canceled ? "Reactivate a plan" : "Choose a plan"
+          children: canceled ? "Reactivate a plan" : lapsed ? "Renew now" : "Choose a plan"
         }
       ),
       /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-fg-dim", children: "Your data is safe and returns the moment you subscribe." })

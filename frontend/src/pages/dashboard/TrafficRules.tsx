@@ -9,6 +9,7 @@ import {
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
+import { useDialog } from "../../context/DialogContext";
 
 const ACTIONS: RuleAction[] = ["allow", "redirect", "block", "review", "tag"];
 
@@ -84,6 +85,7 @@ function CondValue({ c, onChange }: { c: RuleCondition; onChange: (v: string) =>
 }
 
 export default function TrafficRules() {
+  const { confirm } = useDialog();
   const { current } = useWorkspace();
   const [tab, setTab] = useState<"rules" | "ip">("rules");
   const [rules, setRules] = useState<TrafficRule[]>([]);
@@ -182,7 +184,11 @@ export default function TrafficRules() {
     await ruleApi.update(r.id, { active: !r.active }); load();
   }
   async function remove(id: number) {
-    if (!confirm("Delete this rule?")) return;
+    if (!(await confirm({
+      title: "Delete this rule?",
+      message: "Traffic matching it will no longer be filtered.",
+      confirmLabel: "Delete rule",
+    }))) return;
     await ruleApi.remove(id); load();
   }
 

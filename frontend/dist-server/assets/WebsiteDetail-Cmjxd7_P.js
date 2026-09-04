@@ -2,7 +2,7 @@ import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { useParams, Link } from "react-router-dom";
-import { B as Button, y as websiteApi } from "../entry-server.js";
+import { B as Button, z as websiteApi } from "../entry-server.js";
 import { S as StatusBadge } from "./StatusBadge-DCCbwkdF.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";

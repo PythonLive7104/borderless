@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { ipFilterApi, type IPListEntry, type IPKind } from "../../lib/api";
 import Button from "../ui/Button";
+import { useDialog } from "../../context/DialogContext";
 
 export default function IPFilters({ orgId, canManage }: { orgId: number; canManage: boolean }) {
+  const { confirm } = useDialog();
   const [entries, setEntries] = useState<IPListEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [value, setValue] = useState("");
@@ -29,7 +31,11 @@ export default function IPFilters({ orgId, canManage }: { orgId: number; canMana
     } finally { setBusy(false); }
   }
   async function del(entry: IPListEntry) {
-    if (!confirm(`Remove ${entry.value}?`)) return;
+    if (!(await confirm({
+      title: "Remove this entry?",
+      message: `${entry.value} will no longer be filtered.`,
+      confirmLabel: "Remove",
+    }))) return;
     await ipFilterApi.remove(entry.id); await load();
   }
   async function toggle(entry: IPListEntry) {

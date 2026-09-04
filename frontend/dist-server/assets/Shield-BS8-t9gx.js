@@ -2,10 +2,11 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { B as Button, D as ruleApi, c as useWorkspace, y as websiteApi } from "../entry-server.js";
+import { y as useDialog, B as Button, E as ruleApi, c as useWorkspace, z as websiteApi } from "../entry-server.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 function FolderGuard({ orgId, canManage }) {
+  const { confirm } = useDialog();
   const [rules, setRules] = useState([]);
   const [path, setPath] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,7 +45,11 @@ function FolderGuard({ orgId, canManage }) {
     }
   }
   async function remove(id) {
-    if (!confirm("Stop guarding this path?")) return;
+    if (!await confirm({
+      title: "Stop guarding this path?",
+      message: "Requests to it will no longer be screened by the bot engine.",
+      confirmLabel: "Stop guarding"
+    })) return;
     await ruleApi.remove(id);
     load();
   }

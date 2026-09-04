@@ -68,9 +68,16 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 
 ## Updating later
 ```bash
-git pull
-docker compose -f docker-compose.prod.yml up -d --build
+bash update.sh
 ```
+That's the whole deploy. It backs the database up first (and refuses to continue
+if the dump is empty), pulls, **checks the migration graph before touching the
+running stack**, rebuilds the images, waits for gunicorn to actually answer, then
+runs `sync_shield` and `enforce_access`. Any failure stops the script with the
+restore command printed.
+
+Rebuilding is not optional: production bakes the code into the images, so
+`docker compose restart` silently keeps running the previous build.
 
 ## 9. Short-link domain & abuse handling
 Short links run on their own domain so that link abuse can't blacklist

@@ -1,12 +1,13 @@
 import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { B as Button, A as variantApi, z as campaignApi, c as useWorkspace } from "../entry-server.js";
+import { y as useDialog, B as Button, C as variantApi, A as campaignApi, c as useWorkspace } from "../entry-server.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { C as ClassBadge } from "./ClassBadge-B1OvS151.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 function CampaignVariants({ campaignId, canManage }) {
+  const { confirm } = useDialog();
   const [variants, setVariants] = useState([]);
   const [stats, setStats] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -57,7 +58,11 @@ function CampaignVariants({ campaignId, canManage }) {
     await load();
   }
   async function del(v) {
-    if (!confirm(`Delete variant "${v.label}"?`)) return;
+    if (!await confirm({
+      title: "Delete this variant?",
+      message: `"${v.label}" and its traffic split will be removed.`,
+      confirmLabel: "Delete variant"
+    })) return;
     await variantApi.remove(v.id);
     await load();
   }
@@ -173,6 +178,7 @@ function CampaignVariants({ campaignId, canManage }) {
   ] });
 }
 function CampaignDetail() {
+  const { confirm } = useDialog();
   const { id } = useParams();
   const nav = useNavigate();
   const { current } = useWorkspace();
@@ -193,7 +199,11 @@ function CampaignDetail() {
     setC(updated);
   }
   async function remove() {
-    if (!confirm("Delete this campaign?")) return;
+    if (!await confirm({
+      title: "Delete this campaign?",
+      message: "Its variants and click data go with it. This can't be undone.",
+      confirmLabel: "Delete campaign"
+    })) return;
     await campaignApi.remove(Number(id));
     nav("/dashboard/campaigns");
   }

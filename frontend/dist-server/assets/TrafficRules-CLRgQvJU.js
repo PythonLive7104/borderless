@@ -1,13 +1,14 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { B as Button, C as ipFilterApi, c as useWorkspace, R as RULE_FIELDS, D as ruleApi, y as websiteApi, E as RULE_OPS, F as FIELD_VALUE_OPTIONS, G as COUNTRIES } from "../entry-server.js";
+import { y as useDialog, B as Button, D as ipFilterApi, c as useWorkspace, R as RULE_FIELDS, E as ruleApi, z as websiteApi, F as RULE_OPS, G as FIELD_VALUE_OPTIONS, H as COUNTRIES } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
 function IPFilters({ orgId, canManage }) {
+  const { confirm } = useDialog();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [value, setValue] = useState("");
@@ -47,7 +48,11 @@ function IPFilters({ orgId, canManage }) {
     }
   }
   async function del(entry) {
-    if (!confirm(`Remove ${entry.value}?`)) return;
+    if (!await confirm({
+      title: "Remove this entry?",
+      message: `${entry.value} will no longer be filtered.`,
+      confirmLabel: "Remove"
+    })) return;
     await ipFilterApi.remove(entry.id);
     await load();
   }
@@ -209,6 +214,7 @@ function CondValue({ c, onChange }) {
   return /* @__PURE__ */ jsx("input", { value: c.value, onChange: (e) => onChange(e.target.value), placeholder: "value", required: true, className: cls });
 }
 function TrafficRules() {
+  const { confirm } = useDialog();
   const { current } = useWorkspace();
   const [tab, setTab] = useState("rules");
   const [rules, setRules] = useState([]);
@@ -340,7 +346,11 @@ function TrafficRules() {
     load();
   }
   async function remove(id) {
-    if (!confirm("Delete this rule?")) return;
+    if (!await confirm({
+      title: "Delete this rule?",
+      message: "Traffic matching it will no longer be filtered.",
+      confirmLabel: "Delete rule"
+    })) return;
     await ruleApi.remove(id);
     load();
   }
