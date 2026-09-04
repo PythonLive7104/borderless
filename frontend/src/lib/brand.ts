@@ -43,6 +43,9 @@ export const FOOTER_COLS = [
       { label: "FAQ", to: "/faq" },
       { label: "Privacy", to: "/privacy" },
       { label: "Terms", to: "/terms" },
+      // Discoverable abuse reporting: a complainant who can't find this goes
+      // to our registrar instead, and the whole short domain gets suspended.
+      { label: "Report abuse", to: "/report" },
     ],
   },
 ];

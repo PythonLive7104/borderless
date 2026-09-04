@@ -3,6 +3,7 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.integrations.views import PublicConversionView
 from apps.intelligence.views import BotCheckView
+from apps.links.views import AbuseReportView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -20,4 +21,5 @@ urlpatterns = [
     path("api/links/", include("apps.links.urls")),
     path("api/v1/conversions/", PublicConversionView.as_view()),
     path("api/v1/bot-check/", BotCheckView.as_view()),
+    path("api/v1/abuse/", AbuseReportView.as_view()),
 ]

@@ -25,6 +25,11 @@ server {
 
     # Bare domain -> the main site (the short domain itself isn't a page).
     location = / { return 302 https://${DOMAIN}; }
+    # Abuse reporting. Anyone who receives a malicious link finds it on THIS
+    # domain, so it has to answer here — if a complainant can't reach us they
+    # report the domain to the registrar, which suspends every customer's links.
+    location = /report { return 302 https://${DOMAIN}/report; }
+    location = /abuse  { return 302 https://${DOMAIN}/report; }
     # Bot pages the engine may send bots to (served from the same static bundle).
     location = /decoy.html        { root /usr/share/nginx/html; }
     location = /not-found.html    { root /usr/share/nginx/html; }

@@ -5,7 +5,7 @@ import { jsx, Fragment, jsxs } from "react/jsx-runtime";
 import { renderToString } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server.mjs";
 import { createContext, useContext, useState, useEffect, lazy, Suspense } from "react";
-import { useLocation, Navigate, Link, NavLink, Outlet, Routes, Route } from "react-router-dom";
+import { useLocation, Navigate, Link, NavLink, Outlet, useSearchParams, Routes, Route } from "react-router-dom";
 const ACCESS = "bl_access";
 const REFRESH = "bl_refresh";
 const tokens = {
@@ -24,9 +24,21 @@ const tokens = {
     localStorage.removeItem(REFRESH);
   }
 };
+function errText(data, fallback = "Something went wrong. Please try again.") {
+  if (data == null) return fallback;
+  if (typeof data === "string") return data;
+  if (typeof data.detail === "string") return data.detail;
+  if (Array.isArray(data)) return typeof data[0] === "string" ? data[0] : fallback;
+  for (const k of Object.keys(data)) {
+    const v = data[k];
+    if (typeof v === "string") return v;
+    if (Array.isArray(v) && typeof v[0] === "string") return v[0];
+  }
+  return fallback;
+}
 class ApiError extends Error {
   constructor(status, data) {
-    super(typeof data === "string" ? data : (data == null ? void 0 : data.detail) || "Request failed");
+    super(errText(data, "Request failed"));
     __publicField(this, "status");
     __publicField(this, "data");
     this.status = status;
@@ -38,20 +50,37 @@ async function raw(path, opts = {}) {
   if (opts.auth !== false && tokens.access) headers.Authorization = `Bearer ${tokens.access}`;
   return fetch(`/api${path}`, { ...opts, headers });
 }
+let refreshInFlight = null;
+function refreshAccess() {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const r = await raw("/auth/token/refresh/", {
+          method: "POST",
+          auth: false,
+          body: JSON.stringify({ refresh: tokens.refresh })
+        });
+        if (r.ok) {
+          const { access } = await r.json();
+          tokens.set({ access });
+          return true;
+        }
+        if (r.status === 401) tokens.clear();
+        return false;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
 async function request(path, opts = {}) {
   let res = await raw(path, opts);
   if (res.status === 401 && tokens.refresh && opts.auth !== false) {
-    const r = await raw("/auth/token/refresh/", {
-      method: "POST",
-      auth: false,
-      body: JSON.stringify({ refresh: tokens.refresh })
-    });
-    if (r.ok) {
-      const { access } = await r.json();
-      tokens.set({ access });
+    if (await refreshAccess()) {
       res = await raw(path, opts);
-    } else {
-      tokens.clear();
     }
   }
   const text = await res.text();
@@ -98,7 +127,14 @@ const websiteApi = {
   create: (payload) => http.post("/websites/", payload),
   update: (id, payload) => http.patch(`/websites/${id}/`, payload),
   remove: (id) => http.del(`/websites/${id}/`),
-  verify: (id) => http.post(`/websites/${id}/verify/`)
+  verify: (id) => http.post(`/websites/${id}/verify/`),
+  verifyShield: (id) => http.post(`/websites/${id}/verify-shield/`)
+};
+const linkApi = {
+  list: (orgId) => http.get(`/links/?organization=${orgId}`),
+  create: (p) => http.post("/links/", p),
+  update: (id, p) => http.patch(`/links/${id}/`, p),
+  remove: (id) => http.del(`/links/${id}/`)
 };
 const campaignApi = {
   list: (orgId) => http.get(`/campaigns/?organization=${orgId}`),
@@ -118,6 +154,7 @@ const variantApi = {
 };
 const RULE_FIELDS = [
   ["risk_score", "Risk score"],
+  ["requests_per_min", "Requests per minute"],
   ["classification", "Classification"],
   ["country", "Country"],
   ["device", "Device"],
@@ -129,7 +166,8 @@ const RULE_FIELDS = [
   ["utm_medium", "UTM medium"],
   ["utm_campaign", "UTM campaign"],
   ["referrer", "Referrer"],
-  ["ja3", "TLS/JA3 hash"]
+  ["ja3", "TLS/JA3 hash"],
+  ["path", "URL path"]
 ];
 const RULE_OPS = [
   ["eq", "is"],
@@ -240,11 +278,13 @@ const adminApi = {
   users: () => http.get("/admin/users/"),
   organizations: () => http.get("/admin/organizations/"),
   subscriptions: () => http.get("/admin/subscriptions/"),
-  fraudAlerts: () => http.get("/admin/fraud-alerts/")
+  fraudAlerts: () => http.get("/admin/fraud-alerts/"),
+  grantPlan: (organization, plan) => http.post("/admin/grant-plan/", { organization, plan })
 };
 const botCheckApi = {
   run: (url) => http.post("/v1/bot-check/", { url }, false)
 };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const Ctx$1 = createContext(null);
 const useAuth = () => useContext(Ctx$1);
 function AuthProvider({ children }) {
@@ -255,11 +295,23 @@ function AuthProvider({ children }) {
       setUser(null);
       return;
     }
-    try {
-      setUser(await authApi.me());
-    } catch {
-      setUser(null);
-      tokens.clear();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        setUser(await authApi.me());
+        return;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          setUser(null);
+          tokens.clear();
+          return;
+        }
+        if (attempt < 2) {
+          await sleep(600 * (attempt + 1));
+          continue;
+        }
+        setUser(null);
+        return;
+      }
     }
   }
   useEffect(() => {
@@ -339,7 +391,7 @@ function RequireStaff({ children }) {
   return /* @__PURE__ */ jsx(Fragment, { children });
 }
 const BRAND$1 = {
-  name: "TrackAudit",
+  name: "TryNoBot",
   tagline: "See every visitor. Score every click. Protect every campaign.",
   subtitle: "Analyze, score and protect incoming traffic with real-time visitor intelligence, fraud detection and campaign analytics."
 };
@@ -379,7 +431,10 @@ const FOOTER_COLS = [
       { label: "Contact", to: "/contact" },
       { label: "FAQ", to: "/faq" },
       { label: "Privacy", to: "/privacy" },
-      { label: "Terms", to: "/terms" }
+      { label: "Terms", to: "/terms" },
+      // Discoverable abuse reporting: a complainant who can't find this goes
+      // to our registrar instead, and the whole short domain gets suspended.
+      { label: "Report abuse", to: "/report" }
     ]
   }
 ];
@@ -500,7 +555,7 @@ function MarketingLayout() {
     /* @__PURE__ */ jsx(Footer, {})
   ] });
 }
-const BRAND = "TrackAudit";
+const BRAND = "TryNoBot";
 function setMeta(attr, key, content) {
   let el = document.head.querySelector(`meta[${attr}="${key}"]`);
   if (!el) {
@@ -529,6 +584,29 @@ function useSeo(title, description) {
     }
     link.href = window.location.origin + window.location.pathname;
   }, [title, description]);
+}
+function useReveal() {
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll(".reveal:not(.is-in)"));
+    if (!els.length) return;
+    if (!("IntersectionObserver" in window)) {
+      els.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-in");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.08 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
 }
 function SectionHead({ eyebrow, title, sub, center = true }) {
   return /* @__PURE__ */ jsxs("div", { className: `${center ? "mx-auto text-center" : ""} max-w-2xl`, children: [
@@ -680,13 +758,72 @@ const IGlobe = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
   /* @__PURE__ */ jsx("path", { d: "M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" })
 ] });
 const ICode = (p) => /* @__PURE__ */ jsx("svg", { ...s(p), children: /* @__PURE__ */ jsx("path", { d: "M8 9l-3 3 3 3M16 9l3 3-3 3M13 6l-2 12" }) });
+const IServer = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("rect", { x: "4", y: "4", width: "16", height: "7", rx: "1.5" }),
+  /* @__PURE__ */ jsx("rect", { x: "4", y: "13", width: "16", height: "7", rx: "1.5" }),
+  /* @__PURE__ */ jsx("path", { d: "M7.5 7.5h.01M7.5 16.5h.01" })
+] });
+const IShieldGold = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("path", { d: "M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z", fill: "#f59e0b", stroke: "#d97706" }),
+  /* @__PURE__ */ jsx("path", { d: "M9 12l2 2 4-4", stroke: "#fff" })
+] });
+const IHome = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("path", { d: "M3 11l9-8 9 8" }),
+  /* @__PURE__ */ jsx("path", { d: "M5 10v10h14V10" })
+] });
+const IFilter = (p) => /* @__PURE__ */ jsx("svg", { ...s(p), children: /* @__PURE__ */ jsx("path", { d: "M4 6h16M7 12h10M10 18h4" }) });
+const ILink = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("path", { d: "M9 15l6-6" }),
+  /* @__PURE__ */ jsx("path", { d: "M11 6l1-1a4 4 0 0 1 6 6l-1 1" }),
+  /* @__PURE__ */ jsx("path", { d: "M13 18l-1 1a4 4 0 0 1-6-6l1-1" })
+] });
+const IUsers = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("circle", { cx: "9", cy: "8", r: "3" }),
+  /* @__PURE__ */ jsx("path", { d: "M3 20a6 6 0 0 1 12 0" }),
+  /* @__PURE__ */ jsx("path", { d: "M16 5.5a3 3 0 0 1 0 5.5" }),
+  /* @__PURE__ */ jsx("path", { d: "M18.5 20a6 6 0 0 0-3-5" })
+] });
+const IList = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("path", { d: "M8 6h13M8 12h13M8 18h13" }),
+  /* @__PURE__ */ jsx("circle", { cx: "4", cy: "6", r: "1" }),
+  /* @__PURE__ */ jsx("circle", { cx: "4", cy: "12", r: "1" }),
+  /* @__PURE__ */ jsx("circle", { cx: "4", cy: "18", r: "1" })
+] });
+const IKey = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("circle", { cx: "8", cy: "15", r: "4" }),
+  /* @__PURE__ */ jsx("path", { d: "M10.8 12.2L20 3" }),
+  /* @__PURE__ */ jsx("path", { d: "M16 5l2 2" })
+] });
+const ICard = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("rect", { x: "3", y: "6", width: "18", height: "12", rx: "2" }),
+  /* @__PURE__ */ jsx("path", { d: "M3 10h18" })
+] });
+const IGear = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "3" }),
+  /* @__PURE__ */ jsx("path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" })
+] });
+const IFunnel = (p) => /* @__PURE__ */ jsx("svg", { ...s(p), children: /* @__PURE__ */ jsx("path", { d: "M3 5h18l-7 8v6l-4-2v-4z" }) });
+const ISources = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("circle", { cx: "6", cy: "12", r: "2.5" }),
+  /* @__PURE__ */ jsx("circle", { cx: "18", cy: "6", r: "2.5" }),
+  /* @__PURE__ */ jsx("circle", { cx: "18", cy: "18", r: "2.5" }),
+  /* @__PURE__ */ jsx("path", { d: "M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" })
+] });
+const ILock = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
+  /* @__PURE__ */ jsx("rect", { x: "5", y: "11", width: "14", height: "9", rx: "2" }),
+  /* @__PURE__ */ jsx("path", { d: "M8 11V8a4 4 0 0 1 8 0v3" }),
+  /* @__PURE__ */ jsx("path", { d: "M12 15v2" })
+] });
 const FEATURES = [
   { icon: IRadar, title: "Traffic Intelligence", desc: "See every visitor and session with rich device, network and geo signals in real time." },
   { icon: IShield, title: "Fraud Detection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your budget." },
   { icon: IGauge, title: "Risk Scoring", desc: "Every click gets a transparent 0–100 score with the exact signals that drove it." },
   { icon: IChart, title: "Campaign Analytics", desc: "Break down quality, sources, geos and devices with fast, filterable reports." },
   { icon: ITarget, title: "Conversion Tracking", desc: "Attribute conversions and revenue back to campaigns and traffic quality." },
-  { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." }
+  { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
+  { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
+  { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
+  { icon: ILink, title: "Link Shortener", desc: "Branded short links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." }
 ];
 const STEPS = [
   ["Connect your website", "Add a site and get a unique tracking ID in seconds."],
@@ -746,7 +883,8 @@ const SLIDES = [
   }
 ];
 function Landing() {
-  useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TrackAudit.");
+  useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot.");
+  useReveal();
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
@@ -760,14 +898,14 @@ function Landing() {
             ] }),
             /* @__PURE__ */ jsx(Button, { href: "#demo", variant: "light", size: "lg", children: "View Demo" })
           ] }),
-          /* @__PURE__ */ jsx("p", { className: "mt-4 text-sm text-slate-400", children: "No credit card required · 14-day trial · Cancel anytime" })
+          /* @__PURE__ */ jsx("p", { className: "mt-4 text-sm text-slate-400", children: "No credit card required · 7-day trial · Cancel anytime" })
         ] }),
         /* @__PURE__ */ jsx("div", { id: "demo", className: "fade-up lg:pl-4", children: /* @__PURE__ */ jsx(DashboardPreview, {}) })
       ] })
     ] }),
     /* @__PURE__ */ jsx("div", { className: "border-b border-line bg-white", children: /* @__PURE__ */ jsx(LogoStrip, {}) }),
-    /* @__PURE__ */ jsx(Section, { className: "!py-16", children: /* @__PURE__ */ jsx("div", { className: "grid grid-cols-2 gap-4 lg:grid-cols-4", children: METRICS.map(([v, k]) => /* @__PURE__ */ jsxs("div", { className: "card shadow-soft px-6 py-7 text-center", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-3xl font-extrabold tracking-tight text-fg", children: v }),
+    /* @__PURE__ */ jsx(Section, { className: "!py-16", children: /* @__PURE__ */ jsx("div", { className: "grid grid-cols-2 gap-4 lg:grid-cols-4", children: METRICS.map(([v, k], i) => /* @__PURE__ */ jsxs("div", { className: "card card-hover shadow-soft reveal group px-6 py-7 text-center", style: { transitionDelay: `${i * 60}ms` }, children: [
+      /* @__PURE__ */ jsx("div", { className: "text-3xl font-extrabold tracking-tight text-fg transition-colors group-hover:text-brand", children: v }),
       /* @__PURE__ */ jsx("div", { className: "mt-1 text-sm text-fg-muted", children: k })
     ] }, k)) }) }),
     /* @__PURE__ */ jsxs(Section, { className: "bg-bg-soft rounded-none", children: [
@@ -779,10 +917,11 @@ function Landing() {
           sub: "One platform to analyze, score, protect and measure the traffic hitting your campaigns."
         }
       ),
-      /* @__PURE__ */ jsx("div", { className: "mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3", children: FEATURES.map((f) => /* @__PURE__ */ jsxs("div", { className: "card card-hover shadow-soft p-6", children: [
-        /* @__PURE__ */ jsx("div", { className: "grid h-11 w-11 place-items-center rounded-xl bg-brand/10 text-brand", children: /* @__PURE__ */ jsx(f.icon, { width: 22 }) }),
-        /* @__PURE__ */ jsx("h3", { className: "mt-4 text-lg font-bold", children: f.title }),
-        /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm leading-relaxed text-fg-muted", children: f.desc })
+      /* @__PURE__ */ jsx("div", { className: "mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3", children: FEATURES.map((f, i) => /* @__PURE__ */ jsxs("div", { className: "feature-card card card-hover shadow-soft reveal group relative overflow-hidden p-6", style: { transitionDelay: `${i * 60}ms` }, children: [
+        /* @__PURE__ */ jsx("span", { className: "feature-glow", "aria-hidden": "true" }),
+        /* @__PURE__ */ jsx("div", { className: "relative grid h-12 w-12 place-items-center rounded-xl bg-brand/10 text-brand transition-all duration-300 group-hover:scale-110 group-hover:bg-brand group-hover:text-white group-hover:shadow-lg group-hover:shadow-brand/30", children: /* @__PURE__ */ jsx(f.icon, { width: 22 }) }),
+        /* @__PURE__ */ jsx("h3", { className: "relative mt-4 text-lg font-bold transition-colors group-hover:text-brand", children: f.title }),
+        /* @__PURE__ */ jsx("p", { className: "relative mt-2 text-sm leading-relaxed text-fg-muted", children: f.desc })
       ] }, f.title)) })
     ] }),
     /* @__PURE__ */ jsxs(Section, { children: [
@@ -794,8 +933,8 @@ function Landing() {
           sub: "Go live in minutes. No infrastructure to run, no data pipelines to build."
         }
       ),
-      /* @__PURE__ */ jsx("div", { className: "mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3", children: STEPS.map(([t, d], i) => /* @__PURE__ */ jsxs("div", { className: "card shadow-soft relative p-6", children: [
-        /* @__PURE__ */ jsx("div", { className: "absolute right-5 top-5 text-4xl font-black text-line", children: String(i + 1).padStart(2, "0") }),
+      /* @__PURE__ */ jsx("div", { className: "mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3", children: STEPS.map(([t, d], i) => /* @__PURE__ */ jsxs("div", { className: "card card-hover shadow-soft reveal group relative p-6", style: { transitionDelay: `${i * 60}ms` }, children: [
+        /* @__PURE__ */ jsx("div", { className: "absolute right-5 top-5 text-4xl font-black text-line transition-colors group-hover:text-brand/30", children: String(i + 1).padStart(2, "0") }),
         /* @__PURE__ */ jsxs("div", { className: "text-sm font-bold text-brand", children: [
           "Step ",
           i + 1
@@ -849,62 +988,62 @@ function CryptoIcons() {
   )) });
 }
 const BASE = [
-  "Real-time bot & fraud scoring",
-  "JS + TLS/JA3 fingerprinting",
-  "Traffic rules: country, device, OS, browser",
-  "IP allow / deny lists"
+  "Smart redirects with bot detection on every click",
+  "Full anti-bot engine included",
+  "Smart shortlinks + custom domain redirects",
+  "IP allow / deny rules",
+  "Domain health + ownership checks"
 ];
-const GROWTH_ADD = [
-  "A/B split testing with per-variant conversion rates",
-  "Destination URL threat scanning",
-  "Webhooks & full REST API",
-  "Priority email support"
+const PLUS_ADD = [
+  "More redirects & domains",
+  "Priority support"
 ];
-const ADVANCED = [
-  "Guest access to statistics",
-  "Higher rate limits",
-  "Dedicated onboarding"
+const PRO_ADD = [
+  "Highest redirect & domain limits",
+  "Dedicated support"
 ];
 const PLANS = [
   {
-    name: "Starter",
-    price: 29,
-    tag: "Detect click fraud in contextual & display ads",
-    cta: "Buy this tariff",
-    campaignLimit: "20",
-    clickLimit: "no limit",
+    name: "Basic",
+    price: 25,
+    tag: "Smart redirects with bot detection, for solo buyers",
+    cta: "Get Basic",
+    redirects: "2",
+    domains: "5",
+    access: "7 days of access",
     groups: [{ items: BASE }]
   },
   {
-    name: "Growth",
-    price: 99,
-    tag: "For scaling media buyers & teams",
-    cta: "Buy this tariff",
+    name: "Plus",
+    price: 40,
+    tag: "More links & domains for growing campaigns",
+    cta: "Get Plus",
     highlight: true,
-    campaignLimit: "50",
-    clickLimit: "no limit",
-    groups: [{ items: BASE }, { label: "Everything in Starter, plus:", items: GROWTH_ADD, added: true }]
+    redirects: "5",
+    domains: "10",
+    access: "7 days of access",
+    groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }]
   },
   {
-    name: "Business",
-    price: 299,
-    tag: "Advanced protection & API for agencies",
-    cta: "Buy this tariff",
+    name: "Pro",
+    price: 70,
+    tag: "Top limits & dedicated support for agencies",
+    cta: "Get Pro",
     ribbon: "TOP VALUE",
-    campaignLimit: "unlimited",
-    clickLimit: "no limit",
+    redirects: "10",
+    domains: "20",
+    access: "7 days of access",
     groups: [
       { items: BASE },
-      { label: "Everything in Growth, plus:", items: GROWTH_ADD, added: true },
-      { label: "Plus advanced:", items: ADVANCED, added: true }
+      { label: "Everything in Plus, plus:", items: PRO_ADD, added: true }
     ]
   }
 ];
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies (BTC, ETH, USDT, USDC, TON) as well as cards. Crypto keeps billing private and borderless."],
-  ["What are campaign and click limits?", "Each plan allows a number of concurrent campaigns; clicks processed through the traffic engine are unlimited on every tier."],
-  ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Changes are prorated to your current billing cycle."],
-  ["What happens if I exceed my limit?", "You'll get usage alerts at 70%, 85% and 100%. We prompt you to upgrade rather than cut you off mid-campaign."]
+  ["What are redirects and domains?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
+  ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
+  ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."]
 ];
 function Cart() {
   return /* @__PURE__ */ jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", children: [
@@ -927,14 +1066,14 @@ function PlusDivider() {
   ] });
 }
 function Pricing() {
-  useSeo("Pricing", "Simple plans for real-time bot and fraud detection. Start free, upgrade as you grow. Pay by card, mobile money or crypto.");
+  useSeo("Pricing", "Simple weekly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
       /* @__PURE__ */ jsxs("div", { className: "container-page relative py-16 text-center", children: [
-        /* @__PURE__ */ jsx(Badge, { tone: "light", children: "Simple, transparent pricing" }),
+        /* @__PURE__ */ jsx(Badge, { tone: "light", children: "Simple, weekly pricing" }),
         /* @__PURE__ */ jsx("h1", { className: "mx-auto mt-5 max-w-2xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl", children: "Tariffs & payment" }),
-        /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-xl text-slate-300", children: "Pay with crypto or card. Every plan includes real-time filtering, scoring and analytics." })
+        /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-xl text-slate-300", children: "7 days of access on every plan — renew when it runs out, and unused days roll over. Pay with crypto or card." })
       ] })
     ] }),
     /* @__PURE__ */ jsx("div", { className: "border-b border-line bg-white", children: /* @__PURE__ */ jsxs("div", { className: "container-page py-10 text-center", children: [
@@ -956,30 +1095,28 @@ function Pricing() {
                 "$",
                 p.price
               ] }),
-              /* @__PURE__ */ jsx("span", { className: "pb-1 text-sm text-fg-dim", children: "/month" })
+              /* @__PURE__ */ jsx("span", { className: "pb-1 text-sm text-fg-dim", children: "/week" })
             ] }),
+            /* @__PURE__ */ jsx("div", { className: "mt-0.5 text-xs text-fg-dim", children: p.access }),
             /* @__PURE__ */ jsx("div", { className: "mt-6 text-xs font-bold uppercase tracking-wider text-fg-dim", children: "Key features" }),
             /* @__PURE__ */ jsx("div", { className: "mt-3", children: p.groups.map((g, gi) => /* @__PURE__ */ jsxs("div", { children: [
               gi > 0 && /* @__PURE__ */ jsx(PlusDivider, {}),
               g.label && /* @__PURE__ */ jsx("div", { className: "mb-3 text-xs font-semibold text-fg-muted", children: g.label }),
               /* @__PURE__ */ jsx("ul", { className: "space-y-3", children: g.items.map((f) => /* @__PURE__ */ jsx(FeatureItem, { label: f, added: g.added }, f)) })
             ] }, gi)) }),
-            p.warning && /* @__PURE__ */ jsxs("div", { className: "mt-5 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 px-3 py-2.5 text-xs font-medium text-red-600", children: [
-              /* @__PURE__ */ jsxs("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", className: "mt-0.5 shrink-0", children: [
-                /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "9" }),
-                /* @__PURE__ */ jsx("path", { d: "M12 8v5M12 16h.01" })
-              ] }),
-              p.warning
-            ] }),
             /* @__PURE__ */ jsx("div", { className: "mt-6 flex-1" }),
             /* @__PURE__ */ jsxs("div", { className: "border-t border-line pt-5 text-sm", children: [
               /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
-                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Campaign limit" }),
-                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: p.campaignLimit })
+                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Redirects" }),
+                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: p.redirects })
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
-                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Click limit" }),
-                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: p.clickLimit })
+                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Domains" }),
+                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: p.domains })
+              ] }),
+              /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
+                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Access" }),
+                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: "Weekly" })
               ] })
             ] }),
             /* @__PURE__ */ jsxs(Button, { to: "/signup", variant: p.highlight ? "primary" : "outline", className: "mt-5 w-full", children: [
@@ -1094,8 +1231,8 @@ function BotCheck() {
         }) })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "mt-6 rounded-2xl bg-navy-900 p-7 text-center text-white", children: [
-        /* @__PURE__ */ jsx("h3", { className: "text-xl font-bold", children: "Close these gaps with TrackAudit" }),
-        /* @__PURE__ */ jsx("p", { className: "mx-auto mt-2 max-w-md text-sm text-white/70", children: "TrackAudit scores every visitor in real time, blocks bots and fraud, and shows you exactly what's hitting your site — free to start." }),
+        /* @__PURE__ */ jsx("h3", { className: "text-xl font-bold", children: "Close these gaps with TryNoBot" }),
+        /* @__PURE__ */ jsx("p", { className: "mx-auto mt-2 max-w-md text-sm text-white/70", children: "TryNoBot scores every visitor in real time, blocks bots and fraud, and shows you exactly what's hitting your site — free to start." }),
         /* @__PURE__ */ jsxs("div", { className: "mt-5 flex justify-center gap-2", children: [
           /* @__PURE__ */ jsx(Button, { to: "/signup", size: "lg", children: "Start free" }),
           /* @__PURE__ */ jsx(Button, { to: "/pricing", variant: "light", size: "lg", children: "View pricing" })
@@ -1166,6 +1303,8 @@ function Features() {
         { icon: IShield, title: "Bot & fraud detection", desc: "Datacenter IPs, proxies, VPNs, headless browsers and automation caught in real time." },
         { icon: IGauge, title: "Explainable risk scores", desc: "A 0–100 score per visitor with the exact contributing signals — never a black box." },
         { icon: IBolt, title: "Traffic rules engine", desc: "Allow, review, block or tag traffic with a visual IF/THEN rule builder." },
+        { icon: IServer, title: "Server-side shield", desc: "Block bots before your page loads — enforce rules at your server or edge with drop-in PHP, Django, nginx, Cloudflare or Node snippets." },
+        { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive paths like /admin, /wp-login or /downloads from bots and fraud." },
         { icon: IChart, title: "Analytics & reports", desc: "Filterable reports across campaigns, geos, devices and sources with CSV export." },
         { icon: ITarget, title: "Conversion attribution", desc: "Tie revenue back to campaigns and traffic quality to see what actually converts." }
       ],
@@ -1339,13 +1478,13 @@ function Docs() {
   ] });
 }
 const QA = [
-  ["What is TrackAudit?", "A traffic-intelligence platform that analyzes, scores and classifies your incoming traffic in real time so you can detect fraud, protect campaigns and measure conversions."],
-  ["Do you deceive ad networks or hide content from reviewers?", "No. TrackAudit is built for legitimate traffic-quality, fraud detection and analytics. We don't provide ad-reviewer deception or platform-policy evasion."],
+  ["What is TryNoBot?", "A traffic-intelligence platform that analyzes, scores and classifies your incoming traffic in real time so you can detect fraud, protect campaigns and measure conversions."],
+  ["Do you deceive ad networks or hide content from reviewers?", "No. TryNoBot is built for legitimate traffic-quality, fraud detection and analytics. We don't provide ad-reviewer deception or platform-policy evasion."],
   ["How does risk scoring work?", "Each visitor is evaluated against weighted signals (datacenter IP, proxy, automation, abnormal request rate and more), normalized to a 0–100 score, and classified as Human, Suspicious, Bot or Fraud. Every score lists its contributing signals."],
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],
-  ["Is there a free trial?", "Every plan includes a 14-day free trial with no credit card required."]
+  ["Is there a free trial?", "Every plan includes a 7-day free trial with no credit card required."]
 ];
 function Faq() {
   const [open, setOpen] = useState(0);
@@ -1455,9 +1594,9 @@ function Status() {
 const CONTENT = {
   terms: {
     title: "Terms of Service",
-    intro: "These terms govern your use of the TrackAudit platform. This is placeholder MVP copy — replace with counsel-reviewed terms before launch.",
+    intro: "These terms govern your use of the TryNoBot platform. This is placeholder MVP copy — replace with counsel-reviewed terms before launch.",
     sections: [
-      ["Acceptable use", "TrackAudit may be used only for legitimate traffic-quality, fraud detection and analytics. Using it to deceive advertising networks or evade platform enforcement is prohibited."],
+      ["Acceptable use", "TryNoBot may be used only for legitimate traffic-quality, fraud detection and analytics. Using it to deceive advertising networks or evade platform enforcement is prohibited."],
       ["Accounts", "You are responsible for safeguarding your credentials and API keys, and for all activity under your workspace."],
       ["Billing", "Paid plans are billed monthly. Usage limits and overage behavior are described on the pricing page."],
       ["Termination", "You may cancel anytime. We may suspend accounts that violate the acceptable-use policy."]
@@ -1493,39 +1632,158 @@ function Legal({ kind }) {
     ] }) })
   ] });
 }
-const Login = lazy(() => import("./assets/Login-1Jx2fqRq.js"));
+const REASONS = [
+  ["phishing", "Phishing / fake login page"],
+  ["malware", "Malware or harmful download"],
+  ["spam", "Spam (unsolicited email or SMS)"],
+  ["scam", "Scam or fraud"],
+  ["other", "Something else"]
+];
+function ReportAbuse() {
+  const [params] = useSearchParams();
+  const [url, setUrl] = useState("");
+  const [reason, setReason] = useState("phishing");
+  const [details, setDetails] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  useEffect(() => {
+    const u = params.get("url");
+    if (u) setUrl(u);
+  }, [params]);
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      setResult(await http.post("/v1/abuse/", { url, reason, details, email }, false));
+    } catch (err) {
+      setError(errText(err == null ? void 0 : err.data, "We couldn't file that report. Please email us instead."));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
+      /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
+      /* @__PURE__ */ jsxs("div", { className: "container-page relative py-16 text-center", children: [
+        /* @__PURE__ */ jsx(Badge, { tone: "light", children: "Abuse" }),
+        /* @__PURE__ */ jsx("h1", { className: "mt-5 text-4xl font-extrabold tracking-tight text-white sm:text-5xl", children: "Report a short link" }),
+        /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-xl text-slate-300", children: "Received a link from us that looks like phishing, malware or spam? Tell us here. We re-check the destination the moment you submit, disable it straight away if the threat is confirmed, and put everything else in front of a human." })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx(Section, { children: /* @__PURE__ */ jsxs("div", { className: "mx-auto max-w-xl", children: [
+      result ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft p-8 text-center", children: [
+        /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/10 text-success", children: /* @__PURE__ */ jsx("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx("path", { d: "M20 6L9 17l-5-5" }) }) }),
+        /* @__PURE__ */ jsx("h3", { className: "mt-4 text-lg font-bold", children: result.disabled ? "Link disabled" : "Report received" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-fg-muted", children: result.disabled ? "We've confirmed the problem and the link no longer redirects anyone." : result.matched ? "Our automated scan couldn't confirm a threat, so a person is reviewing it now." : "We couldn't match that to one of our links, but we've logged it for review." }),
+        /* @__PURE__ */ jsxs("p", { className: "mt-4 text-xs text-fg-muted", children: [
+          "Reference #",
+          result.id
+        ] })
+      ] }) : /* @__PURE__ */ jsxs("form", { className: "card shadow-soft space-y-4 p-7", onSubmit: submit, children: [
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("label", { className: "mb-1.5 block text-sm font-semibold", children: "The link you received" }),
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              required: true,
+              value: url,
+              onChange: (e) => setUrl(e.target.value),
+              placeholder: "https://trynb.cc/aB3xK9",
+              className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            }
+          ),
+          /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-xs text-fg-muted", children: "Paste the whole link. Don't visit it again to check." })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("label", { className: "mb-1.5 block text-sm font-semibold", children: "What's wrong with it?" }),
+          /* @__PURE__ */ jsx(
+            "select",
+            {
+              value: reason,
+              onChange: (e) => setReason(e.target.value),
+              className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20",
+              children: REASONS.map(([v, l]) => /* @__PURE__ */ jsx("option", { value: v, children: l }, v))
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsxs("label", { className: "mb-1.5 block text-sm font-semibold", children: [
+            "Anything else? ",
+            /* @__PURE__ */ jsx("span", { className: "font-normal text-fg-muted", children: "(optional)" })
+          ] }),
+          /* @__PURE__ */ jsx(
+            "textarea",
+            {
+              rows: 4,
+              value: details,
+              onChange: (e) => setDetails(e.target.value),
+              placeholder: "Where you received it, what brand it impersonates, what the page asked for…",
+              className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsxs("label", { className: "mb-1.5 block text-sm font-semibold", children: [
+            "Your email ",
+            /* @__PURE__ */ jsx("span", { className: "font-normal text-fg-muted", children: "(optional)" })
+          ] }),
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "email",
+              value: email,
+              onChange: (e) => setEmail(e.target.value),
+              placeholder: "you@company.com",
+              className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            }
+          ),
+          /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-xs text-fg-muted", children: "Leave it and we'll tell you what we did about this report." })
+        ] }),
+        error && /* @__PURE__ */ jsx("p", { className: "text-sm font-medium text-danger", children: error }),
+        /* @__PURE__ */ jsx(Button, { type: "submit", className: "w-full", disabled: busy, children: busy ? "Checking the link…" : "Report this link" })
+      ] }),
+      /* @__PURE__ */ jsx("p", { className: "mt-6 text-center text-xs text-fg-muted", children: "Security teams and researchers: reports sent here are actioned automatically and reach our abuse team directly." })
+    ] }) })
+  ] });
+}
+const Login = lazy(() => import("./assets/Login-DGRBypus.js"));
 const Signup = lazy(() => import("./assets/Signup-m0wuQFbP.js"));
 const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"));
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
-const AcceptInvite = lazy(() => import("./assets/AcceptInvite-CKEWZjat.js"));
-const DashboardLayout = lazy(() => import("./assets/DashboardLayout-rxBSKv3i.js"));
-const Overview = lazy(() => import("./assets/Overview-Bw3quV_y.js"));
-const Websites = lazy(() => import("./assets/Websites-CxSkyCeJ.js"));
-const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-Bd1O0AB3.js"));
-const Campaigns = lazy(() => import("./assets/Campaigns-CDslyL5r.js"));
-const CampaignDetail = lazy(() => import("./assets/CampaignDetail-_mU3spPi.js"));
-const TrafficRules = lazy(() => import("./assets/TrafficRules-DcZzrWBM.js"));
-const BotScanner = lazy(() => import("./assets/BotScanner-BfHDcbKW.js"));
-const Visitors = lazy(() => import("./assets/Visitors-BQcPXCXf.js"));
-const VisitorDetail = lazy(() => import("./assets/VisitorDetail-4dS_2n2k.js"));
-const ClickLog = lazy(() => import("./assets/ClickLog-2mrwAs4g.js"));
-const TrafficSources = lazy(() => import("./assets/TrafficSources-P90ALC2s.js"));
-const Conversions = lazy(() => import("./assets/Conversions-dAR6p69-.js"));
-const DashIntegrations = lazy(() => import("./assets/Integrations-C-SEMYD4.js"));
-const ApiKeys = lazy(() => import("./assets/ApiKeys-ByocI1ke.js"));
-const Webhooks = lazy(() => import("./assets/Webhooks-Ckm9Rr4g.js"));
-const Billing = lazy(() => import("./assets/Billing-CiNOOHMb.js"));
-const UsagePage = lazy(() => import("./assets/UsagePage-DFGneGJE.js"));
-const Team = lazy(() => import("./assets/Team-BNdtiftS.js"));
-const Settings = lazy(() => import("./assets/Settings-DipGCV5X.js"));
-const Reports = lazy(() => import("./assets/Reports-bEXSTn-N.js"));
-const AdminLayout = lazy(() => import("./assets/AdminLayout-CTW8CZA8.js"));
-const AdminOverview = lazy(() => import("./assets/AdminOverview-CFHEaT-q.js"));
-const AdminUsers = lazy(() => import("./assets/AdminUsers-BBJ-0D3F.js"));
-const AdminOrgs = lazy(() => import("./assets/AdminOrgs-CRW7QcLY.js"));
-const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-jQIP_4jd.js"));
-const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-DyjVFW7J.js"));
+const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
+const DashboardLayout = lazy(() => import("./assets/DashboardLayout-BvdFpFbJ.js"));
+const Overview = lazy(() => import("./assets/Overview-DStCz6du.js"));
+const Websites = lazy(() => import("./assets/Websites-B5z4yjqn.js"));
+const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-C-t6Ji6i.js"));
+const Campaigns = lazy(() => import("./assets/Campaigns-BMNy-AYa.js"));
+const CampaignDetail = lazy(() => import("./assets/CampaignDetail-B_aaSU2-.js"));
+const TrafficRules = lazy(() => import("./assets/TrafficRules-CG8Jc1A0.js"));
+const Shield = lazy(() => import("./assets/Shield-DtLeBreS.js"));
+const Links = lazy(() => import("./assets/Links-BrlvZpnZ.js"));
+const BotScanner = lazy(() => import("./assets/BotScanner-DiCJQKpT.js"));
+const Visitors = lazy(() => import("./assets/Visitors-VEcRqY-5.js"));
+const VisitorDetail = lazy(() => import("./assets/VisitorDetail-CPPQkGaU.js"));
+const ClickLog = lazy(() => import("./assets/ClickLog-C_nX-TAV.js"));
+const TrafficSources = lazy(() => import("./assets/TrafficSources-y-tyDvXq.js"));
+const Conversions = lazy(() => import("./assets/Conversions-Co1i5was.js"));
+const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
+const ApiKeys = lazy(() => import("./assets/ApiKeys-BgRTYRFB.js"));
+const Webhooks = lazy(() => import("./assets/Webhooks-DFybJpm9.js"));
+const Billing = lazy(() => import("./assets/Billing-Cdss7Sgd.js"));
+const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
+const Team = lazy(() => import("./assets/Team-CwYl61NG.js"));
+const Settings = lazy(() => import("./assets/Settings-A9nqqFl4.js"));
+const Reports = lazy(() => import("./assets/Reports-Bg-CpY8O.js"));
+const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
+const AdminOverview = lazy(() => import("./assets/AdminOverview-DeiGjSa1.js"));
+const AdminUsers = lazy(() => import("./assets/AdminUsers-DSj4p2x1.js"));
+const AdminOrgs = lazy(() => import("./assets/AdminOrgs-CHo9p4V4.js"));
+const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-CG6YY1bb.js"));
+const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-Btykmn1h.js"));
 const spinner = /* @__PURE__ */ jsx("div", { className: "grid min-h-screen place-items-center", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
 function AppRoutes() {
   return /* @__PURE__ */ jsx(Suspense, { fallback: spinner, children: /* @__PURE__ */ jsxs(Routes, { children: [
@@ -1543,6 +1801,8 @@ function AppRoutes() {
       /* @__PURE__ */ jsx(Route, { path: "/faq", element: /* @__PURE__ */ jsx(Faq, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "/contact", element: /* @__PURE__ */ jsx(Contact, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "/status", element: /* @__PURE__ */ jsx(Status, {}) }),
+      /* @__PURE__ */ jsx(Route, { path: "/report", element: /* @__PURE__ */ jsx(ReportAbuse, {}) }),
+      /* @__PURE__ */ jsx(Route, { path: "/abuse", element: /* @__PURE__ */ jsx(ReportAbuse, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "/terms", element: /* @__PURE__ */ jsx(Legal, { kind: "terms" }) }),
       /* @__PURE__ */ jsx(Route, { path: "/privacy", element: /* @__PURE__ */ jsx(Legal, { kind: "privacy" }) })
     ] }),
@@ -1559,6 +1819,8 @@ function AppRoutes() {
       /* @__PURE__ */ jsx(Route, { path: "campaigns", element: /* @__PURE__ */ jsx(Campaigns, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "campaigns/:id", element: /* @__PURE__ */ jsx(CampaignDetail, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "traffic-rules", element: /* @__PURE__ */ jsx(TrafficRules, {}) }),
+      /* @__PURE__ */ jsx(Route, { path: "shield", element: /* @__PURE__ */ jsx(Shield, {}) }),
+      /* @__PURE__ */ jsx(Route, { path: "links", element: /* @__PURE__ */ jsx(Links, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "scanner", element: /* @__PURE__ */ jsx(BotScanner, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "visitors", element: /* @__PURE__ */ jsx(Visitors, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "visitors/:id", element: /* @__PURE__ */ jsx(VisitorDetail, {}) }),
@@ -1590,29 +1852,48 @@ function render(url) {
   );
 }
 export {
+  variantApi as A,
   Button as B,
-  COUNTRIES as C,
+  ipFilterApi as C,
+  ruleApi as D,
+  RULE_OPS as E,
   FIELD_VALUE_OPTIONS as F,
+  COUNTRIES as G,
+  linkApi as H,
+  IHome as I,
+  botCheckApi as J,
+  conversionsApi as K,
   Logo as L,
+  keysApi as M,
+  webhookApi as N,
+  downloadReportCsv as O,
+  adminApi as P,
   RULE_FIELDS as R,
   authApi as a,
   BRAND$1 as b,
   useWorkspace as c,
   billingApi as d,
-  analyticsApi as e,
-  campaignApi as f,
-  RULE_OPS as g,
-  botCheckApi as h,
-  ipFilterApi as i,
-  conversionsApi as j,
-  keysApi as k,
-  webhookApi as l,
-  downloadReportCsv as m,
-  adminApi as n,
+  IGlobe as e,
+  ITarget as f,
+  IFilter as g,
+  IShieldGold as h,
+  ILink as i,
+  IRadar as j,
+  IUsers as k,
+  IList as l,
+  IChart as m,
+  IFunnel as n,
   orgApi as o,
-  ruleApi as r,
+  ISources as p,
+  IPlug as q,
+  IKey as r,
   render,
+  IBolt as s,
+  ICard as t,
   useAuth as u,
-  variantApi as v,
-  websiteApi as w
+  IGauge as v,
+  IGear as w,
+  analyticsApi as x,
+  websiteApi as y,
+  campaignApi as z
 };

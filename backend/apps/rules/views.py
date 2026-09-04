@@ -5,9 +5,12 @@ from apps.organizations.models import OrganizationMember
 from .models import TrafficRule
 from .serializers import RuleSerializer
 from .sync import publish_org
+from rest_framework.permissions import IsAuthenticated
+from apps.billing.permissions import HasWorkspaceAccess
 
 
 class RuleViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
     serializer_class = RuleSerializer
 
     def _member_org_ids(self):
@@ -44,6 +47,7 @@ from .serializers import IPListEntrySerializer
 
 
 class IPListEntryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
     serializer_class = IPListEntrySerializer
 
     def _member_org_ids(self):

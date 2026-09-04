@@ -13,6 +13,7 @@ from .models import APIKey, Webhook, WEBHOOK_EVENTS
 from .serializers import APIKeySerializer, WebhookSerializer, DeliverySerializer
 from .auth import APIKeyAuthentication
 from .dispatch import dispatch
+from apps.billing.permissions import HasWorkspaceAccess
 
 
 def _member_org_ids(user):
@@ -26,6 +27,7 @@ def _require_manager(user, org_id):
 
 
 class APIKeyViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
     serializer_class = APIKeySerializer
 
     def get_queryset(self):
@@ -57,6 +59,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
 
 
 class WebhookViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
     serializer_class = WebhookSerializer
 
     def get_queryset(self):

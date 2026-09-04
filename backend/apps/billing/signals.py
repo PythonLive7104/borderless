@@ -10,9 +10,9 @@ from .models import Subscription, Plan, TRIAL_DAYS
 def ensure_subscription(sender, instance, created, **kwargs):
     if not created:
         return
-    starter = Plan.objects.filter(slug="starter").first()
-    if starter:
+    default_plan = Plan.objects.filter(slug="basic").first()
+    if default_plan:
         Subscription.objects.get_or_create(
             organization=instance,
-            defaults={"plan": starter, "trial_end": timezone.now() + timedelta(days=TRIAL_DAYS)},
+            defaults={"plan": default_plan, "trial_end": timezone.now() + timedelta(days=TRIAL_DAYS)},
         )

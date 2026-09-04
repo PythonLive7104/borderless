@@ -72,8 +72,51 @@ git pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+## 9. Short-link domain & abuse handling
+Short links run on their own domain so that link abuse can't blacklist
+`trynobot.com` (dashboard + email deliverability).
+
+1. Register the short domain at a registrar that **forwards** abuse complaints
+   rather than suspending on the first one. Cloudflare Registrar is the safe
+   pick; Namecheap suspends aggressively on phishing reports, which takes every
+   customer's links down at once.
+2. Point its DNS at this box, then issue the cert **before** deploying —
+   `deploy/shortdomain.sh` silently no-ops while the cert is missing.
+3. Set `SHORT_DOMAIN`, `SHORTLINK_BASE` and `ABUSE_EMAIL` in `.env`, then
+   `docker compose -f docker-compose.prod.yml up -d --force-recreate web`
+   (a plain `restart` will not reload `.env`).
+4. Put `ABUSE_EMAIL` in the domain's WHOIS record and **read it**. Complaints
+   reach the registrar only when the reporter can't get action from us.
+5. Verify the domain in Google Search Console now, while things are calm — if it
+   ever gets flagged you want to click "request review", not scramble to prove
+   ownership mid-outage.
+
+## Scheduled jobs (host cron)
+Celery was removed to save RAM, so these run from host cron:
+
+```cron
+0 3 * * *   docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_retention
+0 * * * *   docker compose -f docker-compose.prod.yml exec -T backend python manage.py sync_ja3
+15 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py rescan_links
+30 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_access
+```
+
+`enforce_access` is what makes the weekly window real. A subscription expires at
+a moment in time with no request behind it, so nothing in the request path
+notices; this command withdraws the Redis keys the Go engine reads (`rules:`,
+`ipfilter:`, `site:`, `apikey:`, `shortlink:`) for any workspace past its period,
+and republishes them on renewal. Without it an expired customer keeps full bot
+protection and working short links indefinitely. The engine fails open when the
+keys are gone — /v1/decide answers "allow", short links 404 — so we stop
+protecting their traffic without ever taking their own website down.
+
+`rescan_links` re-checks the destinations of live short links and disables any
+that turned malicious after they were created — the slow bait-and-switch that
+create/edit-time scanning can't catch. Defaults scan 60 links/hour to stay inside
+the VirusTotal free-tier quota; raise `--limit` (and `--sleep`) as volume grows.
+
 ## Notes
 - `deploy/nginx.conf` + `deploy/proxy.inc` are baked into the `web` image.
-- Scheduled jobs (retention, JA3 resync) run in `celery-beat`; the traffic
-  stream consumer runs in `worker`.
+- The traffic stream consumer runs in `worker`; scheduled jobs are host cron
+  (above), not Celery.
 - Real TLS/JA3 needs a TLS-terminating proxy (Cloudflare or an nginx JA3 build).

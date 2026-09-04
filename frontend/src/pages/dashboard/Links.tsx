@@ -38,7 +38,9 @@ export default function Links() {
   const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string }>(
     { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
-  const linkEnabled = !!sub && sub.status === "active" && ["growth", "business"].includes(sub.plan.slug);
+  // Mirrors link_shortener_enabled() on the server: every paid tier includes
+  // the shortener, but only while the access period is still running.
+  const linkEnabled = !!sub && sub.status === "active" && !sub.access?.locked;
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
 
   async function load(silent = false) {

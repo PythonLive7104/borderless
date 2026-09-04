@@ -200,3 +200,11 @@ TRACKER_URL = os.getenv("TRACKER_URL", "https://cdn.borderless.local/bl.js")
 # Base for short links (/l/<slug>). Set this to a separate short domain to keep
 # link traffic off the main domain; falls back to FRONTEND_URL when unset.
 SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")
+
+# Abuse handling for the short domain. ABUSE_EMAIL is published on the report
+# page and belongs in the domain's WHOIS record; being reachable and fast is
+# what stops a complainant escalating to the registrar (which suspends the whole
+# domain, killing every customer's links). Reports never disable a link by
+# themselves — only a confirmed threat scan does — so watch the triage queue.
+ABUSE_EMAIL = os.getenv("ABUSE_EMAIL", "")
+ABUSE_NOTIFY_EMAIL = os.getenv("ABUSE_NOTIFY_EMAIL", "") or ABUSE_EMAIL

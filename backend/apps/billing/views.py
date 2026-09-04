@@ -118,6 +118,7 @@ from rest_framework import permissions
 from django.core.mail import send_mail
 
 from . import bachs
+from .entitlements import restore_org
 
 
 def _notify_activation(sub, plan):
@@ -147,6 +148,9 @@ def _notify_activation(sub, plan):
 def _activate(sub, plan):
     sub.start_period(plan)  # applies the plan + rolls unused days into the new period
     sub.save(update_fields=["plan", "status", "period_start", "period_end", "pending_plan_slug"])
+    # Put the engine keys back immediately — a renewal shouldn't wait for the
+    # hourly enforce_access run to start protecting traffic again.
+    restore_org(sub.organization_id)
     _notify_activation(sub, plan)
 
 

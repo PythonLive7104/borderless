@@ -6,9 +6,12 @@ from rest_framework.response import Response
 from apps.organizations.models import OrganizationMember, Role
 from .models import Website
 from .serializers import WebsiteSerializer
+from rest_framework.permissions import IsAuthenticated
+from apps.billing.permissions import HasWorkspaceAccess
 
 
 class WebsiteViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
     serializer_class = WebsiteSerializer
 
     def _member_org_ids(self):

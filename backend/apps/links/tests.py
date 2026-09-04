@@ -1,0 +1,206 @@
+from datetime import timedelta
+from unittest.mock import patch
+
+from django.core.management import call_command
+from django.test import TestCase, override_settings
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from apps.links.abuse import extract_slug
+from apps.links.models import AbuseReport, ShortLink
+from django.contrib.auth import get_user_model
+
+from apps.organizations.models import create_workspace
+
+SHORT = "https://trynb.cc"
+
+
+def _workspace(email: str):
+    user = get_user_model().objects.create_user(
+        username=email, email=email, password="testpass123")
+    return create_workspace(user, "Acme")
+
+
+@override_settings(SHORTLINK_BASE=SHORT, FRONTEND_URL="https://www.trynobot.com")
+class ExtractSlugTest(TestCase):
+    def test_accepts_the_shapes_reporters_actually_paste(self):
+        for value in (f"{SHORT}/aB3xK9", "trynb.cc/aB3xK9", f"{SHORT}/l/aB3xK9",
+                      "/aB3xK9", "aB3xK9", f"{SHORT}/aB3xK9?utm=x", f"{SHORT}/aB3xK9#frag",
+                      "HTTPS://TRYNB.CC/aB3xK9", "https://www.trynobot.com/l/aB3xK9"):
+            self.assertEqual(extract_slug(value), "aB3xK9", value)
+
+    def test_foreign_host_never_yields_a_slug(self):
+        # Otherwise reporting evil.example/<victim-slug> would disable an
+        # innocent customer's link — the form becomes the abuse vector.
+        self.assertEqual(extract_slug("https://evil.example/aB3xK9"), "")
+        self.assertEqual(extract_slug("https://example.com/some/deep/path"), "")
+
+    def test_junk_is_ignored(self):
+        for value in ("", "   ", "not a url at all", SHORT + "/", "https://trynb.cc"):
+            self.assertEqual(extract_slug(value), "", repr(value))
+
+
+class AbuseReportBase(TestCase):
+    def setUp(self):
+        # The limiter counts in Redis, which outlives the test database, so the
+        # functional tests turn it off and test_rate_limit covers it on its own.
+        limiter = patch("apps.links.views._rate_limited", return_value=False)
+        limiter.start()
+        self.addCleanup(limiter.stop)
+
+        self.c = APIClient()
+        self.org = _workspace("owner@acme.example")
+        self.link = ShortLink.objects.create(
+            organization=self.org, slug="aB3xK9",
+            destination_url="https://phish.example/login", active=True)
+
+    def report(self, **kw):
+        payload = {"url": f"{SHORT}/aB3xK9", "reason": "phishing"}
+        payload.update(kw)
+        return self.c.post("/api/v1/abuse/", payload, format="json")
+
+
+@override_settings(SHORTLINK_BASE=SHORT, ABUSE_EMAIL="abuse@trynobot.com")
+class AbuseReportEndpointTest(AbuseReportBase):
+    def test_report_needs_no_account(self):
+        r = self.report()
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()["matched"])
+        self.assertEqual(AbuseReport.objects.count(), 1)
+
+    def test_url_is_required(self):
+        r = self.c.post("/api/v1/abuse/", {"reason": "phishing"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_unknown_reason_falls_back_instead_of_rejecting(self):
+        # Never turn away a report over a bad enum — we want the signal.
+        r = self.report(reason="something-invented")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(AbuseReport.objects.get().reason, "other")
+
+    def test_flagged_scan_disables_the_link_immediately(self):
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url",
+                   return_value={"safe": False, "threats": ["SOCIAL_ENGINEERING"],
+                                 "flagged_by": ["google_safe_browsing"], "checked": True}):
+            r = self.report()
+        self.assertTrue(r.json()["disabled"])
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.active)
+        self.assertEqual(AbuseReport.objects.get().status, AbuseReport.Status.ACTIONED)
+
+    def test_clean_scan_leaves_the_link_live_for_triage(self):
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url",
+                   return_value={"safe": True, "threats": [], "flagged_by": [], "checked": True}):
+            r = self.report()
+        self.assertFalse(r.json()["disabled"])
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.active)
+
+    def test_reports_alone_never_disable_a_link(self):
+        # Reports are unverified. Only a confirmed threat scan pulls a link, so
+        # nobody can take down a rival's link by filing complaints.
+        clean = {"safe": True, "threats": [], "flagged_by": [], "checked": True}
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url", return_value=clean):
+            for ip in ("203.0.113.1", "203.0.113.2", "203.0.113.3", "203.0.113.4"):
+                self.c.credentials(HTTP_X_FORWARDED_FOR=ip)
+                r = self.report()
+                self.assertFalse(r.json()["disabled"])
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.active)
+        self.assertEqual(AbuseReport.objects.count(), 4)
+        # They stay open so a human sees the pile-up in the triage queue.
+        self.assertEqual(
+            AbuseReport.objects.filter(status=AbuseReport.Status.NEW).count(), 4)
+
+    def test_unmatched_url_is_still_recorded(self):
+        r = self.report(url="https://evil.example/whatever")
+        self.assertEqual(r.status_code, 201)
+        self.assertFalse(r.json()["matched"])
+        self.assertEqual(AbuseReport.objects.count(), 1)
+
+    def test_rate_limited_reporter_is_told_to_email_instead(self):
+        with patch("apps.links.views._rate_limited", return_value=True):
+            r = self.report()
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("email us", r.json()["detail"])
+        self.assertEqual(AbuseReport.objects.count(), 0)
+
+    def test_limiter_fails_open_when_redis_is_down(self):
+        # A Redis outage must never swallow an abuse report.
+        from apps.links.views import _rate_limited
+        with patch("apps.rules.sync._r", side_effect=RuntimeError("redis down")):
+            self.assertFalse(_rate_limited("203.0.113.50"))
+
+    def test_disabled_link_stops_redirecting(self):
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url",
+                   return_value={"safe": False, "threats": ["MALWARE"],
+                                 "flagged_by": ["virustotal"], "checked": True}), \
+             patch("apps.links.abuse.publish_link") as published:
+            self.report()
+        # Redis must be rewritten or the engine keeps serving the old payload.
+        self.assertTrue(published.called)
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class RescanCommandTest(TestCase):
+    def setUp(self):
+        self.org = _workspace("owner@rescan.example")
+        self.stale = ShortLink.objects.create(
+            organization=self.org, slug="stale1", destination_url="https://went-bad.example",
+            active=True, url_safe=True, url_scanned_at=timezone.now() - timedelta(days=5))
+        self.fresh = ShortLink.objects.create(
+            organization=self.org, slug="fresh1", destination_url="https://fine.example",
+            active=True, url_safe=True, url_scanned_at=timezone.now())
+
+    def test_disables_a_destination_that_turned_malicious(self):
+        bad = {"safe": False, "threats": ["SOCIAL_ENGINEERING"],
+               "flagged_by": ["google_safe_browsing"], "checked": True}
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url", return_value=bad):
+            call_command("rescan_links", "--sleep", "0", verbosity=0)
+        self.stale.refresh_from_db()
+        self.assertFalse(self.stale.active)
+
+    def test_skips_links_scanned_recently(self):
+        clean = {"safe": True, "threats": [], "flagged_by": [], "checked": True}
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url", return_value=clean) as scan:
+            call_command("rescan_links", "--sleep", "0", verbosity=0)
+        scanned = {c.args[0] for c in scan.call_args_list}
+        self.assertIn(self.stale.destination_url, scanned)
+        self.assertNotIn(self.fresh.destination_url, scanned)
+
+    def test_never_re_enables_a_link_we_already_disabled(self):
+        self.stale.active = False
+        self.stale.save()
+        clean = {"safe": True, "threats": [], "flagged_by": [], "checked": True}
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url", return_value=clean):
+            call_command("rescan_links", "--sleep", "0", verbosity=0)
+        self.stale.refresh_from_db()
+        self.assertFalse(self.stale.active)
+
+    def test_dry_run_calls_no_scanner(self):
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url") as scan:
+            call_command("rescan_links", "--dry-run", verbosity=0)
+        scan.assert_not_called()
+
+    def test_no_keys_configured_is_a_clean_no_op(self):
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=False), \
+             patch("apps.intelligence.threatscan.scan_url") as scan:
+            call_command("rescan_links", verbosity=0)
+        scan.assert_not_called()
+
+
+class ReservedSlugTest(TestCase):
+    def test_report_slug_cannot_be_claimed(self):
+        from apps.links.serializers import ShortLinkSerializer
+        for slug in ("report", "abuse", "Report"):
+            s = ShortLinkSerializer()
+            with self.assertRaises(Exception, msg=slug):
+                s.validate_slug(slug)

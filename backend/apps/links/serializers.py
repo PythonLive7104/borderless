@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.conf import settings
 from apps.organizations.models import OrganizationMember
-from .models import ShortLink, gen_slug
+from .models import RESERVED_SLUGS, ShortLink, gen_slug
 
 
 class ShortLinkSerializer(serializers.ModelSerializer):
@@ -37,6 +37,13 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         if not m.can_manage:
             raise serializers.ValidationError("Only Owners and Admins can manage links.")
         return org
+
+    def validate_slug(self, slug):
+        # The short domain serves /report and the bot pages itself; a link with
+        # one of those slugs would shadow the page a complainant needs.
+        if slug.lower() in RESERVED_SLUGS:
+            raise serializers.ValidationError(f'"{slug}" is reserved — pick another.')
+        return slug
 
     def validate(self, attrs):
         website = attrs.get("website")

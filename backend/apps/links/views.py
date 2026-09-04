@@ -1,13 +1,18 @@
-from rest_framework import viewsets
+from rest_framework import permissions, viewsets, views
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
 
 from apps.organizations.models import OrganizationMember
-from .models import ShortLink
+from .abuse import extract_slug, process_report
+from .models import AbuseReport, ShortLink
 from .serializers import ShortLinkSerializer
 from .sync import publish_link, unpublish_link, scan_and_flag
+from rest_framework.permissions import IsAuthenticated
+from apps.billing.permissions import HasWorkspaceAccess
 
 
 class ShortLinkViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
     serializer_class = ShortLinkSerializer
 
     def _member_org_ids(self):
@@ -49,3 +54,79 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         slug = instance.slug
         instance.delete()
         unpublish_link(slug)
+
+
+# --- Public abuse reporting (no account required) -------------------------
+# Anyone who receives a malicious short link must be able to tell us in a few
+# seconds. If they can't, they report the domain to our registrar instead and
+# every customer's links die with it.
+
+RL_LIMIT = 10      # reports per IP
+RL_WINDOW = 3600   # per hour
+
+
+def _client_ip(request):
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "") or ""
+
+
+def _rate_limited(ip) -> bool:
+    try:
+        from apps.rules.sync import _r
+        r = _r()
+        key = f"abuse:rl:{ip}"
+        n = r.incr(key)
+        if n == 1:
+            r.expire(key, RL_WINDOW)
+        return n > RL_LIMIT
+    except Exception:
+        return False  # never turn away a report over a Redis hiccup
+
+
+class AbuseReportView(views.APIView):
+    """POST {url, reason, details?, email?} — file a report on a short link."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        ip = _client_ip(request)
+        if _rate_limited(ip):
+            return Response(
+                {"detail": "You've filed a lot of reports — please wait a while, "
+                           "or email us directly so nothing gets lost."},
+                status=429,
+            )
+
+        reported_url = (request.data.get("url") or "").strip()[:2000]
+        if not reported_url:
+            return Response({"detail": "Paste the short link you're reporting."}, status=400)
+
+        reason = (request.data.get("reason") or "").strip()
+        if reason not in AbuseReport.Reason.values:
+            reason = AbuseReport.Reason.OTHER
+
+        slug = extract_slug(reported_url)
+        report = AbuseReport.objects.create(
+            reported_url=reported_url,
+            slug=slug,
+            link=ShortLink.objects.filter(slug=slug).first() if slug else None,
+            reason=reason,
+            details=(request.data.get("details") or "").strip()[:5000],
+            reporter_email=(request.data.get("email") or "").strip()[:254],
+            reporter_ip=ip or None,
+        )
+        try:
+            result = process_report(report)
+        except Exception:
+            # A failure here must never lose the report — it's already saved and
+            # will be picked up by triage.
+            result = {"matched": bool(report.link), "disabled": False}
+
+        return Response({
+            "id": report.id,
+            "status": "received",
+            "matched": result["matched"],
+            "disabled": result["disabled"],
+        }, status=201)

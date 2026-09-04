@@ -18,6 +18,7 @@ import Faq from "./pages/marketing/Faq";
 import Contact from "./pages/marketing/Contact";
 import Status from "./pages/marketing/Status";
 import Legal from "./pages/marketing/Legal";
+import ReportAbuse from "./pages/marketing/ReportAbuse";
 // Auth + app + admin are lazy (behind login, no SEO, keeps first load small).
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
@@ -75,6 +76,8 @@ export default function AppRoutes() {
           <Route path="/faq" element={<Faq />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/status" element={<Status />} />
+          <Route path="/report" element={<ReportAbuse />} />
+          <Route path="/abuse" element={<ReportAbuse />} />
           <Route path="/terms" element={<Legal kind="terms" />} />
           <Route path="/privacy" element={<Legal kind="privacy" />} />
         </Route>
