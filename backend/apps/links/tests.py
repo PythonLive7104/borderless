@@ -204,3 +204,59 @@ class ReservedSlugTest(TestCase):
             s = ShortLinkSerializer()
             with self.assertRaises(Exception, msg=slug):
                 s.validate_slug(slug)
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class EditRedirectTest(TestCase):
+    """Editing a redirect must keep Redis in step with the database."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {"email": "ed@example.com", "password": "testpass123",
+                                            "first_name": "E"}, format="json")
+        access = self.c.post("/api/auth/token/", {"email": "ed@example.com", "password": "testpass123"},
+                             format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+        call_command("grant_plan", "--org", str(self.org), "--plan", "pro", verbosity=0)
+        self.link = ShortLink.objects.create(
+            organization_id=self.org, slug="keepme",
+            destination_url="https://example.com/a", active=True)
+
+    def test_can_edit_destination_and_bot_action(self):
+        r = self.c.patch(f"/api/links/{self.link.id}/",
+                         {"destination_url": "https://example.com/b", "bot_action": "notfound"},
+                         format="json")
+        self.assertEqual(r.status_code, 200)
+        self.link.refresh_from_db()
+        self.assertEqual(self.link.destination_url, "https://example.com/b")
+        self.assertEqual(self.link.bot_action, "notfound")
+
+    def test_renaming_the_slug_retires_the_old_redis_key(self):
+        with patch("apps.links.views.unpublish_link") as unpub, \
+             patch("apps.links.views.publish_link"):
+            r = self.c.patch(f"/api/links/{self.link.id}/", {"slug": "brandnew"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        unpub.assert_called_once_with("keepme")   # old URL must stop redirecting
+
+    def test_editing_without_renaming_leaves_the_key_alone(self):
+        with patch("apps.links.views.unpublish_link") as unpub, \
+             patch("apps.links.views.publish_link"):
+            self.c.patch(f"/api/links/{self.link.id}/", {"title": "Renamed"}, format="json")
+        unpub.assert_not_called()
+
+    def test_edit_rescans_the_new_destination_and_disables_if_unsafe(self):
+        bad = {"safe": False, "threats": ["SOCIAL_ENGINEERING"],
+               "flagged_by": ["google_safe_browsing"], "checked": True}
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url", return_value=bad):
+            r = self.c.patch(f"/api/links/{self.link.id}/",
+                             {"destination_url": "https://phish.example/login"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.active)
+
+    def test_cannot_rename_onto_a_reserved_slug(self):
+        r = self.c.patch(f"/api/links/{self.link.id}/", {"slug": "report"}, format="json")
+        self.assertEqual(r.status_code, 400)

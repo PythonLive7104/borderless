@@ -4,17 +4,27 @@ import { KB } from "../../data/knowledge";
 // Tawk.to live-chat embed URL, e.g. https://embed.tawk.to/<propertyId>/<widgetId>
 const TAWK_SRC = ((import.meta as any).env?.VITE_TAWK_SRC as string | undefined) || "";
 
-function openTawk() {
+/** Loads Tawk and maximizes it. Calls onFail() when it can't be used — the
+ *  common case is an ad blocker (Brave Shields, uBlock) dropping tawk.to, which
+ *  is very likely for this audience. Without this the caller hides our own
+ *  widget and the visitor is left with nothing at all. */
+function openTawk(onFail: () => void) {
   const w = window as any;
-  if (!TAWK_SRC) { window.open("mailto:support@trynobot.com?subject=Support%20request", "_blank"); return; }
+  if (!TAWK_SRC || TAWK_SRC.includes("<")) { onFail(); return; }   // unset or placeholder
   if (w.Tawk_API?.maximize) { w.Tawk_API.maximize(); return; }
   w.Tawk_API = w.Tawk_API || {};
   w.Tawk_LoadStart = new Date();
   const s = document.createElement("script");
   s.async = true; s.src = TAWK_SRC; s.charset = "UTF-8"; s.setAttribute("crossorigin", "*");
+  let settled = false;
+  const fail = () => { if (!settled) { settled = true; onFail(); } };
+  s.onerror = fail;                       // blocked, offline, or bad property id
   s.onload = () => {
-    const t = setInterval(() => { if (w.Tawk_API?.maximize) { w.Tawk_API.maximize(); clearInterval(t); } }, 300);
-    setTimeout(() => clearInterval(t), 8000);
+    const t = setInterval(() => {
+      if (w.Tawk_API?.maximize) { settled = true; w.Tawk_API.maximize(); clearInterval(t); }
+    }, 300);
+    // Loaded but never initialised (a blocker can serve an empty stub).
+    setTimeout(() => { clearInterval(t); fail(); }, 8000);
   };
   document.body.appendChild(s);
 }
@@ -56,9 +66,22 @@ export default function HelpChat() {
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => { scroller.current?.scrollTo(0, scroller.current.scrollHeight); }, [msgs, open]);
 
-  // Escalate to Tawk: close our widget and hide our bubble so the two chats
-  // don't stack in the same corner (Tawk becomes the active chat).
-  function talkToHuman() { openTawk(); setOpen(false); setTawkActive(true); }
+  // Escalate to Tawk: hide our bubble so the two chats don't stack in the same
+  // corner. If Tawk never comes up we take the widget back and offer email,
+  // rather than leaving the visitor staring at an empty corner.
+  function talkToHuman() {
+    setOpen(false);
+    setTawkActive(true);
+    openTawk(() => {
+      setTawkActive(false);
+      setOpen(true);
+      setMsgs((m) => [...m, {
+        from: "bot",
+        text: "I couldn't open live chat — an ad blocker or privacy shield is usually the reason. "
+            + "Email support@trynobot.com and we'll pick it up there.",
+      }]);
+    });
+  }
 
   // If Tawk is the active chat, get out of its way entirely.
   if (tawkActive) return null;

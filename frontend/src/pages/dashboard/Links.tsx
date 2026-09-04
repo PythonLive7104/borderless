@@ -32,6 +32,7 @@ export default function Links() {
   const [rows, setRows] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ShortLink | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
@@ -49,6 +50,7 @@ export default function Links() {
   const cap = sub?.plan.max_redirects ?? 0;
   const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
+  const linkBase = rows[0]?.short_url.replace(/\/[^/]*$/, "") || `${ORIGIN}/l`;
 
   async function load(silent = false) {
     if (!current) return;
@@ -61,20 +63,41 @@ export default function Links() {
   useLivePoll(load, [current?.id]);
 
   function openCreate() {
-    setErr(""); setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "" }); setOpen(true);
+    setErr(""); setEditing(null);
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "" });
+    setOpen(true);
   }
-  async function create(e: React.FormEvent) {
+  function openEdit(l: ShortLink) {
+    setErr(""); setEditing(l);
+    setForm({
+      destination_url: l.destination_url, title: l.title || "", slug: l.slug,
+      bot_action: l.bot_action, website: l.website ? String(l.website) : "",
+    });
+    setOpen(true);
+  }
+  async function save(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
+    const payload = {
+      destination_url: form.destination_url,
+      title: form.title || "",
+      slug: form.slug || undefined,
+      bot_action: form.bot_action,
+      website: form.website ? Number(form.website) : null,
+    };
     try {
-      await linkApi.create({
-        organization: current!.id,
-        destination_url: form.destination_url,
-        title: form.title || undefined,
-        slug: form.slug || undefined,
-        bot_action: form.bot_action,
-        website: form.website ? Number(form.website) : null,
-      });
-      setOpen(false); load();
+      // Both paths re-scan the destination server-side; a link whose new target
+      // comes back unsafe is auto-disabled, so say so rather than let it look
+      // like the save silently failed.
+      const saved = editing
+        ? await linkApi.update(editing.id, payload)
+        : await linkApi.create({ organization: current!.id, ...payload });
+      setOpen(false);
+      if (saved.url_safe === false) {
+        notify("Saved, but the destination was flagged as unsafe — the redirect is disabled.", "danger");
+      } else {
+        notify(editing ? "Redirect updated." : "Redirect created.");
+      }
+      load();
     } catch (e: any) { setErr(e.data?.slug?.[0] || e.data?.destination_url?.[0] || e.data?.detail || e.message); }
     finally { setBusy(false); }
   }
@@ -173,6 +196,7 @@ export default function Links() {
                         className={`h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`}>
                         <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}`} />
                       </button>
+                      <button onClick={() => openEdit(l)} className="text-brand hover:underline">Edit</button>
                       <button onClick={() => remove(l.id)} className="text-red-500 hover:underline">Delete</button>
                     </>
                   )}
@@ -183,12 +207,12 @@ export default function Links() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Create a redirect" size="lg">
-        <form onSubmit={create} className="space-y-4">
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Edit redirect" : "Create a redirect"} size="lg">
+        <form onSubmit={save} className="space-y-4">
           {/* live preview */}
           <div className="rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
             <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Your link</div>
-            <div className="mt-0.5 break-all font-mono text-sm font-semibold text-brand">{ORIGIN}/l/{form.slug || "…"}</div>
+            <div className="mt-0.5 break-all font-mono text-sm font-semibold text-brand">{linkBase}/{form.slug || "…"}</div>
           </div>
 
           <Field label="Where should it send people?" type="url" value={form.destination_url} onChange={(v) => setForm({ ...form, destination_url: v })} placeholder="https://your-offer.com/landing" />
@@ -206,6 +230,13 @@ export default function Links() {
               <Button type="button" variant="outline" onClick={() => setForm({ ...form, slug: randSlug(clampLen(form.slug.length || 10)) })}>Regenerate</Button>
             </div>
             <p className="mt-1 text-xs text-fg-dim">Drag for a random ending, or type your own. Longer is harder to guess.</p>
+            {editing && form.slug !== editing.slug && (
+              <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-amber-800">
+                Changing the ending breaks the old link
+                {editing.clicks > 0 && <> — it already has <b>{editing.clicks}</b> click{editing.clicks === 1 ? "" : "s"}</>}.
+                Anyone who already has <span className="font-mono">{editing.slug}</span> will get a 404.
+              </p>
+            )}
           </div>
 
           <div>
@@ -235,7 +266,9 @@ export default function Links() {
           </label>
 
           {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
-          <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Create link"}</Button>
+          <Button type="submit" className="w-full" disabled={busy}>
+            {busy ? "Saving…" : editing ? "Save changes" : "Create redirect"}
+          </Button>
         </form>
       </Modal>
     </div>

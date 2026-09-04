@@ -45,7 +45,13 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         self._require_manager(serializer.instance.organization_id)
+        old_slug = serializer.instance.slug
         link = serializer.save()
+        # A renamed redirect must stop answering on its old slug. publish_link
+        # only writes the new key, so without this the old URL keeps redirecting
+        # out of Redis forever — including one renamed to disown an abused link.
+        if link.slug != old_slug:
+            unpublish_link(old_slug)
         scan_and_flag(link)
         publish_link(link)
 
