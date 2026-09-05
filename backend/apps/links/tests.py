@@ -282,8 +282,10 @@ class LinkBaseTest(TestCase):
         self.assertEqual(r.json()["base"], SHORT)
 
     @override_settings(SHORTLINK_BASE="")
-    def test_falls_back_to_the_legacy_path_when_no_short_domain(self):
-        self.assertEqual(self.c.get("/api/links/").json()["base"], "https://www.trynobot.com/l")
+    def test_no_short_domain_means_no_base_rather_than_the_brand_domain(self):
+        # Previously this fell back to <main domain>/l, which served redirects
+        # from the brand we keep link abuse away from.
+        self.assertEqual(self.c.get("/api/links/").json()["base"], "")
 
 
 @override_settings(SHORTLINK_BASE=SHORT)
@@ -397,3 +399,67 @@ class TrackerEnforcementTest(TestCase):
         snip = self._snippet(True)
         self.assertIn('data-strict="1"', snip)
         self.assertNotIn("async", snip)
+
+
+class NoBrandDomainFallbackTest(TestCase):
+    """Short links live on SHORT_DOMAIN only.
+
+    With no short domain the service is OFF — it must never fall back to the
+    main domain, because the entire reason for the separate domain is that link
+    abuse lands there instead of on the brand.
+    """
+
+    def setUp(self):
+        self.org = _workspace("owner@fallback.example")
+        self.link = ShortLink.objects.create(
+            organization=self.org, slug="abc", destination_url="https://example.com")
+
+    @override_settings(SHORTLINK_BASE="", FRONTEND_URL="https://www.trynobot.com")
+    def test_no_short_domain_yields_no_link_at_all(self):
+        from apps.links.serializers import ShortLinkSerializer
+        self.assertEqual(ShortLinkSerializer(self.link).data["short_url"], "")
+
+    @override_settings(SHORTLINK_BASE="", FRONTEND_URL="https://www.trynobot.com")
+    def test_the_brand_domain_never_appears_in_a_link(self):
+        from apps.links.serializers import ShortLinkSerializer
+        self.assertNotIn("trynobot.com", ShortLinkSerializer(self.link).data["short_url"])
+
+    @override_settings(SHORTLINK_BASE="", FRONTEND_URL="https://www.trynobot.com")
+    def test_decoy_is_not_served_from_the_brand_domain(self):
+        import json
+        from apps.links.sync import _payload
+        self.assertNotIn("trynobot.com", json.loads(_payload(self.link))["decoy_url"])
+
+    @override_settings(SHORTLINK_BASE="")
+    def test_service_reports_unavailable_and_gates_the_feature(self):
+        from apps.billing.models import link_shortener_enabled, redirects_available
+        self.assertFalse(redirects_available())
+        self.assertFalse(link_shortener_enabled(self.org.id))
+
+    @override_settings(SHORTLINK_BASE=SHORT)
+    def test_service_is_available_once_a_short_domain_is_set(self):
+        from apps.billing.models import redirects_available
+        self.assertTrue(redirects_available())
+
+
+@override_settings(SHORTLINK_BASE="")
+class RedirectsPausedApiTest(TestCase):
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {"email": "p@example.com", "password": "testpass123",
+                                            "first_name": "P"}, format="json")
+        access = self.c.post("/api/auth/token/", {"email": "p@example.com", "password": "testpass123"},
+                             format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+
+    def test_list_reports_an_empty_base(self):
+        self.assertEqual(self.c.get("/api/links/").json()["base"], "")
+
+    def test_creating_a_link_is_refused_while_paused(self):
+        call_command("grant_plan", "--org", str(self.org), "--plan", "pro", verbosity=0)
+        r = self.c.post("/api/links/", {"organization": self.org,
+                                        "destination_url": "https://example.com"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("unavailable", r.json()["detail"].lower())

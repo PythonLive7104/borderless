@@ -7,7 +7,9 @@ from apps.rules.sync import _r
 
 
 def _bot_base() -> str:
-    return (getattr(settings, "SHORTLINK_BASE", "") or settings.FRONTEND_URL).rstrip("/")
+    """Where the decoy page lives. Short domain only — a decoy served from the
+    brand domain would hand bots a trynobot.com URL to report."""
+    return (getattr(settings, "SHORTLINK_BASE", "") or "").rstrip("/")
 
 
 def _payload(link) -> str:

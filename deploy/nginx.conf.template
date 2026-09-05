@@ -37,7 +37,11 @@ server {
     location /static/ { set $up http://backend:8000;  proxy_pass $up; include /etc/nginx/proxy.inc; }
     location = /bl.js { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
     location /v1/     { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
-    location /l/      { set $dec http://decision:8080; proxy_pass $dec; include /etc/nginx/proxy.inc; }
+    # NOTE: /l/ is deliberately NOT proxied here. Short links are served only on
+    # SHORT_DOMAIN (deploy/shortdomain.sh). If a link is abused, the fallout has
+    # to stay on that domain — routing redirects through the brand domain would
+    # put the dashboard and email reputation behind the same blocklist entry,
+    # which is the whole reason the short domain exists.
 
     location /assets/ { root /usr/share/nginx/html; expires 1y; add_header Cache-Control "public, immutable"; }
     # Marketing routes resolve to their own pre-rendered index.html (via $uri/).

@@ -158,10 +158,25 @@ def _paid_active(sub) -> bool:
                 and sub.period_end and timezone.now() < sub.period_end)
 
 
+def redirects_available() -> bool:
+    """Whether the redirect service can run at all.
+
+    Short links are served exclusively from SHORT_DOMAIN. If that domain is
+    unset — never configured, or withdrawn because it was suspended or
+    blocklisted — the service is OFF for everyone. It must never quietly fall
+    back to the main domain: the point of the separate domain is that abuse
+    lands there and not on the brand.
+    """
+    from django.conf import settings
+    return bool((getattr(settings, "SHORTLINK_BASE", "") or "").strip())
+
+
 def link_shortener_enabled(organization_id) -> bool:
     """Redirection (short links) is included on every paid tier, but NOT on
     the free trial — payment gates it to deter abuse. The count of links is then
     capped per tier (see redirect_limit)."""
+    if not redirects_available():
+        return False
     sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
     return _paid_active(sub)
 

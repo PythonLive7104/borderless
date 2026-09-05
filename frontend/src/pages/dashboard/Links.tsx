@@ -33,7 +33,9 @@ export default function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ShortLink | null>(null);
-  const [linkBase, setLinkBase] = useState(`${ORIGIN}/l`);
+  // "" means no short domain is configured — the service is off, and we must
+  // never show a trynobot.com link as a stand-in.
+  const [linkBase, setLinkBase] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
@@ -44,7 +46,8 @@ export default function Links() {
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
-  const linkEnabled = !!sub && sub.status === "active" && !sub.access?.locked;
+  const serviceUp = linkBase !== "";
+  const linkEnabled = serviceUp && !!sub && sub.status === "active" && !sub.access?.locked;
   // Usage against the plan's cap. Mirrors redirect_limit() on the server, which
   // is what actually refuses the create — 0 means the tier has no allowance.
   const used = rows.length;
@@ -60,7 +63,7 @@ export default function Links() {
     try {
       const [l, w, s] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id), billingApi.subscription(current.id)]);
       setRows(l.results); setSites(w.results); setSub(s);
-      if (l.base) setLinkBase(l.base);
+      setLinkBase(l.base || "");
     } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);
@@ -161,7 +164,17 @@ export default function Links() {
       </div>
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
-       : !linkEnabled ? (
+       : !serviceUp ? (
+        <div className="card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl">⏸️</div>
+          <h2 className="mt-3 text-lg font-bold">Redirects are paused</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
+            The redirect service is temporarily unavailable, so no links are being served and
+            none can be created. Your existing links and their stats are safe and will work
+            again as soon as it's back.
+          </p>
+        </div>
+      ) : !linkEnabled ? (
         <div className="card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl">🔗</div>
           <h2 className="mt-3 text-lg font-bold">Redirection is a paid feature</h2>

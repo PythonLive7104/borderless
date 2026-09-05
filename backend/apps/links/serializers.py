@@ -21,10 +21,11 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         # A dedicated short domain serves bare-slug links at the root
         # (nobot.link/<slug>). Without one, fall back to the main app domain,
         # which only routes /l/ to the engine — so keep the /l/ prefix there.
+        # No short domain configured (or it was pulled after abuse) => no link.
+        # Never fall back to the main domain: that would serve redirects from the
+        # brand we isolated them from in the first place.
         base = getattr(settings, "SHORTLINK_BASE", "").rstrip("/")
-        if base:
-            return f"{base}/{obj.slug}"
-        return f"{settings.FRONTEND_URL.rstrip('/')}/l/{obj.slug}"
+        return f"{base}/{obj.slug}" if base else ""
 
     def get_quality(self, obj) -> float:
         return round(obj.human_clicks / obj.clicks, 4) if obj.clicks else 0.0

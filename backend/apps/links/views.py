@@ -39,12 +39,15 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         response = super().list(request, *args, **kwargs)
         base = (getattr(settings, "SHORTLINK_BASE", "") or "").rstrip("/")
         if isinstance(response.data, dict):
-            response.data["base"] = base or f"{settings.FRONTEND_URL.rstrip('/')}/l"
+            response.data["base"] = base          # "" => redirects are switched off
         return response
 
     def perform_create(self, serializer):
         org = serializer.validated_data["organization"]
-        from apps.billing.models import link_shortener_enabled, redirect_limit
+        from apps.billing.models import link_shortener_enabled, redirect_limit, redirects_available
+        if not redirects_available():
+            raise PermissionDenied(
+                "Redirects are temporarily unavailable. No new links can be created right now.")
         if not link_shortener_enabled(org.id):
             raise PermissionDenied(
                 "Redirects are a paid feature. Start a plan on the Billing page to create them.")

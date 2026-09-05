@@ -9,7 +9,6 @@ import { N as NoData } from "./NoData-fWp_o2IY.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
-const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const randSlug = (len = 10) => {
   let s = "";
@@ -32,7 +31,7 @@ function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [linkBase, setLinkBase] = useState(`${ORIGIN}/l`);
+  const [linkBase, setLinkBase] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(null);
@@ -42,7 +41,8 @@ function Links() {
     { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
-  const linkEnabled = !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
+  const serviceUp = linkBase !== "";
+  const linkEnabled = serviceUp && !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
   const used = rows.length;
   const cap = (sub == null ? void 0 : sub.plan.max_redirects) ?? 0;
   const atCap = linkEnabled && cap > 0 && used >= cap;
@@ -58,7 +58,7 @@ function Links() {
       setRows(l.results);
       setSites(w.results);
       setSub(s);
-      if (l.base) setLinkBase(l.base);
+      setLinkBase(l.base || "");
     } finally {
       setLoading(false);
     }
@@ -174,7 +174,11 @@ function Links() {
         ] })
       ] })
     ] }),
-    loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !linkEnabled ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center", children: [
+    loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !serviceUp ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center", children: [
+      /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl", children: "⏸️" }),
+      /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirects are paused" }),
+      /* @__PURE__ */ jsx("p", { className: "mx-auto mt-2 max-w-md text-sm text-fg-muted", children: "The redirect service is temporarily unavailable, so no links are being served and none can be created. Your existing links and their stats are safe and will work again as soon as it's back." })
+    ] }) : !linkEnabled ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl", children: "🔗" }),
       /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirection is a paid feature" }),
       /* @__PURE__ */ jsxs("p", { className: "mx-auto mt-2 max-w-md text-sm text-fg-muted", children: [

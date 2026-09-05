@@ -205,6 +205,7 @@ class GrantPlanCommandTest(TestCase):
         with self.assertRaises(CommandError):
             call_command("grant_plan", "--org", str(self.org.id), "--plan", "enterprise", verbosity=0)
 
+    @override_settings(SHORTLINK_BASE="https://trynb.cc")
     def test_granting_unlocks_the_redirect_feature(self):
         from apps.billing.models import link_shortener_enabled, redirect_limit
         self.assertFalse(link_shortener_enabled(self.org.id))   # trialing
