@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -88,6 +90,7 @@ func main() {
 	mux.HandleFunc("/v1/collect", h.collect)
 	mux.HandleFunc("/v1/decide", h.decide)
 	mux.HandleFunc("/v1/guard", h.guard)
+	mux.HandleFunc("/v1/challenge", h.challenge)
 	mux.HandleFunc("/l/", h.shortlink)         // legacy /l/<slug>
 	mux.HandleFunc("/", h.shortlink)           // bare /<slug> (short domain)
 
@@ -452,6 +455,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		BotAction   string `json:"bot_action"` // off | decoy | notfound | blank
 		DecoyURL    string `json:"decoy_url"`
 		Active      bool   `json:"active"`
+		Challenge   bool   `json:"challenge"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
 		http.NotFound(w, r)
@@ -518,6 +522,13 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Human check. Only stands between a visitor and the destination when we
+	// were going to let them through anyway — a bot already has its own
+	// outcome, and re-checking it here would just leak that it was detected.
+	if link.Challenge && (mode == "allow" || mode == "redirect") && !challengePassed(r) {
+		mode = "challenge"
+	}
+
 	sigJSON, _ := json.Marshal(result.Signals)
 	go h.st.EmitTraffic(context.Background(), map[string]any{
 		"site_id": link.TID, "visitor_id": "click:" + fp.IP, "session_id": "",
@@ -530,6 +541,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	})
 
 	switch mode {
+	case "challenge":
+		writeChallengePage(w, slug)
 	case "block":
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Access denied"))
@@ -589,3 +602,111 @@ func env(k, def string) string {
 	}
 	return def
 }
+
+// --- Human check ("click to continue") ---------------------------------
+// A link with challenge=true shows an interstitial to visitors we would
+// otherwise send straight through. Bots already get bot_action, so this is
+// aimed at the automation the scorer missed: anything that can't run JS or
+// won't click never reaches the destination.
+//
+// Passing sets a short-lived signed cookie, so a real visitor is asked once
+// rather than on every click. The signature is keyed on the app secret, so
+// the cookie can't be forged or lifted from one visitor's browser and reused
+// past its expiry.
+
+const challengeCookie = "tnb_hc"
+const challengeTTL = 30 * time.Minute
+
+func challengeSecret() string {
+	return env("DJANGO_SECRET_KEY", "insecure-dev-secret")
+}
+
+func signChallenge(exp int64) string {
+	m := hmac.New(sha256.New, []byte(challengeSecret()))
+	fmt.Fprintf(m, "hc|%d", exp)
+	return fmt.Sprintf("%d.%s", exp, hex.EncodeToString(m.Sum(nil)))
+}
+
+func challengePassed(r *http.Request) bool {
+	c, err := r.Cookie(challengeCookie)
+	if err != nil || c.Value == "" {
+		return false
+	}
+	parts := strings.SplitN(c.Value, ".", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	var exp int64
+	if _, err := fmt.Sscanf(parts[0], "%d", &exp); err != nil {
+		return false
+	}
+	if time.Now().Unix() > exp {
+		return false
+	}
+	// constant-time compare so the signature can't be probed byte by byte
+	return hmac.Equal([]byte(signChallenge(exp)), []byte(c.Value))
+}
+
+// GET /v1/challenge?to=<slug> — sets the cookie, then bounces back to the link.
+func (h *handler) challenge(w http.ResponseWriter, r *http.Request) {
+	slug := strings.Trim(r.URL.Query().Get("to"), "/")
+	// Only ever bounce back to one of our own slugs, never an arbitrary URL —
+	// otherwise this endpoint is an open redirect.
+	if slug == "" || strings.ContainsAny(slug, "/:?#\\") {
+		http.NotFound(w, r)
+		return
+	}
+	exp := time.Now().Add(challengeTTL).Unix()
+	http.SetCookie(w, &http.Cookie{
+		Name: challengeCookie, Value: signChallenge(exp), Path: "/",
+		Expires: time.Unix(exp, 0), HttpOnly: true, Secure: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, "/"+slug, http.StatusFound)
+}
+
+func writeChallengePage(w http.ResponseWriter, slug string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, challengeHTML, template.HTMLEscapeString(slug))
+}
+
+const challengeHTML = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Just a moment…</title>
+<style>
+ :root{color-scheme:light}*{box-sizing:border-box}
+ body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.5rem;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#f6f8fc;color:#0f1626}
+ .card{max-width:26rem;width:100%%;text-align:center;background:#fff;border:1px solid #e6e9f0;
+  border-radius:1rem;padding:2.25rem 1.75rem;box-shadow:0 24px 60px -30px rgba(15,22,38,.35)}
+ h1{font-size:1.15rem;margin:0 0 .4rem}
+ p{color:#566072;font-size:.9rem;line-height:1.6;margin:0 auto;max-width:20rem}
+ button{margin-top:1.5rem;width:100%%;border:0;border-radius:999px;background:#2563eb;color:#fff;
+  font:600 .95rem system-ui;padding:.8rem 1rem;cursor:pointer}
+ button:hover{background:#1d4ed8}button:disabled{opacity:.6;cursor:default}
+ .tag{display:block;margin-top:1.25rem;font-size:.68rem;letter-spacing:.08em;
+  text-transform:uppercase;color:#8b93a3}
+ noscript p{color:#dc2626}
+</style></head><body>
+ <main class="card">
+  <h1>Confirm you're human</h1>
+  <p>One quick check before we take you there.</p>
+  <button id="go" type="button">I'm not a robot</button>
+  <noscript><p>JavaScript is required to continue.</p></noscript>
+  <span class="tag">Protected by TryNoBot</span>
+ </main>
+ <script>
+  // Wiring the target in JS (not an <a href>) means a scraper that only reads
+  // the HTML has nothing to follow.
+  var slug = %q;
+  document.getElementById("go").addEventListener("click", function (e) {
+    e.target.disabled = true; e.target.textContent = "Checking…";
+    location.href = "/v1/challenge?to=" + encodeURIComponent(slug);
+  });
+ </script>
+</body></html>`

@@ -39,8 +39,8 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "" });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -67,7 +67,7 @@ export default function Links() {
 
   function openCreate() {
     setErr(""); setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -75,6 +75,7 @@ export default function Links() {
     setForm({
       destination_url: l.destination_url, title: l.title || "", slug: l.slug,
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
+      challenge: !!l.challenge,
     });
     setOpen(true);
   }
@@ -85,6 +86,7 @@ export default function Links() {
       title: form.title || "",
       slug: form.slug || undefined,
       bot_action: form.bot_action,
+      challenge: form.challenge,
       website: form.website ? Number(form.website) : null,
     };
     try {
@@ -187,6 +189,7 @@ export default function Links() {
                   <div className="mt-1 text-xs text-fg-dim">
                     Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
+                    {l.challenge && <> · <b className="text-fg-muted">Human check on</b></>}
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
@@ -257,6 +260,19 @@ export default function Links() {
               ))}
             </div>
           </div>
+
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
+            <input type="checkbox" checked={form.challenge} className="mt-0.5"
+              onChange={(e) => setForm({ ...form, challenge: e.target.checked })} />
+            <span>
+              <span className="block text-sm font-semibold">Ask visitors to confirm they're human</span>
+              <span className="block text-xs text-fg-muted">
+                Shows a "I'm not a robot" button before the redirect. Only people we'd already let
+                through see it — bots still get the handling above — so it catches automation the
+                score missed. Confirmed visitors aren't asked again for 30 minutes.
+              </span>
+            </span>
+          </label>
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Apply a website's Traffic Rules? <span className="font-normal text-fg-dim">(optional, advanced)</span></span>

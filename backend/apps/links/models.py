@@ -31,6 +31,13 @@ class ShortLink(models.Model):
     # What automated traffic gets. Real visitors always go to the destination.
     bot_action = models.CharField(max_length=10, choices=BotAction.choices, default=BotAction.DECOY)
 
+    # Interstitial "click to continue" check. Only shown to visitors we'd
+    # otherwise let through — bots already get bot_action — so it catches the
+    # automation the scorer missed rather than taxing everyone twice.
+    challenge = models.BooleanField(
+        default=False,
+        help_text="Ask visitors to confirm they're human before redirecting.")
+
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)

@@ -284,3 +284,30 @@ class LinkBaseTest(TestCase):
     @override_settings(SHORTLINK_BASE="")
     def test_falls_back_to_the_legacy_path_when_no_short_domain(self):
         self.assertEqual(self.c.get("/api/links/").json()["base"], "https://www.trynobot.com/l")
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class ChallengeFlagTest(TestCase):
+    """The human check is per-redirect and has to reach the engine via Redis."""
+
+    def setUp(self):
+        self.org = _workspace("owner@challenge.example")
+
+    def test_defaults_to_off(self):
+        link = ShortLink.objects.create(organization=self.org, slug="c1",
+                                        destination_url="https://example.com")
+        self.assertFalse(link.challenge)
+
+    def test_flag_is_published_in_the_redis_payload(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, slug="c2",
+                                        destination_url="https://example.com", challenge=True)
+        self.assertTrue(json.loads(_payload(link))["challenge"])
+
+    def test_payload_stays_false_when_off(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, slug="c3",
+                                        destination_url="https://example.com")
+        self.assertFalse(json.loads(_payload(link))["challenge"])

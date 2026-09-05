@@ -39,7 +39,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "" }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const linkEnabled = !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
@@ -67,7 +67,7 @@ function Links() {
   function openCreate() {
     setErr("");
     setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false });
     setOpen(true);
   }
   function openEdit(l) {
@@ -78,7 +78,8 @@ function Links() {
       title: l.title || "",
       slug: l.slug,
       bot_action: l.bot_action,
-      website: l.website ? String(l.website) : ""
+      website: l.website ? String(l.website) : "",
+      challenge: !!l.challenge
     });
     setOpen(true);
   }
@@ -92,6 +93,7 @@ function Links() {
       title: form.title || "",
       slug: form.slug || void 0,
       bot_action: form.bot_action,
+      challenge: form.challenge,
       website: form.website ? Number(form.website) : null
     };
     try {
@@ -199,6 +201,10 @@ function Links() {
           l.website && /* @__PURE__ */ jsxs(Fragment, { children: [
             " · Rules: ",
             /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: siteName(l.website) || "a website" })
+          ] }),
+          l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
+            " · ",
+            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Human check on" })
           ] })
         ] })
       ] }),
@@ -294,6 +300,21 @@ function Links() {
             /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: o.desc })
           ] })
         ] }, o.value)) })
+      ] }),
+      /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: form.challenge,
+            className: "mt-0.5",
+            onChange: (e) => setForm({ ...form, challenge: e.target.checked })
+          }
+        ),
+        /* @__PURE__ */ jsxs("span", { children: [
+          /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Ask visitors to confirm they're human" }),
+          /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: `Shows a "I'm not a robot" button before the redirect. Only people we'd already let through see it — bots still get the handling above — so it catches automation the score missed. Confirmed visitors aren't asked again for 30 minutes.` })
+        ] })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: "block", children: [
         /* @__PURE__ */ jsxs("span", { className: "mb-1.5 block text-sm font-semibold", children: [
