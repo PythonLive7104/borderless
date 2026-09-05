@@ -71,3 +71,31 @@ func TestMergeQueryAllowList(t *testing.T) {
 		t.Errorf("non-matching allow-list should forward nothing, got %s", got)
 	}
 }
+
+
+// The formats people actually type into a campaign link.
+func TestMergeQueryRealWorldFormats(t *testing.T) {
+	dest := "https://form.example/s"
+	allow := []string{"email", "rid"}
+
+	// An unencoded @ is fine going in — it comes out correctly encoded.
+	if got := mergeQuery(dest, "email=jane@co.com", allow); got != "https://form.example/s?email=jane%40co.com" {
+		t.Errorf("plain @ should be encoded, got %s", got)
+	}
+
+	// Both parameters together.
+	if got := mergeQuery(dest, "email=jane@co.com&rid=8842", allow); got != "https://form.example/s?email=jane%40co.com&rid=8842" {
+		t.Errorf("both params: got %s", got)
+	}
+
+	// A hyphen instead of "=" is not a parameter at all: the whole thing reads
+	// as one key with an empty value, so it never matches the allow-list.
+	if got := mergeQuery(dest, "rid-8842", allow); got != dest {
+		t.Errorf("rid-8842 is malformed and must be dropped, got %s", got)
+	}
+
+	// Without an allow-list it still travels, but as a nonsense key.
+	if got := mergeQuery(dest, "rid-8842", nil); got != "https://form.example/s?rid-8842=" {
+		t.Errorf("malformed key passthrough: got %s", got)
+	}
+}

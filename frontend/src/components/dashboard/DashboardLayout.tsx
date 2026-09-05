@@ -17,26 +17,32 @@ import type { SVGProps, ComponentType } from "react";
 
 type IconType = ComponentType<SVGProps<SVGSVGElement>>;
 type Item = { label: string; to?: string; soon?: boolean; icon?: IconType };
-type Group = { title: string; items: Item[] };
+type Group = { title: string; hint?: string; items: Item[] };
 
+// Grouped by GOAL, not by feature. New users kept asking "which of these do I
+// need?" — the answer is one of two paths: protect a site you own (Antibot) or
+// protect a link you share (Short Links). Everything else is reporting.
 const NAV: Group[] = [
   { title: "Overview", items: [
     { label: "Dashboard", to: "/dashboard", icon: IHome },
-    { label: "Websites", to: "/dashboard/websites", icon: IGlobe },
   ]},
-  { title: "Traffic", items: [
-    { label: "Campaigns", to: "/dashboard/campaigns", icon: ITarget },
+  // Setup order matters here: add the site, set the rules, then harden it.
+  { title: "Antibot", hint: "Protect a site you own", items: [
+    { label: "Websites", to: "/dashboard/websites", icon: IGlobe },
     { label: "Traffic Rules", to: "/dashboard/traffic-rules", icon: IFilter },
     { label: "Shield", to: "/dashboard/shield", icon: IShieldGold },
-    { label: "Redirection", to: "/dashboard/links", icon: ILink },
     { label: "Bot Scanner", to: "/dashboard/scanner", icon: IRadar },
+  ]},
+  { title: "Short Links", hint: "Protect a link you share", items: [
+    { label: "Redirection", to: "/dashboard/links", icon: ILink },
+  ]},
+  { title: "Analytics", hint: "See who's visiting", items: [
     { label: "Visitors", to: "/dashboard/visitors", icon: IUsers },
     { label: "Click Log", to: "/dashboard/click-log", icon: IList },
-  ]},
-  { title: "Analytics", items: [
-    { label: "Reports", to: "/dashboard/reports", icon: IChart },
-    { label: "Conversions", to: "/dashboard/conversions", icon: IFunnel },
+    { label: "Campaigns", to: "/dashboard/campaigns", icon: ITarget },
     { label: "Traffic Sources", to: "/dashboard/traffic-sources", icon: ISources },
+    { label: "Conversions", to: "/dashboard/conversions", icon: IFunnel },
+    { label: "Reports", to: "/dashboard/reports", icon: IChart },
   ]},
   { title: "Developer", items: [
     { label: "Integrations", to: "/dashboard/integrations", icon: IPlug },
@@ -85,7 +91,12 @@ export default function DashboardLayout() {
         <nav className="space-y-6 overflow-y-auto px-3 py-5" style={{ maxHeight: "calc(100vh - 4rem)" }}>
           {NAV.map((g) => (
             <div key={g.title}>
-              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-fg-dim">{g.title}</div>
+              <div className="px-3 pb-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-fg-dim">{g.title}</div>
+                {/* One line saying what the group is FOR — the thing new users
+                    were asking in support before they'd click anything. */}
+                {g.hint && <div className="text-[10px] leading-tight text-fg-dim/70">{g.hint}</div>}
+              </div>
               <div className="space-y-0.5">{g.items.map((it) => <SidebarLink key={it.label} item={it} onNavigate={() => setOpen(false)} />)}</div>
             </div>
           ))}

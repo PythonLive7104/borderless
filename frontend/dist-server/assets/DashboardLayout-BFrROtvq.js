@@ -1,7 +1,7 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, Link, useNavigate, Outlet, NavLink } from "react-router-dom";
-import { c as useWorkspace, d as billingApi, u as useAuth, B as Button, a as authApi, L as Logo, I as IHome, e as IGlobe, f as ITarget, g as IFilter, h as IShieldGold, i as ILink, j as IRadar, k as IUsers, l as IList, m as IChart, n as IFunnel, p as ISources, q as IPlug, r as IKey, s as IBolt, t as ICard, v as IGauge, w as IGear } from "../entry-server.js";
+import { c as useWorkspace, d as billingApi, u as useAuth, B as Button, a as authApi, L as Logo, I as IHome, e as IGlobe, f as IFilter, g as IShieldGold, h as IRadar, i as ILink, j as IUsers, k as IList, l as ITarget, m as ISources, n as IFunnel, p as IChart, q as IPlug, r as IKey, s as IBolt, t as ICard, v as IGauge, w as IGear } from "../entry-server.js";
 import { T as TourProvider } from "./TourContext-Bymw7lRR.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
@@ -534,22 +534,25 @@ function VerifyEmailGate({ children }) {
 }
 const NAV = [
   { title: "Overview", items: [
-    { label: "Dashboard", to: "/dashboard", icon: IHome },
-    { label: "Websites", to: "/dashboard/websites", icon: IGlobe }
+    { label: "Dashboard", to: "/dashboard", icon: IHome }
   ] },
-  { title: "Traffic", items: [
-    { label: "Campaigns", to: "/dashboard/campaigns", icon: ITarget },
+  // Setup order matters here: add the site, set the rules, then harden it.
+  { title: "Antibot", hint: "Protect a site you own", items: [
+    { label: "Websites", to: "/dashboard/websites", icon: IGlobe },
     { label: "Traffic Rules", to: "/dashboard/traffic-rules", icon: IFilter },
     { label: "Shield", to: "/dashboard/shield", icon: IShieldGold },
-    { label: "Redirection", to: "/dashboard/links", icon: ILink },
-    { label: "Bot Scanner", to: "/dashboard/scanner", icon: IRadar },
-    { label: "Visitors", to: "/dashboard/visitors", icon: IUsers },
-    { label: "Click Log", to: "/dashboard/click-log", icon: IList }
+    { label: "Bot Scanner", to: "/dashboard/scanner", icon: IRadar }
   ] },
-  { title: "Analytics", items: [
-    { label: "Reports", to: "/dashboard/reports", icon: IChart },
+  { title: "Short Links", hint: "Protect a link you share", items: [
+    { label: "Redirection", to: "/dashboard/links", icon: ILink }
+  ] },
+  { title: "Analytics", hint: "See who's visiting", items: [
+    { label: "Visitors", to: "/dashboard/visitors", icon: IUsers },
+    { label: "Click Log", to: "/dashboard/click-log", icon: IList },
+    { label: "Campaigns", to: "/dashboard/campaigns", icon: ITarget },
+    { label: "Traffic Sources", to: "/dashboard/traffic-sources", icon: ISources },
     { label: "Conversions", to: "/dashboard/conversions", icon: IFunnel },
-    { label: "Traffic Sources", to: "/dashboard/traffic-sources", icon: ISources }
+    { label: "Reports", to: "/dashboard/reports", icon: IChart }
   ] },
   { title: "Developer", items: [
     { label: "Integrations", to: "/dashboard/integrations", icon: IPlug },
@@ -593,7 +596,10 @@ function DashboardLayout() {
     /* @__PURE__ */ jsxs("aside", { className: `fixed inset-y-0 left-0 z-40 w-60 border-r border-line bg-white transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`, children: [
       /* @__PURE__ */ jsx("div", { className: "flex h-16 items-center border-b border-line px-5", children: /* @__PURE__ */ jsx(Logo, {}) }),
       /* @__PURE__ */ jsx("nav", { className: "space-y-6 overflow-y-auto px-3 py-5", style: { maxHeight: "calc(100vh - 4rem)" }, children: NAV.map((g) => /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("div", { className: "px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-fg-dim", children: g.title }),
+        /* @__PURE__ */ jsxs("div", { className: "px-3 pb-1", children: [
+          /* @__PURE__ */ jsx("div", { className: "text-[10px] font-bold uppercase tracking-wider text-fg-dim", children: g.title }),
+          g.hint && /* @__PURE__ */ jsx("div", { className: "text-[10px] leading-tight text-fg-dim/70", children: g.hint })
+        ] }),
         /* @__PURE__ */ jsx("div", { className: "space-y-0.5", children: g.items.map((it) => /* @__PURE__ */ jsx(SidebarLink, { item: it, onNavigate: () => setOpen(false) }, it.label)) })
       ] }, g.title)) })
     ] }),
