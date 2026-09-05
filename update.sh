@@ -31,9 +31,19 @@ ls -1t "$BACKUP_DIR"/db-*.sql 2>/dev/null | tail -n +15 | xargs -r rm --   # kee
 # --- 2. Code --------------------------------------------------------------
 say "Pulling latest code"
 BEFORE=$(git rev-parse --short HEAD)
+SELF_BEFORE=$(sha256sum "$0" | cut -d" " -f1)
 git fetch origin
 git reset --hard origin/main      # safe: .env and certbot/ are untracked
 AFTER=$(git rev-parse --short HEAD)
+
+# The reset just rewrote the file bash is reading. Bash reads a script
+# incrementally, so continuing here means executing from a byte offset into a
+# file that has changed underneath us — which can silently run the wrong lines.
+# If this script itself changed, start over with the new one.
+if [ "$SELF_BEFORE" != "$(sha256sum "$0" | cut -d" " -f1)" ]; then
+  ok "update.sh itself changed in this pull — restarting with the new version"
+  exec bash "$0" "$@"
+fi
 [ "$BEFORE" = "$AFTER" ] && ok "already at $AFTER" || ok "$BEFORE -> $AFTER"
 
 # --- 3. Pre-flight --------------------------------------------------------
