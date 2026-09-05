@@ -58,8 +58,14 @@ $COMPOSE build backend web decision worker || die "Build failed. The running sta
 ok "built"
 
 say "Starting"
+# Bring up the dependencies (postgres, redis, certbot) normally...
 $COMPOSE up -d
-ok "containers up"
+# ...then force the services we just rebuilt. Plain `up -d` decides for itself
+# whether a container needs replacing and regularly keeps a running one on its
+# old image, reporting "Running ✔" while the new build sits unused. Only these
+# four are forced, so the database and Redis are never needlessly restarted.
+$COMPOSE up -d --force-recreate --no-deps backend web decision worker
+ok "containers up on the new images"
 
 # --- 5. Wait for the backend to actually serve ----------------------------
 say "Waiting for the backend"
