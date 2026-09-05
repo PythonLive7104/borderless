@@ -2,7 +2,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { c as useWorkspace, x as analyticsApi } from "../entry-server.js";
+import { c as useWorkspace, z as analyticsApi } from "../entry-server.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import { P as Pager } from "./Pager-Dnb3DgGO.js";
 import "react-dom/server";

@@ -1,6 +1,6 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { y as useDialog, c as useWorkspace, u as useAuth, B as Button, o as orgApi } from "../entry-server.js";
+import { A as useDialog, c as useWorkspace, u as useAuth, B as Button, o as orgApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";

@@ -1,7 +1,7 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { y as useDialog, c as useWorkspace, B as Button, J as linkApi, z as websiteApi, d as billingApi } from "../entry-server.js";
+import { A as useDialog, c as useWorkspace, B as Button, y as linkApi, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";

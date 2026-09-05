@@ -2,7 +2,7 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { y as useDialog, B as Button, E as ruleApi, c as useWorkspace, z as websiteApi } from "../entry-server.js";
+import { A as useDialog, B as Button, F as ruleApi, c as useWorkspace, x as websiteApi } from "../entry-server.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 function FolderGuard({ orgId, canManage }) {

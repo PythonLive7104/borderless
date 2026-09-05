@@ -1,7 +1,7 @@
 import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { y as useDialog, B as Button, C as variantApi, A as campaignApi, c as useWorkspace } from "../entry-server.js";
+import { A as useDialog, B as Button, D as variantApi, C as campaignApi, c as useWorkspace } from "../entry-server.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { C as ClassBadge } from "./ClassBadge-B1OvS151.js";
 import "react-dom/server";
