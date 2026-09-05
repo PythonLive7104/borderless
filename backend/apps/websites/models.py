@@ -27,6 +27,13 @@ class Website(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    # Emits data-strict="1" in the snippet: the tracker hides the page until the
+    # verdict lands, so a blocked visitor never sees the content. Always reveals
+    # on a 1.2s timer, so a slow check can never white-screen a real visitor.
+    strict_mode = models.BooleanField(
+        default=False,
+        help_text="Hide the page until the bot check finishes (stops blocked visitors seeing content).")
+
     def __str__(self):
         return f"{self.name} ({self.tracking_id})"
 

@@ -371,3 +371,29 @@ class BlockVpnTest(TestCase):
         link = ShortLink.objects.create(organization=self.org, slug="v2",
                                         destination_url="https://example.com", block_vpn=True)
         self.assertTrue(json.loads(_payload(link))["block_vpn"])
+
+
+class TrackerEnforcementTest(TestCase):
+    """Strict mode changes the snippet the dashboard hands out."""
+
+    def setUp(self):
+        self.org = _workspace("owner@strict.example")
+
+    def _snippet(self, strict):
+        from apps.websites.models import Website
+        from apps.websites.serializers import WebsiteSerializer
+        w = Website.objects.create(organization=self.org, name="S", domain="s.example",
+                                   strict_mode=strict)
+        return WebsiteSerializer(w).data["snippet"]
+
+    def test_default_snippet_is_async_and_not_strict(self):
+        snip = self._snippet(False)
+        self.assertIn("async", snip)
+        self.assertNotIn("data-strict", snip)
+
+    def test_strict_snippet_drops_async_and_sets_the_flag(self):
+        # An async script can't hide the page before it paints, so strict mode
+        # has to load synchronously or it does nothing.
+        snip = self._snippet(True)
+        self.assertIn('data-strict="1"', snip)
+        self.assertNotIn("async", snip)

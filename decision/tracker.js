@@ -6,6 +6,27 @@
   if (!script) return;
   var siteId = script.getAttribute('data-site-id');
   if (!siteId) return;
+  // data-strict="1" hides the page until the verdict arrives, so a blocked
+  // visitor never sees the content. It ALWAYS reveals again on a timer, so a
+  // slow or failed check can't white-screen real people.
+  var strict = script.getAttribute('data-strict') === '1';
+  var revealTimer = 0, revealed = false;
+  function reveal() {
+    if (revealed) return;
+    revealed = true;
+    clearTimeout(revealTimer);
+    var el = document.getElementById('bl-veil');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+  if (strict) {
+    try {
+      var v = document.createElement('style');
+      v.id = 'bl-veil';
+      v.textContent = 'html{visibility:hidden!important}';
+      (document.head || document.documentElement).appendChild(v);
+    } catch (e) {}
+    revealTimer = setTimeout(reveal, 1200);   // fail open, always
+  }
   var endpoint;
   try { endpoint = new URL(script.src).origin + '/v1/collect'; } catch (e) { return; }
 
@@ -88,12 +109,41 @@
       try {
         fetch(endpoint, { method: 'POST', body: body, keepalive: true, mode: 'cors', headers: { 'Content-Type': 'text/plain' } })
           .then(function (r) { return r && r.status === 200 ? r.json() : null; })
-          .then(function (d) { if (d && d.action === 'redirect' && d.redirect) { location.replace(d.redirect); } })
-          .catch(function () {});
+          .then(function (d) { act(d); })
+          .catch(function () { reveal(); });
         return;
       } catch (e) {}
     }
     try { if (navigator.sendBeacon) { navigator.sendBeacon(endpoint, new Blob([body], { type: 'text/plain' })); } } catch (e) {}
+  }
+
+  // Enforce the engine's verdict. This is best-effort by nature: it runs in the
+  // visitor's browser, so anything ignoring JS ignores this too — that's what
+  // the server-side Shield is for. It does stop the large slice of automation
+  // that does run JS, which previously walked straight through because only
+  // "redirect" was ever acted on.
+  function act(d) {
+    if (!d) { reveal(); return; }
+    if (d.action === 'redirect' && d.redirect) { location.replace(d.redirect); return; }
+    if (d.action === 'block') { deny(); return; }
+    reveal();
+  }
+
+  function deny() {
+    try {
+      // Replace the document outright rather than overlaying it, so the real
+      // content isn't left sitting in the DOM for a scraper to read.
+      document.documentElement.innerHTML =
+        '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Access denied</title></head><body style="margin:0;min-height:100vh;display:grid;' +
+        'place-items:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;' +
+        'background:#0b1220;color:#e5e7eb"><div style="text-align:center;max-width:26rem;padding:1.5rem">' +
+        '<h1 style="font-size:1.5rem;margin:0 0 .5rem">Access denied</h1>' +
+        '<p style="color:#9ca3af;line-height:1.6;margin:0">Automated or suspicious traffic isn\'t allowed here. ' +
+        'If you believe this is a mistake, try again from a standard web browser.</p></div></body>';
+      window.stop && window.stop();
+    } catch (e) {}
+    reveal();
   }
 
   function bl(cmd, opts) {

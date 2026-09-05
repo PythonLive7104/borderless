@@ -10,10 +10,17 @@ class WebsiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Website
         fields = ["id", "organization", "name", "domain", "url", "tracking_id",
-                  "status", "last_event_at", "created_at", "snippet"]
+                  "status", "last_event_at", "created_at", "strict_mode", "snippet"]
         read_only_fields = ["tracking_id", "status", "last_event_at", "created_at"]
 
     def get_snippet(self, obj) -> str:
+        # Strict mode drops `async`: an async script can't hide the page before
+        # it paints, which is the whole point of strict.
+        if obj.strict_mode:
+            return (
+                f'<script src="{settings.TRACKER_URL}" '
+                f'data-site-id="{obj.tracking_id}" data-strict="1"></script>'
+            )
         return (
             f'<script async src="{settings.TRACKER_URL}" '
             f'data-site-id="{obj.tracking_id}"></script>'

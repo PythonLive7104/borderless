@@ -253,15 +253,23 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	// fire-and-forget; never block the caller
 	go h.st.EmitTraffic(context.Background(), fields)
 
-	// Tell the tracker what to do. Only "redirect" carries a URL the browser
-	// acts on; everything else is a no-op decision (logged only).
-	if action == "redirect" && redirect != "" {
+	// Tell the tracker what to do. "block" is returned as well as "redirect":
+	// without it a Block rule was silently detect-only on any site running the
+	// tracker alone, which is most of them. Enforcement is still best-effort —
+	// it happens in the visitor's browser — but a rule that says block should
+	// at least try to block.
+	switch {
+	case action == "redirect" && redirect != "":
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"action": "redirect", "redirect": redirect})
-		return
+	case action == "block":
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"action": "block"})
+	default:
+		w.WriteHeader(http.StatusNoContent)
 	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // scoreResult is a normalized enforcement verdict shared by /v1/decide (JSON)
