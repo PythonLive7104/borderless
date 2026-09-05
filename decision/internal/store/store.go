@@ -83,3 +83,14 @@ func (s *Store) GetIPFilter(ctx context.Context, siteID string) string {
 	}
 	return v
 }
+
+// SetEx writes a value with a TTL. Used to share the IP-intelligence cache with
+// the Django side, which reads and writes the same ipintel:cache:<ip> keys.
+func (s *Store) SetEx(ctx context.Context, key, val string, ttl time.Duration) {
+	s.rdb.Set(ctx, key, val, ttl)
+}
+
+// SAdd adds a member to a set, best effort.
+func (s *Store) SAdd(ctx context.Context, key, member string) {
+	s.rdb.SAdd(ctx, key, member)
+}

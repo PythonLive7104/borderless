@@ -21,6 +21,7 @@ def _payload(link) -> str:
         "challenge": bool(link.challenge),      # human click-to-continue check
         "forward_params": bool(link.forward_params),
         "forward_keys": link.forward_keys(),
+        "block_vpn": bool(link.block_vpn),
         # a link that's inactive OR flagged unsafe stops redirecting
         "active": bool(link.active and link.url_safe is not False),
     })

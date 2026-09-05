@@ -55,6 +55,13 @@ class ShortLink(models.Model):
     def forward_keys(self) -> list:
         return [k.strip() for k in self.forward_param_keys.split(",") if k.strip()]
 
+    # VPN / proxy / Tor / datacenter (which is where RDP sessions come from).
+    # Surfaced as one plain switch here because the equivalent Traffic Rule
+    # ("Proxy/Datacenter is Yes") is buried where nobody finds it.
+    block_vpn = models.BooleanField(
+        default=False,
+        help_text="Give VPN, proxy and datacenter/RDP visitors the bot handling.")
+
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)

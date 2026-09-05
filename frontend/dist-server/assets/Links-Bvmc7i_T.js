@@ -39,7 +39,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const linkEnabled = !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
@@ -67,7 +67,7 @@ function Links() {
   function openCreate() {
     setErr("");
     setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false });
     setOpen(true);
   }
   function openEdit(l) {
@@ -81,7 +81,8 @@ function Links() {
       website: l.website ? String(l.website) : "",
       challenge: !!l.challenge,
       forward_params: !!l.forward_params,
-      forward_param_keys: l.forward_param_keys || ""
+      forward_param_keys: l.forward_param_keys || "",
+      block_vpn: !!l.block_vpn
     });
     setOpen(true);
   }
@@ -96,6 +97,7 @@ function Links() {
       slug: form.slug || void 0,
       bot_action: form.bot_action,
       challenge: form.challenge,
+      block_vpn: form.block_vpn,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
       website: form.website ? Number(form.website) : null
@@ -206,6 +208,10 @@ function Links() {
             " · Rules: ",
             /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: siteName(l.website) || "a website" })
           ] }),
+          l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
+            " · ",
+            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
+          ] }),
           l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
             " · ",
             /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Human check on" })
@@ -311,6 +317,21 @@ function Links() {
             /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: o.desc })
           ] })
         ] }, o.value)) })
+      ] }),
+      /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_vpn ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: form.block_vpn,
+            className: "mt-0.5",
+            onChange: (e) => setForm({ ...form, block_vpn: e.target.checked })
+          }
+        ),
+        /* @__PURE__ */ jsxs("span", { children: [
+          /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Block VPN, proxy and RDP traffic" }),
+          /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: "Visitors on a VPN, proxy, Tor, or a datacenter/RDP connection get the bot handling above instead of your destination — they're never told why. Useful when you're paying for ad clicks and don't want to pay for masked traffic." })
+        ] })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
         /* @__PURE__ */ jsx(

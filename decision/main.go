@@ -458,6 +458,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		Challenge   bool   `json:"challenge"`
 		ForwardQS   bool     `json:"forward_params"`
 		ForwardKeys []string `json:"forward_keys"`
+		BlockVPN    bool     `json:"block_vpn"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
 		http.NotFound(w, r)
@@ -495,6 +496,20 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 			mode = link.BotAction
 		}
 	}
+	// VPN / proxy / RDP-datacenter blocking. Treated as bot traffic rather than a
+	// hard 403 so the visitor sees the same decoy or 404 as any other bot and
+	// isn't told what gave them away. "Send them through too" is not a sensible
+	// outcome for someone who explicitly asked to block these, so fall back to a 404.
+	if link.BlockVPN && h.lookupIP(ctx, fp.IP).flagged() {
+		isBot = true
+		switch link.BotAction {
+		case "decoy", "notfound", "blank":
+			mode = link.BotAction
+		default:
+			mode = "notfound"
+		}
+	}
+
 	// If a website is attached, its Traffic Rules + IP allow/deny take precedence
 	// — granular control (country/device/OS/risk/JA3). Falls back to bot handling.
 	if link.TID != "" {
@@ -610,6 +625,72 @@ func urlPath(raw string) string {
 // Incoming values win over defaults already on the destination. Capped, because
 // the query arrives from whoever clicked the link.
 // `only` is an allow-list of parameter names; empty forwards everything.
+// --- IP intelligence, on demand -----------------------------------------
+// The Django worker enriches IPs after the fact, which is fine for page
+// traffic but useless for a redirect: most short links see one click per IP,
+// so by the time the set is populated the visitor has already been sent
+// through. When a link asks for VPN blocking we therefore resolve the IP on
+// the spot — cache first (shared with Django), then a short live lookup.
+
+type ipIntel struct {
+	Proxy      bool `json:"proxy"`
+	VPN        bool `json:"vpn"`
+	Datacenter bool `json:"datacenter"`
+}
+
+func (i ipIntel) flagged() bool { return i.Proxy || i.VPN || i.Datacenter }
+
+var intelClient = &http.Client{Timeout: 700 * time.Millisecond}
+
+func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
+	var out ipIntel
+	if ip == "" {
+		return out
+	}
+	// The sets are still authoritative when they already know this IP.
+	if h.st.InSet(ctx, "ipintel:proxy", ip) || h.st.InSet(ctx, "ipintel:datacenter", ip) {
+		out.Proxy = true
+		return out
+	}
+	key := "ipintel:cache:" + ip
+	if raw := h.st.GetStr(ctx, key); raw != "" {
+		json.Unmarshal([]byte(raw), &out) // "{}" = looked up, nothing found
+		return out
+	}
+	apiKey := env("IPQUALITYSCORE_KEY", "")
+	if apiKey == "" || !strings.EqualFold(env("IP_INTEL_PROVIDER", ""), "ipqualityscore") {
+		return out
+	}
+	resp, err := intelClient.Get("https://ipqualityscore.com/api/json/ip/" +
+		url.PathEscape(apiKey) + "/" + url.PathEscape(ip))
+	if err != nil {
+		return out // fail open: never hold a visitor up over a slow lookup
+	}
+	defer resp.Body.Close()
+	var d struct {
+		Success        bool   `json:"success"`
+		Proxy          bool   `json:"proxy"`
+		VPN            bool   `json:"vpn"`
+		Tor            bool   `json:"tor"`
+		ConnectionType string `json:"connection_type"`
+	}
+	if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&d) != nil || !d.Success {
+		return out
+	}
+	out = ipIntel{Proxy: d.Proxy, VPN: d.VPN || d.Tor, Datacenter: d.ConnectionType == "Data Center"}
+	// Share the answer with Django's cache and sets, same keys and shape.
+	if b, err := json.Marshal(out); err == nil {
+		h.st.SetEx(ctx, key, string(b), 24*time.Hour)
+	}
+	if out.Datacenter {
+		h.st.SAdd(ctx, "ipintel:datacenter", ip)
+	}
+	if out.Proxy || out.VPN {
+		h.st.SAdd(ctx, "ipintel:proxy", ip)
+	}
+	return out
+}
+
 func mergeQuery(dest, raw string, only []string) string {
 	if raw == "" || len(raw) > 2048 {
 		return dest
@@ -820,9 +901,12 @@ const challengeHTML = `<!doctype html>
     cancelAnimationFrame(raf);
     label.textContent = "Verified — taking you there…";
     btn.disabled = true;
+    // location.hash is kept on the end: a fragment never reaches the server, so
+    // the only way it survives the hold is for the browser to carry it. It then
+    // rides the redirect chain to the destination on its own.
     location.href = "/v1/challenge?to=" + encodeURIComponent(slug) +
                     "&iat=" + iat + "&sig=" + encodeURIComponent(sig) +
-                    (qs ? "&q=" + encodeURIComponent(qs) : "");
+                    (qs ? "&q=" + encodeURIComponent(qs) : "") + location.hash;
   }
   function start(e) {
     if (done) return;

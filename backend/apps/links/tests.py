@@ -353,3 +353,21 @@ class ForwardParamKeysTest(TestCase):
         from apps.links.sync import _payload
         self.assertEqual(json.loads(_payload(self._link("email,rid")))["forward_keys"],
                          ["email", "rid"])
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class BlockVpnTest(TestCase):
+    def setUp(self):
+        self.org = _workspace("owner@vpn.example")
+
+    def test_defaults_to_off(self):
+        self.assertFalse(ShortLink.objects.create(
+            organization=self.org, slug="v1",
+            destination_url="https://example.com").block_vpn)
+
+    def test_flag_reaches_the_engine_payload(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, slug="v2",
+                                        destination_url="https://example.com", block_vpn=True)
+        self.assertTrue(json.loads(_payload(link))["block_vpn"])

@@ -39,8 +39,8 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; forward_params: boolean; forward_param_keys: string }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; forward_params: boolean; forward_param_keys: string; block_vpn: boolean }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -67,7 +67,7 @@ export default function Links() {
 
   function openCreate() {
     setErr(""); setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -76,7 +76,7 @@ export default function Links() {
       destination_url: l.destination_url, title: l.title || "", slug: l.slug,
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
       challenge: !!l.challenge, forward_params: !!l.forward_params,
-      forward_param_keys: l.forward_param_keys || "",
+      forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn,
     });
     setOpen(true);
   }
@@ -88,6 +88,7 @@ export default function Links() {
       slug: form.slug || undefined,
       bot_action: form.bot_action,
       challenge: form.challenge,
+      block_vpn: form.block_vpn,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
       website: form.website ? Number(form.website) : null,
@@ -192,6 +193,7 @@ export default function Links() {
                   <div className="mt-1 text-xs text-fg-dim">
                     Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
+                    {l.block_vpn && <> · <b className="text-fg-muted">VPN/RDP blocked</b></>}
                     {l.challenge && <> · <b className="text-fg-muted">Human check on</b></>}
                     {l.forward_params && <> · <b className="text-fg-muted">
                       Forwards {l.forward_param_keys || "all params"}</b></>}
@@ -265,6 +267,19 @@ export default function Links() {
               ))}
             </div>
           </div>
+
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_vpn ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
+            <input type="checkbox" checked={form.block_vpn} className="mt-0.5"
+              onChange={(e) => setForm({ ...form, block_vpn: e.target.checked })} />
+            <span>
+              <span className="block text-sm font-semibold">Block VPN, proxy and RDP traffic</span>
+              <span className="block text-xs text-fg-muted">
+                Visitors on a VPN, proxy, Tor, or a datacenter/RDP connection get the bot handling
+                above instead of your destination — they're never told why. Useful when you're
+                paying for ad clicks and don't want to pay for masked traffic.
+              </span>
+            </span>
+          </label>
 
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
             <input type="checkbox" checked={form.challenge} className="mt-0.5"
