@@ -75,7 +75,47 @@ if [ "${BACKEND_UP:-}" != "1" ]; then
   die "Deploy failed. Restore with:  $COMPOSE exec -T postgres psql -U ${POSTGRES_USER:-borderless} ${POSTGRES_DB:-borderless} < $BACKUP"
 fi
 
-# --- 6. Post-deploy -------------------------------------------------------
+# --- 6. Verify what is actually RUNNING -----------------------------------
+# `up -d` can decide a container needs no change and quietly leave the previous
+# one in place, so "build succeeded" is not the same as "the new code is live".
+# Checking from outside the box is unreliable — redirects, client-rendered
+# strings, lazy chunks and per-environment bundle hashes all produce false
+# results. The honest test is inside the container: is the container running the
+# image tag we just built?
+say "Verifying the running containers match what was just built"
+STALE=""
+for svc in backend web decision worker; do
+  cid=$($COMPOSE ps -q "$svc" 2>/dev/null) || true
+  [ -n "$cid" ] || { printf "  \033[1;31m??\033[0m %-9s not running\n" "$svc"; STALE="$STALE $svc"; continue; }
+  running=$(docker inspect -f '{{.Image}}' "$cid")
+  tag=$(docker inspect -f '{{.Config.Image}}' "$cid")
+  latest=$(docker image inspect -f '{{.Id}}' "$tag" 2>/dev/null || echo "")
+  if [ -n "$latest" ] && [ "$running" != "$latest" ]; then
+    printf "  \033[1;31mSTALE\033[0m %-9s running an older image than %s\n" "$svc" "$tag"
+    STALE="$STALE $svc"
+  else
+    ok "$svc is on the image just built"
+  fi
+done
+if [ -n "$STALE" ]; then
+  printf "\n\033[1;31mThese services did not pick up the new build:%s\033[0m\n" "$STALE"
+  die "Force them with:  $COMPOSE up -d --force-recreate$STALE"
+fi
+
+# The frontend is served as static files, so also confirm the bundle its
+# index.html points at is actually present — catches a half-copied build that
+# would otherwise 404 every asset while the page itself still loads.
+BUNDLE=$($COMPOSE exec -T web sh -c \
+  "grep -o 'assets/index-[A-Za-z0-9_-]*\.js' /usr/share/nginx/html/index.html | head -1" 2>/dev/null | tr -d '\r')
+if [ -n "$BUNDLE" ]; then
+  if $COMPOSE exec -T web test -f "/usr/share/nginx/html/$BUNDLE" 2>/dev/null; then
+    ok "frontend bundle present: $BUNDLE"
+  else
+    die "index.html references $BUNDLE but it is missing from the image — the frontend build is incomplete."
+  fi
+fi
+
+# --- 7. Post-deploy -------------------------------------------------------
 say "Syncing the engine"
 $COMPOSE exec -T backend python manage.py sync_shield
 $COMPOSE exec -T backend python manage.py enforce_access

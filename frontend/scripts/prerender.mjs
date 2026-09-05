@@ -23,7 +23,7 @@ const routes = [
   { path: "/status", out: "status/index.html", title: "Status", desc: "TryNoBot system status." },
   { path: "/terms", out: "terms/index.html", title: "Terms of Service", desc: "TryNoBot terms of service." },
   { path: "/privacy", out: "privacy/index.html", title: "Privacy Policy", desc: "How TryNoBot handles your data." },
-  { path: "/report", out: "report/index.html", title: "Report a short link", desc: "Report a TryNoBot short link used for phishing, malware or spam. We re-scan the destination immediately and disable confirmed threats." },
+  { path: "/report", out: "report/index.html", title: "Report a redirect link", desc: "Report a TryNoBot short link used for phishing, malware or spam. We re-scan the destination immediately and disable confirmed threats." },
 ];
 
 function withHead(html, title, desc) {
