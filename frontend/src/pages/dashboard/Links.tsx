@@ -33,6 +33,7 @@ export default function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ShortLink | null>(null);
+  const [linkBase, setLinkBase] = useState(`${ORIGIN}/l`);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
@@ -50,7 +51,8 @@ export default function Links() {
   const cap = sub?.plan.max_redirects ?? 0;
   const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
-  const linkBase = rows[0]?.short_url.replace(/\/[^/]*$/, "") || `${ORIGIN}/l`;
+  // Served by the API (SHORTLINK_BASE) so a brand-new workspace with no links
+  // still previews the real short domain instead of the old /l/ form.
 
   async function load(silent = false) {
     if (!current) return;
@@ -58,6 +60,7 @@ export default function Links() {
     try {
       const [l, w, s] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id), billingApi.subscription(current.id)]);
       setRows(l.results); setSites(w.results); setSub(s);
+      if (l.base) setLinkBase(l.base);
     } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);

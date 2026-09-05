@@ -260,3 +260,27 @@ class EditRedirectTest(TestCase):
     def test_cannot_rename_onto_a_reserved_slug(self):
         r = self.c.patch(f"/api/links/{self.link.id}/", {"slug": "report"}, format="json")
         self.assertEqual(r.status_code, 400)
+
+
+@override_settings(SHORTLINK_BASE=SHORT, FRONTEND_URL="https://www.trynobot.com")
+class LinkBaseTest(TestCase):
+    """The list response carries the short-link base so the dashboard can
+    preview a link before the workspace has created any."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {"email": "b@example.com", "password": "testpass123",
+                                            "first_name": "B"}, format="json")
+        access = self.c.post("/api/auth/token/", {"email": "b@example.com", "password": "testpass123"},
+                             format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
+    def test_base_is_the_short_domain_with_no_links_yet(self):
+        r = self.c.get("/api/links/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["results"], [])
+        self.assertEqual(r.json()["base"], SHORT)
+
+    @override_settings(SHORTLINK_BASE="")
+    def test_falls_back_to_the_legacy_path_when_no_short_domain(self):
+        self.assertEqual(self.c.get("/api/links/").json()["base"], "https://www.trynobot.com/l")

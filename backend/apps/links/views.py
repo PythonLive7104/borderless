@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import permissions, viewsets, views
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -27,6 +28,19 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         m = OrganizationMember.objects.filter(organization_id=org_id, user=self.request.user).first()
         if not m or not m.can_manage:
             raise PermissionDenied("Only Owners and Admins can manage links.")
+
+    def list(self, request, *args, **kwargs):
+        """List, plus the base every short link is built on.
+
+        The dashboard needs this to preview a link BEFORE one exists — deriving
+        it from an existing row leaves a brand-new workspace previewing the wrong
+        domain (the old /l/ form on the main site instead of the short domain).
+        """
+        response = super().list(request, *args, **kwargs)
+        base = (getattr(settings, "SHORTLINK_BASE", "") or "").rstrip("/")
+        if isinstance(response.data, dict):
+            response.data["base"] = base or f"{settings.FRONTEND_URL.rstrip('/')}/l"
+        return response
 
     def perform_create(self, serializer):
         org = serializer.validated_data["organization"]

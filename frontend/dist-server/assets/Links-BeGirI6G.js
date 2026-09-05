@@ -25,13 +25,14 @@ const BOT_OPTIONS = [
 ];
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 function Links() {
-  var _a, _b;
+  var _a;
   const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [linkBase, setLinkBase] = useState(`${ORIGIN}/l`);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(null);
@@ -49,7 +50,6 @@ function Links() {
     var _a2;
     return (_a2 = sites.find((s) => s.id === id)) == null ? void 0 : _a2.name;
   };
-  const linkBase = ((_b = rows[0]) == null ? void 0 : _b.short_url.replace(/\/[^/]*$/, "")) || `${ORIGIN}/l`;
   async function load(silent = false) {
     if (!current) return;
     if (!silent) setLoading(true);
@@ -58,6 +58,7 @@ function Links() {
       setRows(l.results);
       setSites(w.results);
       setSub(s);
+      if (l.base) setLinkBase(l.base);
     } finally {
       setLoading(false);
     }
@@ -82,7 +83,7 @@ function Links() {
     setOpen(true);
   }
   async function save(e) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b, _c, _d, _e;
     e.preventDefault();
     setErr("");
     setBusy(true);
@@ -103,7 +104,7 @@ function Links() {
       }
       load();
     } catch (e2) {
-      setErr(((_b2 = (_a2 = e2.data) == null ? void 0 : _a2.slug) == null ? void 0 : _b2[0]) || ((_d = (_c = e2.data) == null ? void 0 : _c.destination_url) == null ? void 0 : _d[0]) || ((_e = e2.data) == null ? void 0 : _e.detail) || e2.message);
+      setErr(((_b = (_a2 = e2.data) == null ? void 0 : _a2.slug) == null ? void 0 : _b[0]) || ((_d = (_c = e2.data) == null ? void 0 : _c.destination_url) == null ? void 0 : _d[0]) || ((_e = e2.data) == null ? void 0 : _e.detail) || e2.message);
     } finally {
       setBusy(false);
     }
