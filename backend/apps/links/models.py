@@ -38,6 +38,23 @@ class ShortLink(models.Model):
         default=False,
         help_text="Ask visitors to confirm they're human before redirecting.")
 
+    # Pass ?utm_source=…&rid=… from the short link through to the destination.
+    # Off by default: forwarding is what personalised survey/campaign links need,
+    # but those params often carry PII, so it's an explicit opt-in per link.
+    forward_params = models.BooleanField(
+        default=False,
+        help_text="Forward the link's query string on to the destination.")
+    # Comma-separated allow-list of parameter names, e.g. "email,rid". Blank
+    # means forward everything. Naming them is the safer default: only what the
+    # campaign actually needs reaches the destination, and stray tracking junk
+    # picked up in transit is dropped.
+    forward_param_keys = models.CharField(
+        max_length=300, blank=True, default="",
+        help_text='Only forward these parameters, e.g. "email,rid". Blank = all.')
+
+    def forward_keys(self) -> list:
+        return [k.strip() for k in self.forward_param_keys.split(",") if k.strip()]
+
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)

@@ -39,8 +39,8 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; forward_params: boolean; forward_param_keys: string }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -67,7 +67,7 @@ export default function Links() {
 
   function openCreate() {
     setErr(""); setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -75,7 +75,8 @@ export default function Links() {
     setForm({
       destination_url: l.destination_url, title: l.title || "", slug: l.slug,
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
-      challenge: !!l.challenge,
+      challenge: !!l.challenge, forward_params: !!l.forward_params,
+      forward_param_keys: l.forward_param_keys || "",
     });
     setOpen(true);
   }
@@ -87,6 +88,8 @@ export default function Links() {
       slug: form.slug || undefined,
       bot_action: form.bot_action,
       challenge: form.challenge,
+      forward_params: form.forward_params,
+      forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
       website: form.website ? Number(form.website) : null,
     };
     try {
@@ -190,6 +193,8 @@ export default function Links() {
                     Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
                     {l.challenge && <> · <b className="text-fg-muted">Human check on</b></>}
+                    {l.forward_params && <> · <b className="text-fg-muted">
+                      Forwards {l.forward_param_keys || "all params"}</b></>}
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
@@ -273,6 +278,41 @@ export default function Links() {
               </span>
             </span>
           </label>
+
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.forward_params ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
+            <input type="checkbox" checked={form.forward_params} className="mt-0.5"
+              onChange={(e) => setForm({ ...form, forward_params: e.target.checked })} />
+            <span>
+              <span className="block text-sm font-semibold">Pass the link's query string to the destination</span>
+              <span className="block text-xs text-fg-muted">
+                For personalised links: <span className="font-mono">?rid=8842</span> on the short link
+                arrives on your page. Needed for per-recipient survey and campaign tracking.
+                Query values are never written to your click log, so anything personal in them
+                isn't stored here.
+              </span>
+            </span>
+          </label>
+
+          {form.forward_params && (
+            <div className="-mt-1 rounded-xl border border-line bg-bg-soft p-3.5">
+              <span className="mb-1.5 block text-sm font-semibold">Which parameters?</span>
+              <input value={form.forward_param_keys} placeholder="email, rid"
+                onChange={(e) => setForm({ ...form, forward_param_keys: e.target.value })}
+                className="w-full rounded-xl border border-line bg-white px-4 py-2.5 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+              <p className="mt-1.5 text-xs text-fg-dim">
+                Comma-separated names. Only these are passed on — anything else on the link is
+                dropped, so stray trackers picked up in transit don't follow people to your page.
+                Leave blank to forward everything.
+              </p>
+              {form.forward_param_keys.trim() && (
+                <p className="mt-2 break-all font-mono text-xs text-fg-muted">
+                  {linkBase}/{form.slug || "…"}?
+                  {form.forward_param_keys.split(",").map((k) => k.trim()).filter(Boolean)
+                    .map((k, i) => <span key={k}>{i > 0 && "&"}<b className="text-brand">{k}</b>=…</span>)}
+                </p>
+              )}
+            </div>
+          )}
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Apply a website's Traffic Rules? <span className="font-normal text-fg-dim">(optional, advanced)</span></span>

@@ -311,3 +311,45 @@ class ChallengeFlagTest(TestCase):
         link = ShortLink.objects.create(organization=self.org, slug="c3",
                                         destination_url="https://example.com")
         self.assertFalse(json.loads(_payload(link))["challenge"])
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class ForwardParamsTest(TestCase):
+    def setUp(self):
+        self.org = _workspace("owner@forward.example")
+
+    def test_defaults_to_off(self):
+        link = ShortLink.objects.create(organization=self.org, slug="f1",
+                                        destination_url="https://form.example/s")
+        self.assertFalse(link.forward_params)
+
+    def test_flag_reaches_the_engine_payload(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, slug="f2",
+                                        destination_url="https://form.example/s",
+                                        forward_params=True)
+        self.assertTrue(json.loads(_payload(link))["forward_params"])
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class ForwardParamKeysTest(TestCase):
+    def setUp(self):
+        self.org = _workspace("owner@keys.example")
+
+    def _link(self, keys):
+        return ShortLink.objects.create(
+            organization=self.org, slug=f"k{abs(hash(keys)) % 9999}",
+            destination_url="https://form.example/s",
+            forward_params=True, forward_param_keys=keys)
+
+    def test_keys_are_split_trimmed_and_emptied(self):
+        self.assertEqual(self._link("email, rid").forward_keys(), ["email", "rid"])
+        self.assertEqual(self._link(" email ,, ,rid ").forward_keys(), ["email", "rid"])
+        self.assertEqual(self._link("").forward_keys(), [])
+
+    def test_keys_reach_the_engine_payload(self):
+        import json
+        from apps.links.sync import _payload
+        self.assertEqual(json.loads(_payload(self._link("email,rid")))["forward_keys"],
+                         ["email", "rid"])

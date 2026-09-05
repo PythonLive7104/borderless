@@ -19,6 +19,8 @@ def _payload(link) -> str:
         "bot_action": link.bot_action,          # off | decoy | notfound | blank
         "decoy_url": _bot_base() + "/decoy.html",
         "challenge": bool(link.challenge),      # human click-to-continue check
+        "forward_params": bool(link.forward_params),
+        "forward_keys": link.forward_keys(),
         # a link that's inactive OR flagged unsafe stops redirecting
         "active": bool(link.active and link.url_safe is not False),
     })

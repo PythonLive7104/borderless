@@ -39,7 +39,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const linkEnabled = !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
@@ -67,7 +67,7 @@ function Links() {
   function openCreate() {
     setErr("");
     setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "" });
     setOpen(true);
   }
   function openEdit(l) {
@@ -79,7 +79,9 @@ function Links() {
       slug: l.slug,
       bot_action: l.bot_action,
       website: l.website ? String(l.website) : "",
-      challenge: !!l.challenge
+      challenge: !!l.challenge,
+      forward_params: !!l.forward_params,
+      forward_param_keys: l.forward_param_keys || ""
     });
     setOpen(true);
   }
@@ -94,6 +96,8 @@ function Links() {
       slug: form.slug || void 0,
       bot_action: form.bot_action,
       challenge: form.challenge,
+      forward_params: form.forward_params,
+      forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
       website: form.website ? Number(form.website) : null
     };
     try {
@@ -205,6 +209,13 @@ function Links() {
           l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
             " · ",
             /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Human check on" })
+          ] }),
+          l.forward_params && /* @__PURE__ */ jsxs(Fragment, { children: [
+            " · ",
+            /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
+              "Forwards ",
+              l.forward_param_keys || "all params"
+            ] })
           ] })
         ] })
       ] }),
@@ -314,6 +325,49 @@ function Links() {
         /* @__PURE__ */ jsxs("span", { children: [
           /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Ask visitors to confirm they're human" }),
           /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: `Shows a "I'm not a robot" button before the redirect. Only people we'd already let through see it — bots still get the handling above — so it catches automation the score missed. Confirmed visitors aren't asked again for 30 minutes.` })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.forward_params ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: form.forward_params,
+            className: "mt-0.5",
+            onChange: (e) => setForm({ ...form, forward_params: e.target.checked })
+          }
+        ),
+        /* @__PURE__ */ jsxs("span", { children: [
+          /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Pass the link's query string to the destination" }),
+          /* @__PURE__ */ jsxs("span", { className: "block text-xs text-fg-muted", children: [
+            "For personalised links: ",
+            /* @__PURE__ */ jsx("span", { className: "font-mono", children: "?rid=8842" }),
+            " on the short link arrives on your page. Needed for per-recipient survey and campaign tracking. Query values are never written to your click log, so anything personal in them isn't stored here."
+          ] })
+        ] })
+      ] }),
+      form.forward_params && /* @__PURE__ */ jsxs("div", { className: "-mt-1 rounded-xl border border-line bg-bg-soft p-3.5", children: [
+        /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "Which parameters?" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            value: form.forward_param_keys,
+            placeholder: "email, rid",
+            onChange: (e) => setForm({ ...form, forward_param_keys: e.target.value }),
+            className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+          }
+        ),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-xs text-fg-dim", children: "Comma-separated names. Only these are passed on — anything else on the link is dropped, so stray trackers picked up in transit don't follow people to your page. Leave blank to forward everything." }),
+        form.forward_param_keys.trim() && /* @__PURE__ */ jsxs("p", { className: "mt-2 break-all font-mono text-xs text-fg-muted", children: [
+          linkBase,
+          "/",
+          form.slug || "…",
+          "?",
+          form.forward_param_keys.split(",").map((k) => k.trim()).filter(Boolean).map((k, i) => /* @__PURE__ */ jsxs("span", { children: [
+            i > 0 && "&",
+            /* @__PURE__ */ jsx("b", { className: "text-brand", children: k }),
+            "=…"
+          ] }, k))
         ] })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: "block", children: [

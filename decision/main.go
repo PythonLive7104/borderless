@@ -456,6 +456,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		DecoyURL    string `json:"decoy_url"`
 		Active      bool   `json:"active"`
 		Challenge   bool   `json:"challenge"`
+		ForwardQS   bool     `json:"forward_params"`
+		ForwardKeys []string `json:"forward_keys"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
 		http.NotFound(w, r)
@@ -542,7 +544,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 
 	switch mode {
 	case "challenge":
-		writeChallengePage(w, slug)
+		writeChallengePage(w, slug, r.URL.RawQuery)
 	case "block":
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Access denied"))
@@ -557,7 +559,14 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		}
 	default: // "allow" (human -> destination) or "redirect"
-		http.Redirect(w, r, dest, http.StatusFound)
+		out := dest
+		if link.ForwardQS {
+			out = mergeQuery(out, r.URL.RawQuery, link.ForwardKeys)
+		}
+		// NB: the traffic event above logs link.Destination, never `out` — the
+		// forwarded params can carry PII (survey links commonly hold an email)
+		// and that has no business sitting in the click log.
+		http.Redirect(w, r, out, http.StatusFound)
 	}
 }
 
@@ -596,6 +605,43 @@ func urlPath(raw string) string {
 	return raw
 }
 
+// mergeQuery folds the short link's own query string into the destination, so a
+// personalised link (…/abc?rid=8842) lands on the form with its tracking intact.
+// Incoming values win over defaults already on the destination. Capped, because
+// the query arrives from whoever clicked the link.
+// `only` is an allow-list of parameter names; empty forwards everything.
+func mergeQuery(dest, raw string, only []string) string {
+	if raw == "" || len(raw) > 2048 {
+		return dest
+	}
+	in, err := url.ParseQuery(raw)
+	if err != nil || len(in) == 0 {
+		return dest
+	}
+	u, err := url.Parse(dest)
+	if err != nil {
+		return dest
+	}
+	var allow map[string]bool
+	if len(only) > 0 {
+		allow = make(map[string]bool, len(only))
+		for _, k := range only {
+			allow[k] = true
+		}
+	}
+	q := u.Query()
+	for k, vs := range in {
+		if allow != nil && !allow[k] {
+			continue // not on the list — drop it rather than pass it on
+		}
+		if len(vs) > 0 {
+			q.Set(k, vs[0])
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 func env(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
@@ -617,14 +663,25 @@ func env(k, def string) string {
 const challengeCookie = "tnb_hc"
 const challengeTTL = 30 * time.Minute
 
+// How long the visitor must hold the button. Enforced on BOTH sides: the page
+// animates it, and the server refuses a pass that comes back faster than this.
+// Client-only timing would be trivial to skip by calling the endpoint directly.
+const holdSeconds = 5
+const holdSlack = 1 * time.Second // clock skew / rounding
+const challengePageTTL = 10 * time.Minute
+
 func challengeSecret() string {
 	return env("DJANGO_SECRET_KEY", "insecure-dev-secret")
 }
 
-func signChallenge(exp int64) string {
+func sign(label string, v int64) string {
 	m := hmac.New(sha256.New, []byte(challengeSecret()))
-	fmt.Fprintf(m, "hc|%d", exp)
-	return fmt.Sprintf("%d.%s", exp, hex.EncodeToString(m.Sum(nil)))
+	fmt.Fprintf(m, "%s|%d", label, v)
+	return hex.EncodeToString(m.Sum(nil))
+}
+
+func signChallenge(exp int64) string {
+	return fmt.Sprintf("%d.%s", exp, sign("hc", exp))
 }
 
 func challengePassed(r *http.Request) bool {
@@ -647,30 +704,62 @@ func challengePassed(r *http.Request) bool {
 	return hmac.Equal([]byte(signChallenge(exp)), []byte(c.Value))
 }
 
-// GET /v1/challenge?to=<slug> — sets the cookie, then bounces back to the link.
+// GET /v1/challenge?to=<slug>&iat=<issued>&sig=<hmac>
+// Passes only when the issued-at token is ours, unexpired, and at least
+// holdSeconds old — so the button really was held, not just posted.
 func (h *handler) challenge(w http.ResponseWriter, r *http.Request) {
-	slug := strings.Trim(r.URL.Query().Get("to"), "/")
+	q := r.URL.Query()
+	slug := strings.Trim(q.Get("to"), "/")
 	// Only ever bounce back to one of our own slugs, never an arbitrary URL —
 	// otherwise this endpoint is an open redirect.
 	if slug == "" || strings.ContainsAny(slug, "/:?#\\") {
 		http.NotFound(w, r)
 		return
 	}
+
+	var iat int64
+	fmt.Sscanf(q.Get("iat"), "%d", &iat)
+	age := time.Since(time.Unix(iat, 0))
+	ok := iat > 0 &&
+		hmac.Equal([]byte(sign("hc-iss", iat)), []byte(q.Get("sig"))) &&
+		age >= holdSeconds*time.Second-holdSlack &&
+		age <= challengePageTTL
+	carry := q.Get("q")
+	if len(carry) > 2048 {
+		carry = ""
+	}
+	if !ok {
+		// Too fast, forged, or a stale page: start over rather than pass.
+		writeChallengePage(w, slug, carry)
+		return
+	}
+
 	exp := time.Now().Add(challengeTTL).Unix()
 	http.SetCookie(w, &http.Cookie{
 		Name: challengeCookie, Value: signChallenge(exp), Path: "/",
 		Expires: time.Unix(exp, 0), HttpOnly: true, Secure: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, "/"+slug, http.StatusFound)
+	// Back to the link itself, query intact — slug is validated above, so this
+	// stays on our own host and can't be steered elsewhere.
+	back := "/" + slug
+	if carry != "" {
+		back += "?" + carry
+	}
+	http.Redirect(w, r, back, http.StatusFound)
 }
 
-func writeChallengePage(w http.ResponseWriter, slug string) {
+func writeChallengePage(w http.ResponseWriter, slug, rawQuery string) {
+	iat := time.Now().Unix()
+	if len(rawQuery) > 2048 {
+		rawQuery = ""
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, challengeHTML, template.HTMLEscapeString(slug))
+	fmt.Fprintf(w, challengeHTML,
+		template.HTMLEscapeString(slug), iat, sign("hc-iss", iat), holdSeconds*1000, rawQuery)
 }
 
 const challengeHTML = `<!doctype html>
@@ -686,27 +775,81 @@ const challengeHTML = `<!doctype html>
   border-radius:1rem;padding:2.25rem 1.75rem;box-shadow:0 24px 60px -30px rgba(15,22,38,.35)}
  h1{font-size:1.15rem;margin:0 0 .4rem}
  p{color:#566072;font-size:.9rem;line-height:1.6;margin:0 auto;max-width:20rem}
- button{margin-top:1.5rem;width:100%%;border:0;border-radius:999px;background:#2563eb;color:#fff;
-  font:600 .95rem system-ui;padding:.8rem 1rem;cursor:pointer}
- button:hover{background:#1d4ed8}button:disabled{opacity:.6;cursor:default}
+ #hold{position:relative;overflow:hidden;margin-top:1.5rem;width:100%%;border:0;border-radius:999px;
+  background:#e6e9f0;color:#0f1626;font:600 .95rem system-ui;padding:.85rem 1rem;cursor:pointer;
+  touch-action:none;-webkit-user-select:none;user-select:none}
+ #fill{position:absolute;inset:0 auto 0 0;width:0%%;background:#2563eb;transition:width .08s linear}
+ #label{position:relative;z-index:1;mix-blend-mode:normal}
+ #hold.armed #label{color:#fff}
+ #pct{display:block;margin-top:.75rem;font-size:.8rem;color:#8b93a3;font-variant-numeric:tabular-nums}
  .tag{display:block;margin-top:1.25rem;font-size:.68rem;letter-spacing:.08em;
   text-transform:uppercase;color:#8b93a3}
  noscript p{color:#dc2626}
 </style></head><body>
  <main class="card">
   <h1>Confirm you're human</h1>
-  <p>One quick check before we take you there.</p>
-  <button id="go" type="button">I'm not a robot</button>
+  <p>Press and hold the button until it fills.</p>
+  <button id="hold" type="button" aria-describedby="pct">
+    <span id="fill"></span><span id="label">Press and hold</span>
+  </button>
+  <span id="pct" role="status" aria-live="polite">0%%</span>
   <noscript><p>JavaScript is required to continue.</p></noscript>
   <span class="tag">Protected by TryNoBot</span>
  </main>
  <script>
-  // Wiring the target in JS (not an <a href>) means a scraper that only reads
-  // the HTML has nothing to follow.
-  var slug = %q;
-  document.getElementById("go").addEventListener("click", function (e) {
-    e.target.disabled = true; e.target.textContent = "Checking…";
-    location.href = "/v1/challenge?to=" + encodeURIComponent(slug);
+  // The destination is wired up in JS and only after a real, timed hold, so a
+  // scraper reading the HTML has nothing to follow. The server independently
+  // rejects anything that comes back faster than the hold — see challenge().
+  var slug = %q, iat = %d, sig = %q, need = %d, qs = %q;
+  var btn = document.getElementById("hold"), fill = document.getElementById("fill"),
+      label = document.getElementById("label"), pct = document.getElementById("pct");
+  var raf = 0, started = 0, done = false;
+
+  function paint(p) {
+    fill.style.width = p + "%%";
+    pct.textContent = Math.floor(p) + "%%";
+  }
+  function tick() {
+    var p = Math.min(100, (Date.now() - started) / need * 100);
+    paint(p);
+    if (p >= 100) { finish(); return; }
+    raf = requestAnimationFrame(tick);
+  }
+  function finish() {
+    done = true;
+    cancelAnimationFrame(raf);
+    label.textContent = "Verified — taking you there…";
+    btn.disabled = true;
+    location.href = "/v1/challenge?to=" + encodeURIComponent(slug) +
+                    "&iat=" + iat + "&sig=" + encodeURIComponent(sig) +
+                    (qs ? "&q=" + encodeURIComponent(qs) : "");
+  }
+  function start(e) {
+    if (done) return;
+    e.preventDefault();
+    started = Date.now();
+    btn.classList.add("armed");
+    label.textContent = "Keep holding…";
+    raf = requestAnimationFrame(tick);
+  }
+  function stop() {
+    if (done || !started) return;
+    cancelAnimationFrame(raf);
+    started = 0;
+    btn.classList.remove("armed");
+    paint(0);
+    label.textContent = "Hold it a bit longer";
+  }
+  btn.addEventListener("pointerdown", start);
+  ["pointerup", "pointerleave", "pointercancel", "blur"].forEach(function (ev) {
+    btn.addEventListener(ev, stop);
+  });
+  // Keyboard: hold Space or Enter. Browsers repeat keydown, so ignore repeats.
+  btn.addEventListener("keydown", function (e) {
+    if ((e.key === " " || e.key === "Enter") && !e.repeat) start(e);
+  });
+  btn.addEventListener("keyup", function (e) {
+    if (e.key === " " || e.key === "Enter") stop();
   });
  </script>
 </body></html>`

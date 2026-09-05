@@ -159,6 +159,8 @@ export const websiteApi = {
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
 export interface ShortLink {
   challenge: boolean;
+  forward_params: boolean;
+  forward_param_keys: string;
   id: number; organization: number; website: number | null; slug: string;
   destination_url: string; title: string; active: boolean; bot_action: BotAction;
   clicks: number; human_clicks: number; bot_clicks: number;
