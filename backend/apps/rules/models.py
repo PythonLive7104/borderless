@@ -5,7 +5,12 @@ from apps.organizations.models import Organization
 FIELD_CHOICES = [
     ("risk_score", "Risk score"), ("requests_per_min", "Requests/minute"), ("classification", "Classification"),
     ("country", "Country"), ("device", "Device"), ("browser", "Browser"), ("os", "OS"),
-    ("is_bot", "Bot detected"), ("is_proxy", "Proxy/Datacenter"),
+    ("is_bot", "Bot detected"),
+    # is_proxy stays as the catch-all (and keeps existing rules working); the
+    # two below split it so "block VPN" doesn't also have to mean "block every
+    # datacenter", which is what the single flag forced.
+    ("is_proxy", "Proxy / VPN / Datacenter (any)"),
+    ("is_vpn", "VPN or Tor"), ("is_datacenter", "Datacenter / RDP"),
     ("utm_source", "UTM source"), ("utm_medium", "UTM medium"), ("utm_campaign", "UTM campaign"),
     ("referrer", "Referrer"), ("ja3", "TLS/JA3 hash"), ("path", "URL path"),
 ]

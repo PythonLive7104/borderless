@@ -184,6 +184,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	})
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
+	intel := h.knownIntel(rctx, fp.IP)
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
@@ -194,7 +195,9 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 			"browser":        fp.Browser,
 			"os":             fp.OS,
 			"is_bot":         boolStr(fp.IsBot),
-			"is_proxy":       boolStr(h.st.InSet(rctx, "ipintel:datacenter", fp.IP) || h.st.InSet(rctx, "ipintel:proxy", fp.IP)),
+			"is_proxy":       boolStr(intel.flagged()),
+			"is_vpn":         boolStr(intel.VPN),
+			"is_datacenter":  boolStr(intel.Datacenter),
 			"utm_source":     p.UTMSource,
 			"utm_medium":     p.UTMMedium,
 			"utm_campaign":   p.UTMCampaign,
@@ -296,6 +299,7 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 	})
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
+	intel := h.knownIntel(ctx, fp.IP)
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
@@ -306,7 +310,9 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 			"browser":        fp.Browser,
 			"os":             fp.OS,
 			"is_bot":         boolStr(fp.IsBot),
-			"is_proxy":       boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
+			"is_proxy":       boolStr(intel.flagged()),
+			"is_vpn":         boolStr(intel.VPN),
+			"is_datacenter":  boolStr(intel.Datacenter),
 			"referrer":       referrer,
 			"ja3":            ja3,
 			"path":           urlPath(path),
@@ -500,7 +506,11 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// hard 403 so the visitor sees the same decoy or 404 as any other bot and
 	// isn't told what gave them away. "Send them through too" is not a sensible
 	// outcome for someone who explicitly asked to block these, so fall back to a 404.
-	if link.BlockVPN && h.lookupIP(ctx, fp.IP).flagged() {
+	linkIntel := h.knownIntel(ctx, fp.IP)
+	if link.BlockVPN {
+		linkIntel = h.lookupIP(ctx, fp.IP) // live: this link asked us to be sure
+	}
+	if link.BlockVPN && linkIntel.flagged() {
 		isBot = true
 		switch link.BotAction {
 		case "decoy", "notfound", "blank":
@@ -513,13 +523,16 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// If a website is attached, its Traffic Rules + IP allow/deny take precedence
 	// — granular control (country/device/OS/risk/JA3). Falls back to bot handling.
 	if link.TID != "" {
+		intel := linkIntel
 		action, _, redirect := rules.Evaluate(rules.Parse(h.st.GetRules(ctx, link.TID)), rules.Event{
 			RiskScore: result.Score, Rate: int(rate),
 			Fields: map[string]string{
 				"classification": result.Classification, "country": fp.Country,
 				"device": fp.Device, "browser": fp.Browser, "os": fp.OS,
 				"is_bot": boolStr(fp.IsBot),
-				"is_proxy": boolStr(h.st.InSet(ctx, "ipintel:datacenter", fp.IP) || h.st.InSet(ctx, "ipintel:proxy", fp.IP)),
+				"is_proxy":      boolStr(intel.flagged()),
+				"is_vpn":        boolStr(intel.VPN),
+				"is_datacenter": boolStr(intel.Datacenter),
 				"ja3": ja3,
 			},
 		})
@@ -687,6 +700,27 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	}
 	if out.Proxy || out.VPN {
 		h.st.SAdd(ctx, "ipintel:proxy", ip)
+	}
+	return out
+}
+
+// knownIntel reports what we already know about an IP without going to the
+// network: the cache Django and lookupIP both write, then the coarse sets.
+// Used to fill the rule fields, so evaluating a rule never adds latency.
+func (h *handler) knownIntel(ctx context.Context, ip string) ipIntel {
+	var out ipIntel
+	if ip == "" {
+		return out
+	}
+	if raw := h.st.GetStr(ctx, "ipintel:cache:"+ip); raw != "" {
+		json.Unmarshal([]byte(raw), &out)
+	}
+	// The sets can only say "proxy-ish" or "datacenter", never VPN specifically.
+	if h.st.InSet(ctx, "ipintel:datacenter", ip) {
+		out.Datacenter = true
+	}
+	if h.st.InSet(ctx, "ipintel:proxy", ip) {
+		out.Proxy = true
 	}
 	return out
 }

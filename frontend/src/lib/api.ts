@@ -233,7 +233,8 @@ export interface TrafficRule {
 export const RULE_FIELDS = [
   ["risk_score", "Risk score"], ["requests_per_min", "Requests per minute"], ["classification", "Classification"], ["country", "Country"],
   ["device", "Device"], ["browser", "Browser"], ["os", "OS"], ["is_bot", "Bot detected"],
-  ["is_proxy", "Proxy/Datacenter"], ["utm_source", "UTM source"], ["utm_medium", "UTM medium"],
+  ["is_proxy", "Proxy / VPN / Datacenter (any)"], ["is_vpn", "VPN or Tor"],
+  ["is_datacenter", "Datacenter / RDP"], ["utm_source", "UTM source"], ["utm_medium", "UTM medium"],
   ["utm_campaign", "UTM campaign"], ["referrer", "Referrer"], ["ja3", "TLS/JA3 hash"],
   ["path", "URL path"],
 ] as const;
@@ -251,6 +252,8 @@ export const FIELD_VALUE_OPTIONS: Record<string, [string, string][]> = {
   classification: [["human", "Human"], ["suspicious", "Suspicious"], ["bot", "Bot"], ["fraud", "Fraud"]],
   is_bot: [["1", "Yes"], ["0", "No"]],
   is_proxy: [["1", "Yes"], ["0", "No"]],
+  is_vpn: [["1", "Yes"], ["0", "No"]],
+  is_datacenter: [["1", "Yes"], ["0", "No"]],
 };
 
 // A short list of common countries (ISO-2) for the country restriction picker.

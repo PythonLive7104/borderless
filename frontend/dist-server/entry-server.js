@@ -161,7 +161,9 @@ const RULE_FIELDS = [
   ["browser", "Browser"],
   ["os", "OS"],
   ["is_bot", "Bot detected"],
-  ["is_proxy", "Proxy/Datacenter"],
+  ["is_proxy", "Proxy / VPN / Datacenter (any)"],
+  ["is_vpn", "VPN or Tor"],
+  ["is_datacenter", "Datacenter / RDP"],
   ["utm_source", "UTM source"],
   ["utm_medium", "UTM medium"],
   ["utm_campaign", "UTM campaign"],
@@ -185,7 +187,9 @@ const FIELD_VALUE_OPTIONS = {
   browser: [["chrome", "Chrome"], ["safari", "Safari"], ["firefox", "Firefox"], ["edge", "Edge"], ["opera", "Opera"]],
   classification: [["human", "Human"], ["suspicious", "Suspicious"], ["bot", "Bot"], ["fraud", "Fraud"]],
   is_bot: [["1", "Yes"], ["0", "No"]],
-  is_proxy: [["1", "Yes"], ["0", "No"]]
+  is_proxy: [["1", "Yes"], ["0", "No"]],
+  is_vpn: [["1", "Yes"], ["0", "No"]],
+  is_datacenter: [["1", "Yes"], ["0", "No"]]
 };
 const COUNTRIES = [
   ["US", "United States"],
