@@ -2,7 +2,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, Link, useNavigate, Outlet, NavLink } from "react-router-dom";
 import { c as useWorkspace, d as billingApi, u as useAuth, B as Button, a as authApi, L as Logo, I as IHome, e as IGlobe, f as IFilter, g as IShieldGold, h as IRadar, i as ILink, j as IUsers, k as IList, l as ITarget, m as ISources, n as IFunnel, p as IChart, q as IPlug, r as IKey, s as IBolt, t as ICard, v as IGauge, w as IGear } from "../entry-server.js";
-import { T as TourProvider } from "./TourContext-Bymw7lRR.js";
+import { T as TourProvider } from "./TourContext-CngGBo1N.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 const roleTone = {

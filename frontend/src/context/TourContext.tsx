@@ -2,16 +2,33 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useAuth } from "./AuthContext";
 import TourGuide, { type TourStep } from "../components/dashboard/TourGuide";
 
+// Ordered around the two GOALS, matching the sidebar. The old tour walked the
+// antibot setup and never mentioned Redirection at all, which is the path most
+// new users actually want and the one support kept having to explain.
 const STEPS: TourStep[] = [
-  { icon: "👋", title: "Welcome to TryNoBot", body: "TryNoBot scores every visitor in real time and filters out bots and fraud before they waste your ad budget. Here's a quick 60-second tour of the essentials." },
-  { icon: "🌐", title: "1. Add your website", body: "Open Websites, add your site, and paste the tracking snippet into it. That snippet is what streams visits into TryNoBot for scoring." },
-  { icon: "🎯", title: "2. Track campaigns", body: "Under Campaigns you can see the traffic quality of each ad campaign, run A/B landing-page tests, and scan destination URLs for threats." },
-  { icon: "🛡️", title: "3. Set traffic rules", body: "Traffic Rules let you automatically Allow, Redirect, Block, Flag or Tag visitors by country, device, OS, risk score, JA3 and more — plus IP allow/deny lists." },
-  { icon: "🚧", title: "4. Actually stop bad traffic (NEW)", body: "Detecting bots is half the job — to stop them, redirect them away with a rule (no code needed), or turn on the new Server-side Shield to block them BEFORE your page even loads. Start at Traffic Rules → Recommended protection, or open the Shield page. Not technical? The one-click redirect is all you need." },
-  { icon: "🔍", title: "5. Inspect visitors", body: "Visitors and Click Log show every visit with its risk score, fingerprint and exactly why it was flagged, so you can trust the decisions." },
-  { icon: "📊", title: "6. Read the analytics", body: "Reports, Conversions and Traffic Sources reveal what's actually working and where fraud is coming from." },
-  { icon: "🔌", title: "7. Connect your stack", body: "In the Developer section you'll find API keys, webhooks and integrations to wire TryNoBot into the rest of your tools." },
-  { icon: "🎉", title: "You're all set!", body: "Tap the help bubble at any time to ask a question, or replay this tour from Settings. Happy filtering!" },
+  { icon: "👋", title: "Welcome to TryNoBot",
+    body: "TryNoBot checks every visitor in real time and keeps bots away from what you're paying to promote. This takes about a minute." },
+
+  { icon: "🔀", title: "First: what are you protecting?",
+    body: "There are two ways to use TryNoBot — a link you share, or a website you own. You don't need both, and neither depends on the other. The sidebar is split the same way, so you can ignore half of it." },
+
+  { icon: "🔗", title: "Protecting a link — Redirection",
+    body: "Create a short link and point your ad or campaign at it instead of your landing page. Every click is screened first: real people go straight through, bots don't. Nothing to install, and you don't need to add a website. Short links need a paid plan — that's deliberate, it keeps spammers out." },
+
+  { icon: "🚦", title: "What you control on each link",
+    body: "Choose what bots get: a decoy page that wastes their time, a 404, a blank page, or let them through and just count them. You can also block VPN, proxy and RDP visitors, and ask people to press and hold a button for five seconds to prove they're human." },
+
+  { icon: "🌐", title: "Protecting a website — start here",
+    body: "Open Websites, add your site, and paste the snippet into it. That's what lets TryNoBot see and score your visitors. Turn on Strict mode if you'd rather blocked visitors never see your page at all." },
+
+  { icon: "🛡️", title: "Traffic Rules, then the Shield",
+    body: "Rules act automatically: allow, block, redirect, flag or tag visitors by country, device, risk score, VPN or datacenter. For the strongest protection, install the Shield so bots are stopped on your server before your page is even built." },
+
+  { icon: "🔍", title: "See who actually showed up",
+    body: "Visitors and Click Log list every visit with its IP, country, device and risk score, and why it was flagged. The number to watch is traffic quality — the share of visitors who were real. Compare it across sources to see who's selling you rubbish." },
+
+  { icon: "🎉", title: "That's it",
+    body: "Tap the help bubble any time to ask a question, or replay this tour from Settings. If you're not sure where to start, the Dashboard will ask you which of the two paths you want." },
 ];
 
 type TourCtx = { startTour: () => void };

@@ -1944,7 +1944,7 @@ const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"))
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
-const DashboardLayout = lazy(() => import("./assets/DashboardLayout-BFrROtvq.js"));
+const DashboardLayout = lazy(() => import("./assets/DashboardLayout-HS1wGJvX.js"));
 const Overview = lazy(() => import("./assets/Overview-BBpL0_9e.js"));
 const Websites = lazy(() => import("./assets/Websites-DJuuzOxc.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-Bf-7FWvI.js"));
@@ -1965,7 +1965,7 @@ const Webhooks = lazy(() => import("./assets/Webhooks-CFTmFttc.js"));
 const Billing = lazy(() => import("./assets/Billing-DKky7JhT.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
 const Team = lazy(() => import("./assets/Team-CWlGO-QT.js"));
-const Settings = lazy(() => import("./assets/Settings-A9nqqFl4.js"));
+const Settings = lazy(() => import("./assets/Settings-DHvQu9ge.js"));
 const Reports = lazy(() => import("./assets/Reports-BZsPLPwv.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
 const AdminOverview = lazy(() => import("./assets/AdminOverview-Bi8GBsOo.js"));
