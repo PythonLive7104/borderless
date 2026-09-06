@@ -1,0 +1,22 @@
+# TryNoBot — https://trynobot.com
+# The marketing site is open to crawlers. Everything behind a login, the API,
+# and the bot-handling pages are not: they are per-visitor responses with no
+# search value, and indexing a decoy page would be actively misleading.
+
+User-agent: *
+Allow: /$
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /l/
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password/
+Disallow: /verify-email
+Disallow: /accept-invite
+Disallow: /decoy.html
+Disallow: /blocked.html
+Disallow: /not-found.html
+Disallow: /unauthorized.html
+
+Sitemap: https://trynobot.com/sitemap.xml

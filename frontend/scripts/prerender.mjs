@@ -6,6 +6,9 @@ import { render } from "../dist-server/entry-server.js";
 const dist = path.resolve("dist");
 const template = fs.readFileSync(path.join(dist, "index.html"), "utf-8");
 const BRAND = "TryNoBot";
+// Canonical origin for absolute URLs (og:url, canonical, sitemap).
+const ORIGIN = (process.env.SITE_ORIGIN || "https://trynobot.com").replace(/\/$/, "");
+const OG_IMAGE = `${ORIGIN}/og-image.png`;
 
 const routes = [
   { path: "/", out: "index.html", title: "Real-time traffic intelligence & bot detection", desc: "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot." },
@@ -26,12 +29,19 @@ const routes = [
   { path: "/report", out: "report/index.html", title: "Report a redirect link", desc: "Report a TryNoBot short link used for phishing, malware or spam. We re-scan the destination immediately and disable confirmed threats." },
 ];
 
-function withHead(html, title, desc) {
+function withHead(html, title, desc, path) {
   const full = `${title} · ${BRAND}`;
+  const url = `${ORIGIN}${path === "/" ? "/" : path}`;
   html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${full}</title>`);
   html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${desc}">`);
-  const og = `<meta property="og:title" content="${full}"><meta property="og:description" content="${desc}"><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${full}"><meta name="twitter:description" content="${desc}">`;
-  return html.replace("</head>", og + "</head>");
+  // Replace the shell's page-level tags rather than appending duplicates —
+  // two og:title tags is worse than none, and crawlers pick unpredictably.
+  html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${url}">`);
+  html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${url}">`);
+  html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${full}">`);
+  html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${desc}">`);
+  const tw = `<meta name="twitter:title" content="${full}"><meta name="twitter:description" content="${desc}"><meta name="twitter:image" content="${OG_IMAGE}">`;
+  return html.replace("</head>", tw + "</head>");
 }
 
 // Blank SPA shell (empty #root) for app routes (dashboard/admin/auth). nginx
@@ -46,10 +56,23 @@ for (const r of routes) {
   try { appHtml = render(r.path); }
   catch (e) { console.error("prerender FAILED for", r.path, "-", e.message); continue; }
   let out = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
-  out = withHead(out, r.title, r.desc);
+  out = withHead(out, r.title, r.desc, r.path);
   const dest = path.join(dist, r.out);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.writeFileSync(dest, out);
   ok++;
 }
-console.log(`prerender: wrote ${ok}/${routes.length} pages`);
+// Sitemap from the same route list the pages come from — it cannot list a page
+// that doesn't exist, or miss one that does.
+const today = new Date().toISOString().slice(0, 10);
+const urls = routes.map((r) => {
+  const loc = `${ORIGIN}${r.path === "/" ? "/" : r.path}`;
+  const priority = r.path === "/" ? "1.0" : r.path === "/pricing" ? "0.9" : "0.7";
+  return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${today}</lastmod>\n` +
+         `    <changefreq>weekly</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+}).join("\n");
+fs.writeFileSync(path.join(dist, "sitemap.xml"),
+  `<?xml version="1.0" encoding="UTF-8"?>\n` +
+  `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+
+console.log(`prerender: wrote ${ok}/${routes.length} pages + sitemap.xml`);
