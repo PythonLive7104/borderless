@@ -239,9 +239,28 @@ class CheckoutView(views.APIView):
         sub = _get_subscription(org_id)
         product_id = plan.product_for(interval)
 
-        if plan.price_for(interval) == 0 or not bachs.is_enabled() or not product_id:
-            _activate(sub, plan, interval)  # dev stub / free plan
+        # A genuinely free plan needs no payment.
+        if plan.price_for(interval) == 0:
+            _activate(sub, plan, interval)
             return Response({"activated": True, **SubscriptionSerializer(sub).data})
+
+        # A PRICED plan must never activate without payment. This used to fall
+        # through to the dev stub whenever Bachs was unconfigured or the product
+        # id was missing — in production that hands out paid plans for free, and
+        # it applies per interval, so a tier with no monthly product would give
+        # monthly away while weekly charged correctly.
+        if not bachs.is_enabled() or not product_id:
+            import logging
+            logging.getLogger("bachs").error(
+                "checkout blocked: plan=%s interval=%s price=%s bachs_enabled=%s product_id=%r",
+                plan.slug, interval, plan.price_for(interval), bachs.is_enabled(), product_id)
+            if settings.DEBUG:
+                _activate(sub, plan, interval)   # local development only
+                return Response({"activated": True, **SubscriptionSerializer(sub).data})
+            return Response(
+                {"detail": f"{plan.name} isn't available on {interval} billing yet. "
+                           "Please choose another option or contact support."},
+                status=503)
 
         front = settings.FRONTEND_URL.rstrip("/")
         data, err = bachs.create_checkout_session(

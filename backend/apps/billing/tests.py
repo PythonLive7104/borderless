@@ -28,7 +28,8 @@ class AccessGatingTest(TestCase):
         self.assertTrue(sub.access_state()["locked"])   # expired
         self.assertEqual(sub.access_state()["reason"], "trial_expired")
         # upgrade (dev checkout activates instantly)
-        with patch("apps.billing.bachs.is_enabled", return_value=False):
+        with override_settings(DEBUG=True), \
+             patch("apps.billing.bachs.is_enabled", return_value=False):
             r = self.c.post("/api/billing/checkout/", {"organization": self.org, "plan": "plus"}, format="json")
         self.assertEqual(r.status_code, 200)
         sub.refresh_from_db()
@@ -159,7 +160,8 @@ class ExpiryGatingTest(TestCase):
 
     def test_renewal_restores_engine_access_immediately(self):
         self._expire()
-        with patch("apps.billing.views.restore_org") as restore, \
+        with override_settings(DEBUG=True), \
+             patch("apps.billing.views.restore_org") as restore, \
              patch("apps.billing.bachs.is_enabled", return_value=False):
             r = self.c.post("/api/billing/checkout/",
                             {"organization": self.org, "plan": "plus"}, format="json")
@@ -237,7 +239,8 @@ class MonthlyIntervalTest(TestCase):
         body = {"organization": self.org, "plan": plan}
         if interval:
             body["interval"] = interval
-        with patch("apps.billing.bachs.is_enabled", return_value=False):
+        with override_settings(DEBUG=True), \
+             patch("apps.billing.bachs.is_enabled", return_value=False):
             return self.c.post("/api/billing/checkout/", body, format="json")
 
     def test_monthly_prices_are_seeded(self):
@@ -388,3 +391,52 @@ class SettlePendingCheckoutTest(TestCase):
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.plan.slug, "plus")
         self.assertEqual(self.sub.interval, "monthly")
+
+
+@override_settings(DEBUG=False)
+class NoFreeActivationTest(TestCase):
+    """A priced plan must never activate without a payment."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {"email": "f@example.com", "password": "testpass123",
+                                            "first_name": "F"}, format="json")
+        access = self.c.post("/api/auth/token/", {"email": "f@example.com", "password": "testpass123"},
+                             format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+
+    def _checkout(self, interval):
+        return self.c.post("/api/billing/checkout/",
+                           {"organization": self.org, "plan": "basic", "interval": interval},
+                           format="json")
+
+    @override_settings(BACHS_PRODUCTS={"basic": ""}, BACHS_PRODUCTS_MONTHLY={"basic": ""})
+    def test_missing_product_id_refuses_instead_of_granting_free_access(self):
+        with patch("apps.billing.bachs.is_enabled", return_value=True):
+            r = self._checkout("weekly")
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(Subscription.objects.get(organization_id=self.org).status,
+                         Subscription.Status.TRIALING)
+
+    @override_settings(BACHS_PRODUCTS={"basic": "prod_weekly"}, BACHS_PRODUCTS_MONTHLY={"basic": ""})
+    def test_a_missing_monthly_product_does_not_give_monthly_away(self):
+        # The exact hole that was open while the monthly products were being set up.
+        with patch("apps.billing.bachs.is_enabled", return_value=True):
+            r = self._checkout("monthly")
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(Subscription.objects.get(organization_id=self.org).status,
+                         Subscription.Status.TRIALING)
+
+    def test_bachs_unconfigured_refuses_in_production(self):
+        with patch("apps.billing.bachs.is_enabled", return_value=False):
+            r = self._checkout("weekly")
+        self.assertEqual(r.status_code, 503)
+
+    @override_settings(DEBUG=True)
+    def test_local_development_still_activates_instantly(self):
+        with patch("apps.billing.bachs.is_enabled", return_value=False):
+            r = self._checkout("weekly")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["activated"])
