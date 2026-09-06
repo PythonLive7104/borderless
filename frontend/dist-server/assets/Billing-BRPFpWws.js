@@ -95,7 +95,7 @@ function Billing() {
     const iv = setInterval(async () => {
       tries++;
       try {
-        const s = await billingApi.subscription(current.id);
+        const s = await billingApi.verifyCheckout(current.id);
         if (s.status === "active") {
           setSub(s);
           setPayMsg({ kind: "done", text: `Payment confirmed — you're now on the ${s.plan.name} plan. A receipt has been emailed to you.` });
@@ -106,7 +106,7 @@ function Billing() {
       } catch {
       }
       if (tries >= 12) {
-        setPayMsg({ kind: "confirming", text: "Payment received — your plan will update within a minute. Refresh the page, or contact support if it doesn't." });
+        setPayMsg({ kind: "confirming", text: "Payment received. We're still confirming it with the payment provider — your plan will switch on automatically, usually within a few minutes. Nothing else to do." });
         clearInterval(iv);
         clear();
       }

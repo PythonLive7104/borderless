@@ -404,6 +404,8 @@ export const billingApi = {
     http.post<Subscription>("/billing/subscription/change/", { organization: orgId, plan, interval }),
   checkout: (orgId: number, plan: string, interval: BillingInterval = "weekly") =>
     http.post<{ checkout_url?: string; activated?: boolean } & Partial<Subscription>>("/billing/checkout/", { organization: orgId, plan, interval }),
+  verifyCheckout: (orgId: number) =>
+    http.post<{ activated: boolean } & Subscription>("/billing/checkout/verify/", { organization: orgId }),
   cancel: (orgId: number) => http.post<Subscription>("/billing/subscription/cancel/", { organization: orgId }),
   usage: (orgId: number) => http.get<Usage>(`/billing/usage/?organization=${orgId}`),
 };

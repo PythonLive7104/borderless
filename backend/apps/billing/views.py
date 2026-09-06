@@ -160,6 +160,61 @@ def _activate(sub, plan, interval=None):
     _notify_activation(sub, plan)
 
 
+def settle_pending_checkout(sub) -> bool:
+    """Ask Bachs whether this subscription's pending checkout was paid, and
+    activate it if so. Returns True when it activated something.
+
+    The webhook remains the fast path, but it can't be the only one: delivery
+    can fail, and the signature scheme was written against documentation rather
+    than a real event. This asks Bachs directly, so a paid customer gets their
+    plan even if no webhook ever arrives. Safe to call repeatedly — it does
+    nothing once the pending session has been cleared.
+    """
+    import logging
+    log = logging.getLogger("bachs")
+
+    if not sub or not sub.bachs_session_id or not sub.pending_plan_slug:
+        return False
+    plan = Plan.objects.filter(slug=sub.pending_plan_slug).first()
+    if not plan:
+        log.warning("settle: org=%s pending plan %r no longer exists",
+                    sub.organization_id, sub.pending_plan_slug)
+        return False
+
+    data, err = bachs.get_checkout_session(sub.bachs_session_id)
+    if err:
+        log.warning("settle: org=%s could not read session %s — %s",
+                    sub.organization_id, sub.bachs_session_id, err)
+        return False
+    if not bachs.session_is_paid(data):
+        return False
+
+    interval = sub.pending_interval or sub.interval or WEEKLY
+    _activate(sub, plan, interval)     # clears the pending session + interval
+    sub.bachs_session_id = ""
+    sub.save(update_fields=["bachs_session_id"])
+    log.info("settle: org=%s activated %s (%s) from the checkout session",
+             sub.organization_id, plan.slug, interval)
+    return True
+
+
+class VerifyCheckoutView(views.APIView):
+    """POST {organization} — called when the browser returns from Bachs.
+
+    Confirms the payment with Bachs rather than waiting for a webhook, so the
+    plan is live by the time the page reloads.
+    """
+
+    def post(self, request):
+        org_id = request.data.get("organization")
+        if not _membership(request.user, org_id):
+            return Response({"detail": "Not a member of this workspace."}, status=403)
+        sub = _get_subscription(org_id)
+        activated = settle_pending_checkout(sub)
+        sub.refresh_from_db()
+        return Response({"activated": activated, **SubscriptionSerializer(sub).data})
+
+
 class CheckoutView(views.APIView):
     """Start an upgrade. Free plans activate instantly. When Bachs is configured
     and the target plan has a Bachs product, we return a hosted checkout URL for
@@ -261,6 +316,14 @@ class BachsWebhookView(views.APIView):
             or ""
         )
         if not bachs.verify_signature(raw, sig):
+            # Logged loudly: a rejected webhook is indistinguishable from one
+            # that never arrived, and that ambiguity cost a paying customer
+            # their plan. settle_pending_checkout() is the safety net.
+            import logging
+            logging.getLogger("bachs").error(
+                "bachs webhook REJECTED: signature did not verify "
+                "(header present=%s, secret configured=%s, bytes=%d)",
+                bool(sig), bool(getattr(settings, "BACHS_WEBHOOK_SECRET", "")), len(raw))
             return Response({"detail": "Invalid signature."}, status=400)
         try:
             event = json.loads(raw.decode())

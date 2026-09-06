@@ -84,8 +84,9 @@ export default function Billing() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
-  // After returning from Bachs checkout, poll until the webhook activates the
-  // plan, so the purchase reflects here without a manual refresh.
+  // After returning from Bachs checkout we ASK Bachs whether the payment landed
+  // rather than waiting for a webhook. Waiting was the old behaviour and it left
+  // a paying customer on the free plan when no webhook arrived.
   useEffect(() => {
     const c = params.get("checkout");
     const clear = () => { params.delete("checkout"); setParams(params, { replace: true }); };
@@ -97,7 +98,7 @@ export default function Billing() {
     const iv = setInterval(async () => {
       tries++;
       try {
-        const s = await billingApi.subscription(current.id);
+        const s = await billingApi.verifyCheckout(current.id);
         if (s.status === "active") {
           setSub(s);
           setPayMsg({ kind: "done", text: `Payment confirmed — you're now on the ${s.plan.name} plan. A receipt has been emailed to you.` });
@@ -105,7 +106,7 @@ export default function Billing() {
         }
       } catch { /* keep polling */ }
       if (tries >= 12) {
-        setPayMsg({ kind: "confirming", text: "Payment received — your plan will update within a minute. Refresh the page, or contact support if it doesn't." });
+        setPayMsg({ kind: "confirming", text: "Payment received. We're still confirming it with the payment provider — your plan will switch on automatically, usually within a few minutes. Nothing else to do." });
         clearInterval(iv); clear();
       }
     }, 2000);

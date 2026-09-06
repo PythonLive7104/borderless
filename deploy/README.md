@@ -106,7 +106,13 @@ Celery was removed to save RAM, so these run from host cron:
 0 * * * *   docker compose -f docker-compose.prod.yml exec -T backend python manage.py sync_ja3
 15 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py rescan_links
 30 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_access
+*/10 * * * * docker compose -f docker-compose.prod.yml exec -T backend python manage.py reconcile_payments
 ```
+
+`reconcile_payments` is the safety net under the payment webhook. It asks Bachs
+about any checkout still marked pending and activates the plan if the money
+arrived — so a customer is never left unpaid-looking because a webhook failed to
+deliver, was rejected, or they closed the tab before returning.
 
 `enforce_access` is what makes the weekly window real. A subscription expires at
 a moment in time with no request behind it, so nothing in the request path

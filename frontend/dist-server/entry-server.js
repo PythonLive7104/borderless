@@ -274,6 +274,7 @@ const billingApi = {
   subscription: (orgId) => http.get(`/billing/subscription/?organization=${orgId}`),
   changePlan: (orgId, plan, interval) => http.post("/billing/subscription/change/", { organization: orgId, plan, interval }),
   checkout: (orgId, plan, interval = "weekly") => http.post("/billing/checkout/", { organization: orgId, plan, interval }),
+  verifyCheckout: (orgId) => http.post("/billing/checkout/verify/", { organization: orgId }),
   cancel: (orgId) => http.post("/billing/subscription/cancel/", { organization: orgId }),
   usage: (orgId) => http.get(`/billing/usage/?organization=${orgId}`)
 };
@@ -1962,7 +1963,7 @@ const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
 const ApiKeys = lazy(() => import("./assets/ApiKeys-CXHXJmPy.js"));
 const Webhooks = lazy(() => import("./assets/Webhooks-CFTmFttc.js"));
-const Billing = lazy(() => import("./assets/Billing-DKky7JhT.js"));
+const Billing = lazy(() => import("./assets/Billing-BRPFpWws.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
 const Team = lazy(() => import("./assets/Team-CWlGO-QT.js"));
 const Settings = lazy(() => import("./assets/Settings-DHvQu9ge.js"));

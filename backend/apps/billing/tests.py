@@ -308,3 +308,83 @@ class MonthlyIntervalTest(TestCase):
         sub = Subscription.objects.get(organization_id=self.org)
         self.assertEqual(sub.interval, "monthly")
         self.assertEqual(sub.period_days, 30)
+
+
+class SettlePendingCheckoutTest(TestCase):
+    """A paid checkout must activate even when no webhook ever arrives —
+    for weekly and monthly alike."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="settle@example.com", email="settle@example.com", password="testpass123")
+        self.org = create_workspace(user, "Settle Co")
+        self.sub = Subscription.objects.get(organization=self.org)
+
+    def _pending(self, slug="basic", interval="weekly"):
+        self.sub.bachs_session_id = "cs_test_123"
+        self.sub.pending_plan_slug = slug
+        self.sub.pending_interval = interval
+        self.sub.save()
+
+    def _settle(self, session_payload, err=None):
+        from apps.billing.views import settle_pending_checkout
+        with patch("apps.billing.bachs.get_checkout_session", return_value=(session_payload, err)):
+            return settle_pending_checkout(self.sub)
+
+    def test_weekly_activates_from_a_paid_session(self):
+        self._pending("basic", "weekly")
+        self.assertTrue(self._settle({"status": "paid"}))
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.plan.slug, "basic")
+        self.assertEqual(self.sub.interval, "weekly")
+        self.assertEqual(self.sub.period_days, 7)
+        self.assertFalse(self.sub.access_state()["locked"])
+
+    def test_monthly_activates_with_a_30_day_window(self):
+        self._pending("pro", "monthly")
+        self.assertTrue(self._settle({"data": {"payment_status": "succeeded"}}))
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.plan.slug, "pro")
+        self.assertEqual(self.sub.interval, "monthly")
+        self.assertEqual(self.sub.period_days, 30)
+
+    def test_pending_state_is_cleared_so_it_cannot_double_activate(self):
+        self._pending()
+        self.assertTrue(self._settle({"status": "completed"}))
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.bachs_session_id, "")
+        self.assertEqual(self.sub.pending_plan_slug, "")
+        self.assertFalse(self._settle({"status": "completed"}))   # nothing left to settle
+
+    def test_an_unpaid_session_does_not_activate(self):
+        self._pending()
+        self.assertFalse(self._settle({"status": "pending"}))
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, Subscription.Status.TRIALING)
+
+    def test_a_failed_status_never_activates_even_alongside_a_success_word(self):
+        # Being slow to grant access is recoverable; granting it for a failed
+        # payment is not — so an explicit failure always wins.
+        self._pending()
+        self.assertFalse(self._settle({"status": "completed", "payment_status": "failed"}))
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, Subscription.Status.TRIALING)
+
+    def test_an_api_error_does_not_activate(self):
+        self._pending()
+        self.assertFalse(self._settle(None, err="Bachs API error 500"))
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, Subscription.Status.TRIALING)
+
+    def test_boolean_paid_field_is_understood(self):
+        self._pending()
+        self.assertTrue(self._settle({"paid": True}))
+
+    def test_reconcile_command_activates_a_paid_backlog(self):
+        self._pending("plus", "monthly")
+        with patch("apps.billing.bachs.is_enabled", return_value=True), \
+             patch("apps.billing.bachs.get_checkout_session", return_value=({"status": "paid"}, None)):
+            call_command("reconcile_payments", "--org", str(self.org.id), verbosity=0)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.plan.slug, "plus")
+        self.assertEqual(self.sub.interval, "monthly")

@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from django.conf import settings
@@ -88,3 +89,62 @@ def verify_signature(raw_body: bytes, signature_header: str) -> bool:
     if not candidates:
         candidates = [signature_header.strip()]
     return any(hmac.compare_digest(expected, c) for c in candidates)
+
+def _get(path):
+    req = urllib.request.Request(
+        f"{_base()}{path}",
+        headers={
+            "Authorization": f"Bearer {_key()}",
+            "User-Agent": "TryNoBot/1.0 (+https://trynobot.com)",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read().decode()), None
+    except urllib.error.HTTPError as e:
+        return None, f"Bachs API error {e.code}: {e.read().decode(errors='replace')}"
+    except Exception as e:
+        return None, f"Bachs request failed: {e}"
+
+
+def get_checkout_session(session_id: str):
+    """Read a checkout session back from Bachs. Returns (data, error).
+
+    This is the authoritative answer to "did they pay?", and unlike the webhook
+    it doesn't depend on delivery, on a signature scheme we had to guess, or on
+    the customer leaving the tab open.
+    """
+    if not session_id:
+        return None, "No checkout session id."
+    return _get(f"/checkout-sessions/{urllib.parse.quote(session_id)}")
+
+
+# Status names seen across payment providers for "the money arrived".
+PAID_STATES = {"paid", "succeeded", "success", "completed", "complete", "settled", "active"}
+UNPAID_STATES = {"failed", "cancelled", "canceled", "expired", "refunded", "chargeback"}
+
+
+def session_is_paid(data) -> bool:
+    """Whether a retrieved session represents a completed payment.
+
+    Bachs's exact field name isn't documented to us, so every plausible status
+    field is checked and an explicit failure state always wins over a success
+    one — being slow to grant access is recoverable, granting it for a failed
+    payment is not.
+    """
+    if not isinstance(data, dict):
+        return False
+    node = data.get("data") if isinstance(data.get("data"), dict) else data
+    values = set()
+    for key in ("status", "payment_status", "state", "payment_state", "collection_status"):
+        v = node.get(key)
+        if isinstance(v, str):
+            values.add(v.strip().lower())
+    if values & UNPAID_STATES:
+        return False
+    if values & PAID_STATES:
+        return True
+    # Some APIs report a boolean instead of a status string.
+    return bool(node.get("paid") is True or node.get("is_paid") is True)
