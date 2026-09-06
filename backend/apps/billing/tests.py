@@ -440,3 +440,32 @@ class NoFreeActivationTest(TestCase):
             r = self._checkout("weekly")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.json()["activated"])
+
+
+class SessionIdCaptureTest(TestCase):
+    """The checkout session id must be found wherever Bachs puts it.
+
+    Storing "" here is what left a paying customer on the free plan: the webhook
+    had no id to match and reconciliation skipped the row entirely.
+    """
+
+    def test_id_is_found_at_every_shape_bachs_might_use(self):
+        from apps.billing.views import _find_session_id
+        shapes = [
+            {"id": "cs_1"},
+            {"data": {"id": "cs_1"}},
+            {"data": {"object": {"id": "cs_1"}}},
+            {"session": {"id": "cs_1"}},
+            {"checkout_session": {"id": "cs_1"}},
+            {"data": {"session": {"id": "cs_1"}}},
+            {"reference": "cs_1"},
+            {"data": {"reference": "cs_1"}},
+            {"checkout_id": "cs_1"},
+            {"session_id": "cs_1"},
+        ]
+        for shape in shapes:
+            self.assertEqual(_find_session_id(shape), "cs_1", shape)
+
+    def test_missing_id_returns_empty_rather_than_raising(self):
+        from apps.billing.views import _find_session_id
+        self.assertEqual(_find_session_id({"checkout_url": "https://pay.example"}), "")

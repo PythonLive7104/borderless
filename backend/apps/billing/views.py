@@ -273,8 +273,17 @@ class CheckoutView(views.APIView):
         )
         if err:
             return Response({"detail": err}, status=502)
-        checkout_url = data.get("checkout_url") or data.get("url") or data.get("redirect_url")
-        session_id = data.get("id") or data.get("session_id") or ""
+        checkout_url = (data.get("checkout_url") or data.get("url") or data.get("redirect_url")
+                        or (data.get("data") or {}).get("checkout_url")
+                        or (data.get("data") or {}).get("url"))
+        session_id = _find_session_id(data)
+        if not session_id:
+            # Without an id we cannot confirm this payment later. Log the shape
+            # we did get so the right key can be added rather than guessed at.
+            import logging
+            logging.getLogger("bachs").error(
+                "checkout: NO session id in the Bachs response — org=%s plan=%s keys=%s",
+                org_id, plan.slug, sorted(data.keys()) if isinstance(data, dict) else type(data))
         # Remember what they're buying so the webhook can activate it even if
         # Bachs doesn't echo our metadata back.
         sub.bachs_session_id = session_id
@@ -304,9 +313,16 @@ def _find_metadata(event: dict) -> dict:
 
 
 def _find_session_id(event: dict) -> str:
-    """Find the Bachs checkout/collection id in the webhook body — used to match
-    the subscription we saved it against at checkout."""
+    """Find the Bachs checkout/collection id in a webhook body OR in the
+    create-checkout-session response.
+
+    Reading only the top level cost us real money: the id came back nested, we
+    stored "", and every payment made through that session became impossible to
+    match — the webhook had nothing to look up and reconciliation skipped it.
+    """
     for path in (("id",), ("data", "id"), ("data", "object", "id"),
+                 ("session", "id"), ("checkout_session", "id"), ("data", "session", "id"),
+                 ("reference",), ("data", "reference"), ("checkout_id",), ("data", "checkout_id"),
                  ("data", "checkout_session_id"), ("checkout_session_id",), ("session_id",)):
         node = event
         ok = True
