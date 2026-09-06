@@ -458,7 +458,14 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
 
-	raw := h.st.GetStr(ctx, "shortlink:"+slug)
+	// Keyed by host AND slug: the same slug on a different domain is a
+	// different link, and a slug must never resolve on a domain it was not
+	// created for. Host comes from nginx (proxy_set_header Host $host).
+	host := r.Host
+	if i := strings.IndexByte(host, ':'); i >= 0 {
+		host = host[:i] // strip any :port
+	}
+	raw := h.st.GetStr(ctx, "shortlink:"+strings.ToLower(host)+":"+slug)
 	if raw == "" {
 		http.NotFound(w, r)
 		return

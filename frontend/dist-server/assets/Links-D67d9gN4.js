@@ -24,7 +24,7 @@ const BOT_OPTIONS = [
 ];
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 function Links() {
-  var _a;
+  var _a, _b, _c;
   const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
   const [rows, setRows] = useState([]);
@@ -32,13 +32,14 @@ function Links() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [linkBase, setLinkBase] = useState("");
+  const [domains, setDomains] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(null);
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -59,6 +60,7 @@ function Links() {
       setSites(w.results);
       setSub(s);
       setLinkBase(l.base || "");
+      setDomains(l.domains || []);
     } finally {
       setLoading(false);
     }
@@ -67,7 +69,8 @@ function Links() {
   function openCreate() {
     setErr("");
     setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false });
+    const def = domains.find((d) => d.is_default) || domains[0];
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
     setOpen(true);
   }
   function openEdit(l) {
@@ -82,12 +85,13 @@ function Links() {
       challenge: !!l.challenge,
       forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "",
-      block_vpn: !!l.block_vpn
+      block_vpn: !!l.block_vpn,
+      domain: l.domain ? String(l.domain) : ""
     });
     setOpen(true);
   }
   async function save(e) {
-    var _a2, _b, _c, _d, _e;
+    var _a2, _b2, _c2, _d, _e;
     e.preventDefault();
     setErr("");
     setBusy(true);
@@ -98,6 +102,7 @@ function Links() {
       bot_action: form.bot_action,
       challenge: form.challenge,
       block_vpn: form.block_vpn,
+      domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
       website: form.website ? Number(form.website) : null
@@ -112,7 +117,7 @@ function Links() {
       }
       load();
     } catch (e2) {
-      setErr(((_b = (_a2 = e2.data) == null ? void 0 : _a2.slug) == null ? void 0 : _b[0]) || ((_d = (_c = e2.data) == null ? void 0 : _c.destination_url) == null ? void 0 : _d[0]) || ((_e = e2.data) == null ? void 0 : _e.detail) || e2.message);
+      setErr(((_b2 = (_a2 = e2.data) == null ? void 0 : _a2.slug) == null ? void 0 : _b2[0]) || ((_d = (_c2 = e2.data) == null ? void 0 : _c2.destination_url) == null ? void 0 : _d[0]) || ((_e = e2.data) == null ? void 0 : _e.detail) || e2.message);
     } finally {
       setBusy(false);
     }
@@ -212,6 +217,10 @@ function Links() {
             " · Rules: ",
             /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: siteName(l.website) || "a website" })
           ] }),
+          domains.length > 1 && l.domain_host && /* @__PURE__ */ jsxs(Fragment, { children: [
+            " · ",
+            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: l.domain_host })
+          ] }),
           l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
             " · ",
             /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
@@ -261,10 +270,26 @@ function Links() {
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 px-4 py-3", children: [
         /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "Your link" }),
         /* @__PURE__ */ jsxs("div", { className: "mt-0.5 break-all font-mono text-sm font-semibold text-brand", children: [
-          linkBase,
+          ((_b = domains.find((d) => String(d.id) === form.domain)) == null ? void 0 : _b.base) || linkBase,
           "/",
           form.slug || "…"
         ] })
+      ] }),
+      domains.length > 1 && /* @__PURE__ */ jsxs("label", { className: "block", children: [
+        /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "Domain" }),
+        /* @__PURE__ */ jsx(
+          "select",
+          {
+            value: form.domain,
+            onChange: (e) => setForm({ ...form, domain: e.target.value }),
+            className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20",
+            children: domains.map((d) => /* @__PURE__ */ jsxs("option", { value: d.id, children: [
+              d.host,
+              d.is_default ? " · default" : ""
+            ] }, d.id))
+          }
+        ),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-xs text-fg-dim", children: "Spreading links across domains means one blocklisting can't take them all down. The domain can't be changed after the link is created." })
       ] }),
       /* @__PURE__ */ jsx(Field, { label: "Where should it send people?", type: "url", value: form.destination_url, onChange: (v) => setForm({ ...form, destination_url: v }), placeholder: "https://your-offer.com/landing" }),
       /* @__PURE__ */ jsx(Field, { label: "Title (optional)", required: false, value: form.title, onChange: (v) => setForm({ ...form, title: v }), placeholder: "Summer promo" }),
@@ -384,7 +409,7 @@ function Links() {
         ),
         /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-xs text-fg-dim", children: "Comma-separated names. Only these are passed on — anything else on the link is dropped, so stray trackers picked up in transit don't follow people to your page. Leave blank to forward everything." }),
         form.forward_param_keys.trim() && /* @__PURE__ */ jsxs("p", { className: "mt-2 break-all font-mono text-xs text-fg-muted", children: [
-          linkBase,
+          ((_c = domains.find((d) => String(d.id) === form.domain)) == null ? void 0 : _c.base) || linkBase,
           "/",
           form.slug || "…",
           "?",

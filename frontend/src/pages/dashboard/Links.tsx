@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, websiteApi, billingApi, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
+import { linkApi, websiteApi, billingApi, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -36,13 +36,14 @@ export default function Links() {
   // "" means no short domain is configured — the service is off, and we must
   // never show a trynobot.com link as a stand-in.
   const [linkBase, setLinkBase] = useState("");
+  const [domains, setDomains] = useState<ShortDomain[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; forward_params: boolean; forward_param_keys: string; block_vpn: boolean }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -63,14 +64,15 @@ export default function Links() {
     try {
       const [l, w, s] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id), billingApi.subscription(current.id)]);
       setRows(l.results); setSites(w.results); setSub(s);
-      setLinkBase(l.base || "");
+      setLinkBase(l.base || ""); setDomains(l.domains || []);
     } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);
 
   function openCreate() {
     setErr(""); setEditing(null);
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false });
+    const def = domains.find((d) => d.is_default) || domains[0];
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -80,6 +82,7 @@ export default function Links() {
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
       challenge: !!l.challenge, forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn,
+      domain: l.domain ? String(l.domain) : "",
     });
     setOpen(true);
   }
@@ -92,6 +95,7 @@ export default function Links() {
       bot_action: form.bot_action,
       challenge: form.challenge,
       block_vpn: form.block_vpn,
+      domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
       website: form.website ? Number(form.website) : null,
@@ -206,6 +210,7 @@ export default function Links() {
                   <div className="mt-1 text-xs text-fg-dim">
                     Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
+                    {domains.length > 1 && l.domain_host && <> · <b className="text-fg-muted">{l.domain_host}</b></>}
                     {l.block_vpn && <> · <b className="text-fg-muted">VPN/RDP blocked</b></>}
                     {l.challenge && <> · <b className="text-fg-muted">Human check on</b></>}
                     {l.forward_params && <> · <b className="text-fg-muted">
@@ -238,8 +243,24 @@ export default function Links() {
           {/* live preview */}
           <div className="rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
             <div className="text-xs font-bold uppercase tracking-wide text-fg-dim">Your link</div>
-            <div className="mt-0.5 break-all font-mono text-sm font-semibold text-brand">{linkBase}/{form.slug || "…"}</div>
+            <div className="mt-0.5 break-all font-mono text-sm font-semibold text-brand">{domains.find((d) => String(d.id) === form.domain)?.base || linkBase}/{form.slug || "…"}</div>
           </div>
+
+          {domains.length > 1 && (
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold">Domain</span>
+              <select value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })}
+                className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+                {domains.map((d) => (
+                  <option key={d.id} value={d.id}>{d.host}{d.is_default ? " · default" : ""}</option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-fg-dim">
+                Spreading links across domains means one blocklisting can't take them all down.
+                The domain can't be changed after the link is created.
+              </p>
+            </label>
+          )}
 
           <Field label="Where should it send people?" type="url" value={form.destination_url} onChange={(v) => setForm({ ...form, destination_url: v })} placeholder="https://your-offer.com/landing" />
           <Field label="Title (optional)" required={false} value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Summer promo" />
@@ -334,7 +355,7 @@ export default function Links() {
               </p>
               {form.forward_param_keys.trim() && (
                 <p className="mt-2 break-all font-mono text-xs text-fg-muted">
-                  {linkBase}/{form.slug || "…"}?
+                  {domains.find((d) => String(d.id) === form.domain)?.base || linkBase}/{form.slug || "…"}?
                   {form.forward_param_keys.split(",").map((k) => k.trim()).filter(Boolean)
                     .map((k, i) => <span key={k}>{i > 0 && "&"}<b className="text-brand">{k}</b>=…</span>)}
                 </p>

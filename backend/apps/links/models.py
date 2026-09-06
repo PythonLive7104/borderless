@@ -9,6 +9,58 @@ def gen_slug() -> str:
     return secrets.token_urlsafe(8).replace("_", "").replace("-", "")[:8]
 
 
+class ShortDomain(models.Model):
+    """A domain that serves short links.
+
+    Rows with organization=None are the platform pool: domains we own and offer
+    to everyone. Spreading links across several means one blocklisting can't
+    take every customer's links down at once, and a burned domain can be
+    retired by flipping `active` without touching the links themselves.
+
+    A row with an organization set is a customer's own domain — the schema is
+    ready for it, but issuing certificates per customer domain is not built yet,
+    so `verified_at` stays the gate.
+    """
+    host = models.CharField(max_length=190, unique=True,
+                            help_text='Bare hostname, e.g. "trynb.cc" — no scheme, no trailing slash.')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True,
+                                     related_name="short_domains",
+                                     help_text="Empty = available to every workspace (our own domain).")
+    active = models.BooleanField(default=True,
+                                 help_text="Uncheck to retire a domain; its links stop resolving.")
+    is_default = models.BooleanField(default=False, help_text="Pre-selected when creating a redirect.")
+    verified_at = models.DateTimeField(null=True, blank=True,
+                                       help_text="Our own domains are verified on creation.")
+    sort = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort", "host"]
+
+    def __str__(self):
+        return self.host
+
+    @property
+    def base(self) -> str:
+        return f"https://{self.host}"
+
+    @property
+    def usable(self) -> bool:
+        return bool(self.active and self.verified_at)
+
+    @classmethod
+    def for_org(cls, organization_id):
+        """Domains this workspace may publish on: the shared pool plus its own."""
+        from django.db.models import Q
+        return cls.objects.filter(active=True, verified_at__isnull=False).filter(
+            Q(organization__isnull=True) | Q(organization_id=organization_id))
+
+    @classmethod
+    def default_for(cls, organization_id):
+        qs = cls.for_org(organization_id)
+        return qs.filter(is_default=True).first() or qs.first()
+
+
 class ShortLink(models.Model):
     """A branded short link. Each click is scored by the bot engine and, when a
     website is attached, filtered by that site's Traffic Rules. Real humans go to
@@ -17,7 +69,11 @@ class ShortLink(models.Model):
     website = models.ForeignKey(Website, on_delete=models.SET_NULL, null=True, blank=True,
                                 related_name="short_links",
                                 help_text="Optional — which site's Traffic Rules apply to clicks.")
-    slug = models.SlugField(max_length=64, unique=True, default=gen_slug)
+    # Which domain serves this link. Slugs are unique PER DOMAIN, so two
+    # workspaces on different domains can both use /promo.
+    domain = models.ForeignKey(ShortDomain, on_delete=models.PROTECT, null=True, blank=True,
+                               related_name="links")
+    slug = models.SlugField(max_length=64, default=gen_slug)
     destination_url = models.URLField(max_length=2000)
     title = models.CharField(max_length=120, blank=True)
     active = models.BooleanField(default=True)
@@ -76,9 +132,19 @@ class ShortLink(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["domain", "slug"], name="uniq_slug_per_domain"),
+        ]
 
     def __str__(self):
-        return f"/{self.slug} -> {self.destination_url}"
+        return f"{self.host_slug()} -> {self.destination_url}"
+
+    def host(self) -> str:
+        return self.domain.host if self.domain_id else ""
+
+    def host_slug(self) -> str:
+        """The Redis key body: a slug is only meaningful together with its host."""
+        return f"{self.host()}/{self.slug}"
 
 # Slugs the short domain serves itself (abuse reporting, bot pages). A link can
 # never claim one, or it would shadow the page a complainant is trying to reach.

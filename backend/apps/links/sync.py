@@ -6,10 +6,10 @@ from django.utils import timezone
 from apps.rules.sync import _r
 
 
-def _bot_base() -> str:
-    """Where the decoy page lives. Short domain only — a decoy served from the
-    brand domain would hand bots a trynobot.com URL to report."""
-    return (getattr(settings, "SHORTLINK_BASE", "") or "").rstrip("/")
+def _bot_base(link) -> str:
+    """Where the decoy page lives: the link's OWN domain. Serving it from
+    anywhere else would hand a bot a different domain of ours to report."""
+    return link.domain.base if link.domain_id else ""
 
 
 def _payload(link) -> str:
@@ -19,7 +19,7 @@ def _payload(link) -> str:
         "tid": tid,
         "slug": link.slug,
         "bot_action": link.bot_action,          # off | decoy | notfound | blank
-        "decoy_url": _bot_base() + "/decoy.html",
+        "decoy_url": (_bot_base(link) + "/decoy.html") if link.domain_id else "",
         "challenge": bool(link.challenge),      # human click-to-continue check
         "forward_params": bool(link.forward_params),
         "forward_keys": link.forward_keys(),
@@ -30,15 +30,29 @@ def _payload(link) -> str:
 
 
 def publish_link(link):
+    """Publish under host+slug. A link with no domain, or on a retired one, is
+    withdrawn instead — that is how a burned domain is switched off."""
     try:
-        _r().set(f"shortlink:{link.slug}", _payload(link))
+        if not (link.domain_id and link.domain.usable):
+            unpublish_link(link.slug, link.host())
+            return
+        _r().set(f"shortlink:{link.host()}:{link.slug}", _payload(link))
     except Exception:
         pass
 
 
-def unpublish_link(slug: str):
+def unpublish_link(slug: str, host: str = ""):
     try:
-        _r().delete(f"shortlink:{slug}")
+        c = _r()
+        if host:
+            c.delete(f"shortlink:{host}:{slug}")
+        else:
+            # No host given (a delete where we only kept the slug): clear the
+            # slug on every domain so nothing is left resolving anywhere.
+            from .models import ShortDomain
+            for h in ShortDomain.objects.values_list("host", flat=True):
+                c.delete(f"shortlink:{h}:{slug}")
+        c.delete(f"shortlink:{slug}")   # retire the old un-hosted key too
     except Exception:
         pass
 

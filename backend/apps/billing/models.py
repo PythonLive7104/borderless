@@ -167,8 +167,9 @@ def redirects_available() -> bool:
     back to the main domain: the point of the separate domain is that abuse
     lands there and not on the brand.
     """
-    from django.conf import settings
-    return bool((getattr(settings, "SHORTLINK_BASE", "") or "").strip())
+    from apps.links.models import ShortDomain
+    return ShortDomain.objects.filter(active=True, verified_at__isnull=False,
+                                      organization__isnull=True).exists()
 
 
 def link_shortener_enabled(organization_id) -> bool:

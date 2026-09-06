@@ -1,15 +1,22 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import AbuseReport, ShortLink
+from .models import AbuseReport, ShortDomain, ShortLink
 from .sync import publish_link
+
+
+@admin.register(ShortDomain)
+class ShortDomainAdmin(admin.ModelAdmin):
+    list_display = ("host", "active", "is_default", "verified_at", "organization", "sort")
+    list_filter = ("active", "is_default")
+    search_fields = ("host",)
 
 
 @admin.register(ShortLink)
 class ShortLinkAdmin(admin.ModelAdmin):
-    list_display = ("slug", "destination_url", "organization", "active", "url_safe",
+    list_display = ("slug", "domain", "destination_url", "organization", "active", "url_safe",
                     "clicks", "created_at")
-    list_filter = ("active", "url_safe", "bot_action")
+    list_filter = ("active", "url_safe", "bot_action", "domain")
     search_fields = ("slug", "destination_url", "title", "organization__name")
     readonly_fields = ("clicks", "human_clicks", "bot_clicks", "url_scanned_at", "created_at")
 

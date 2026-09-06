@@ -3,12 +3,20 @@
 # so link abuse can't blacklist the brand/dashboard/email domain. Activates only
 # when SHORT_DOMAIN is set (and its Let's Encrypt cert exists).
 set -e
-[ -z "$SHORT_DOMAIN" ] && exit 0
+# SHORT_DOMAIN is the primary; SHORT_DOMAINS may list more, comma-separated.
+# Each needs its own certificate — a domain without one is skipped rather than
+# taking nginx down with it.
+ALL="$(echo "$SHORT_DOMAIN,$SHORT_DOMAINS" | tr ',' ' ')"
+[ -z "$(echo $ALL)" ] && exit 0
+: > /etc/nginx/conf.d/shortdomain.conf
+
+for SHORT_DOMAIN in $ALL; do
+[ -z "$SHORT_DOMAIN" ] && continue
 if [ ! -f "/etc/letsencrypt/live/$SHORT_DOMAIN/fullchain.pem" ]; then
-  echo "shortdomain: SHORT_DOMAIN=$SHORT_DOMAIN set but no cert yet — skipping (issue it, then recreate web)."
-  exit 0
+  echo "shortdomain: $SHORT_DOMAIN has no cert yet — skipping it (issue the cert, then recreate web)."
+  continue
 fi
-cat > /etc/nginx/conf.d/shortdomain.conf <<EOF
+cat >> /etc/nginx/conf.d/shortdomain.conf <<EOF
 server {
     listen 80;
     server_name ${SHORT_DOMAIN};
@@ -51,3 +59,4 @@ server {
 }
 EOF
 echo "shortdomain: serving links on $SHORT_DOMAIN"
+done

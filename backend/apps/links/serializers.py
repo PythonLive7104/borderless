@@ -1,18 +1,19 @@
 from rest_framework import serializers
 from django.conf import settings
 from apps.organizations.models import OrganizationMember
-from .models import RESERVED_SLUGS, ShortLink, gen_slug
+from .models import RESERVED_SLUGS, ShortDomain, ShortLink, gen_slug
 
 
 class ShortLinkSerializer(serializers.ModelSerializer):
     short_url = serializers.SerializerMethodField()
     quality = serializers.SerializerMethodField()
     slug = serializers.SlugField(max_length=64, required=False)
+    domain_host = serializers.CharField(source="domain.host", read_only=True, default="")
 
     class Meta:
         model = ShortLink
         fields = ["id", "organization", "website", "slug", "destination_url", "title",
-                  "active", "bot_action", "challenge", "forward_params", "forward_param_keys", "block_vpn", "clicks", "human_clicks", "bot_clicks", "url_safe",
+                  "domain", "domain_host", "active", "bot_action", "challenge", "forward_params", "forward_param_keys", "block_vpn", "clicks", "human_clicks", "bot_clicks", "url_safe",
                   "url_threats", "url_scanned_at", "short_url", "quality", "created_at"]
         read_only_fields = ["clicks", "human_clicks", "bot_clicks", "url_safe", "url_threats",
                             "url_scanned_at", "created_at"]
@@ -24,8 +25,9 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         # No short domain configured (or it was pulled after abuse) => no link.
         # Never fall back to the main domain: that would serve redirects from the
         # brand we isolated them from in the first place.
-        base = getattr(settings, "SHORTLINK_BASE", "").rstrip("/")
-        return f"{base}/{obj.slug}" if base else ""
+        # Built from the link's own domain row. No domain (or a retired one)
+        # means no link — never fall back to another domain of ours.
+        return f"{obj.domain.base}/{obj.slug}" if obj.domain_id and obj.domain.active else ""
 
     def get_quality(self, obj) -> float:
         return round(obj.human_clicks / obj.clicks, 4) if obj.clicks else 0.0
@@ -46,6 +48,12 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f'"{slug}" is reserved — pick another.')
         return slug
 
+    def validate_domain(self, domain):
+        org = self.initial_data.get("organization") or getattr(self.instance, "organization_id", None)
+        if domain and org and not ShortDomain.for_org(org).filter(pk=domain.pk).exists():
+            raise serializers.ValidationError("That domain isn't available to this workspace.")
+        return domain
+
     def validate(self, attrs):
         website = attrs.get("website")
         org = attrs.get("organization") or getattr(self.instance, "organization", None)
@@ -56,4 +64,14 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         if not validated_data.get("slug"):
             validated_data["slug"] = gen_slug()
+        if not validated_data.get("domain"):
+            validated_data["domain"] = ShortDomain.default_for(validated_data["organization"].id)
         return super().create(validated_data)
+
+
+class ShortDomainSerializer(serializers.ModelSerializer):
+    base = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = ShortDomain
+        fields = ["id", "host", "base", "is_default"]

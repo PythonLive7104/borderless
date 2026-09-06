@@ -157,7 +157,10 @@ export const websiteApi = {
 
 // ---- short links ----
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
+export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; }
 export interface ShortLink {
+  domain: number | null;
+  domain_host: string;
   challenge: boolean;
   forward_params: boolean;
   forward_param_keys: string;
@@ -169,8 +172,8 @@ export interface ShortLink {
   short_url: string; quality: number; created_at: string;
 }
 export const linkApi = {
-  list: (orgId: number) => http.get<{ results: ShortLink[]; base: string }>(`/links/?organization=${orgId}`),
-  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; bot_action?: BotAction; website?: number | null }) =>
+  list: (orgId: number) => http.get<{ results: ShortLink[]; base: string; domains: ShortDomain[] }>(`/links/?organization=${orgId}`),
+  create: (p: { organization: number; destination_url: string; title?: string; slug?: string; domain?: number | null; bot_action?: BotAction; website?: number | null }) =>
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
   remove: (id: number) => http.del(`/links/${id}/`),

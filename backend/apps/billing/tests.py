@@ -205,9 +205,14 @@ class GrantPlanCommandTest(TestCase):
         with self.assertRaises(CommandError):
             call_command("grant_plan", "--org", str(self.org.id), "--plan", "enterprise", verbosity=0)
 
-    @override_settings(SHORTLINK_BASE="https://trynb.cc")
     def test_granting_unlocks_the_redirect_feature(self):
+        from django.utils import timezone as tz
         from apps.billing.models import link_shortener_enabled, redirect_limit
+        from apps.links.models import ShortDomain
+        # Redirects need a usable domain as well as a paid plan.
+        ShortDomain.objects.get_or_create(
+            host="trynb.cc",
+            defaults={"active": True, "is_default": True, "verified_at": tz.now()})
         self.assertFalse(link_shortener_enabled(self.org.id))   # trialing
         call_command("grant_plan", "--org", str(self.org.id), "--plan", "pro", verbosity=0)
         self.assertTrue(link_shortener_enabled(self.org.id))

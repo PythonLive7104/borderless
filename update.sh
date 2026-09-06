@@ -133,6 +133,9 @@ fi
 
 # --- 7. Post-deploy -------------------------------------------------------
 say "Syncing the engine"
+# Keeps the domain table matching the domains nginx actually serves, so the
+# dashboard can never offer one that nothing answers on.
+$COMPOSE exec -T backend python manage.py sync_short_domains
 $COMPOSE exec -T backend python manage.py sync_shield
 $COMPOSE exec -T backend python manage.py enforce_access
 

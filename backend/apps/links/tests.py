@@ -7,12 +7,20 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.links.abuse import extract_slug
-from apps.links.models import AbuseReport, ShortLink
+from apps.links.models import AbuseReport, ShortDomain, ShortLink
 from django.contrib.auth import get_user_model
 
 from apps.organizations.models import create_workspace
 
 SHORT = "https://trynb.cc"
+
+
+def _domain(host="trynb.cc", **kw):
+    from django.utils import timezone
+    d, _ = ShortDomain.objects.get_or_create(
+        host=host, defaults={"active": True, "is_default": True,
+                             "verified_at": timezone.now(), **kw})
+    return d
 
 
 def _workspace(email: str):
@@ -51,6 +59,7 @@ class AbuseReportBase(TestCase):
         self.c = APIClient()
         self.org = _workspace("owner@acme.example")
         self.link = ShortLink.objects.create(
+            domain=_domain(),
             organization=self.org, slug="aB3xK9",
             destination_url="https://phish.example/login", active=True)
 
@@ -149,10 +158,10 @@ class AbuseReportEndpointTest(AbuseReportBase):
 class RescanCommandTest(TestCase):
     def setUp(self):
         self.org = _workspace("owner@rescan.example")
-        self.stale = ShortLink.objects.create(
+        self.stale = ShortLink.objects.create(domain=_domain(), 
             organization=self.org, slug="stale1", destination_url="https://went-bad.example",
             active=True, url_safe=True, url_scanned_at=timezone.now() - timedelta(days=5))
-        self.fresh = ShortLink.objects.create(
+        self.fresh = ShortLink.objects.create(domain=_domain(), 
             organization=self.org, slug="fresh1", destination_url="https://fine.example",
             active=True, url_safe=True, url_scanned_at=timezone.now())
 
@@ -220,7 +229,7 @@ class EditRedirectTest(TestCase):
         orgs = self.c.get("/api/organizations/").json()
         self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
         call_command("grant_plan", "--org", str(self.org), "--plan", "pro", verbosity=0)
-        self.link = ShortLink.objects.create(
+        self.link = ShortLink.objects.create(domain=_domain(), 
             organization_id=self.org, slug="keepme",
             destination_url="https://example.com/a", active=True)
 
@@ -238,7 +247,7 @@ class EditRedirectTest(TestCase):
              patch("apps.links.views.publish_link"):
             r = self.c.patch(f"/api/links/{self.link.id}/", {"slug": "brandnew"}, format="json")
         self.assertEqual(r.status_code, 200)
-        unpub.assert_called_once_with("keepme")   # old URL must stop redirecting
+        unpub.assert_called_once_with("keepme", "trynb.cc")   # old URL must stop redirecting
 
     def test_editing_without_renaming_leaves_the_key_alone(self):
         with patch("apps.links.views.unpublish_link") as unpub, \
@@ -274,17 +283,20 @@ class LinkBaseTest(TestCase):
         access = self.c.post("/api/auth/token/", {"email": "b@example.com", "password": "testpass123"},
                              format="json").json()["access"]
         self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        _domain()
 
     def test_base_is_the_short_domain_with_no_links_yet(self):
-        r = self.c.get("/api/links/")
+        orgs = self.c.get("/api/organizations/").json()
+        org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+        r = self.c.get(f"/api/links/?organization={org}")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["results"], [])
         self.assertEqual(r.json()["base"], SHORT)
 
-    @override_settings(SHORTLINK_BASE="")
-    def test_no_short_domain_means_no_base_rather_than_the_brand_domain(self):
+    def test_no_usable_domain_means_no_base_rather_than_the_brand_domain(self):
         # Previously this fell back to <main domain>/l, which served redirects
         # from the brand we keep link abuse away from.
+        ShortDomain.objects.update(active=False)
         self.assertEqual(self.c.get("/api/links/").json()["base"], "")
 
 
@@ -296,21 +308,21 @@ class ChallengeFlagTest(TestCase):
         self.org = _workspace("owner@challenge.example")
 
     def test_defaults_to_off(self):
-        link = ShortLink.objects.create(organization=self.org, slug="c1",
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="c1",
                                         destination_url="https://example.com")
         self.assertFalse(link.challenge)
 
     def test_flag_is_published_in_the_redis_payload(self):
         import json
         from apps.links.sync import _payload
-        link = ShortLink.objects.create(organization=self.org, slug="c2",
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="c2",
                                         destination_url="https://example.com", challenge=True)
         self.assertTrue(json.loads(_payload(link))["challenge"])
 
     def test_payload_stays_false_when_off(self):
         import json
         from apps.links.sync import _payload
-        link = ShortLink.objects.create(organization=self.org, slug="c3",
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="c3",
                                         destination_url="https://example.com")
         self.assertFalse(json.loads(_payload(link))["challenge"])
 
@@ -321,14 +333,14 @@ class ForwardParamsTest(TestCase):
         self.org = _workspace("owner@forward.example")
 
     def test_defaults_to_off(self):
-        link = ShortLink.objects.create(organization=self.org, slug="f1",
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="f1",
                                         destination_url="https://form.example/s")
         self.assertFalse(link.forward_params)
 
     def test_flag_reaches_the_engine_payload(self):
         import json
         from apps.links.sync import _payload
-        link = ShortLink.objects.create(organization=self.org, slug="f2",
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="f2",
                                         destination_url="https://form.example/s",
                                         forward_params=True)
         self.assertTrue(json.loads(_payload(link))["forward_params"])
@@ -340,7 +352,7 @@ class ForwardParamKeysTest(TestCase):
         self.org = _workspace("owner@keys.example")
 
     def _link(self, keys):
-        return ShortLink.objects.create(
+        return ShortLink.objects.create(domain=_domain(), 
             organization=self.org, slug=f"k{abs(hash(keys)) % 9999}",
             destination_url="https://form.example/s",
             forward_params=True, forward_param_keys=keys)
@@ -363,14 +375,14 @@ class BlockVpnTest(TestCase):
         self.org = _workspace("owner@vpn.example")
 
     def test_defaults_to_off(self):
-        self.assertFalse(ShortLink.objects.create(
+        self.assertFalse(ShortLink.objects.create(domain=_domain(), 
             organization=self.org, slug="v1",
             destination_url="https://example.com").block_vpn)
 
     def test_flag_reaches_the_engine_payload(self):
         import json
         from apps.links.sync import _payload
-        link = ShortLink.objects.create(organization=self.org, slug="v2",
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="v2",
                                         destination_url="https://example.com", block_vpn=True)
         self.assertTrue(json.loads(_payload(link))["block_vpn"])
 
@@ -411,38 +423,38 @@ class NoBrandDomainFallbackTest(TestCase):
 
     def setUp(self):
         self.org = _workspace("owner@fallback.example")
-        self.link = ShortLink.objects.create(
+        self.link = ShortLink.objects.create(domain=_domain(), 
             organization=self.org, slug="abc", destination_url="https://example.com")
 
-    @override_settings(SHORTLINK_BASE="", FRONTEND_URL="https://www.trynobot.com")
-    def test_no_short_domain_yields_no_link_at_all(self):
+    @override_settings(FRONTEND_URL="https://www.trynobot.com")
+    def test_a_retired_domain_yields_no_link_at_all(self):
         from apps.links.serializers import ShortLinkSerializer
+        ShortDomain.objects.update(active=False)
+        self.link.refresh_from_db()
         self.assertEqual(ShortLinkSerializer(self.link).data["short_url"], "")
 
-    @override_settings(SHORTLINK_BASE="", FRONTEND_URL="https://www.trynobot.com")
+    @override_settings(FRONTEND_URL="https://www.trynobot.com")
     def test_the_brand_domain_never_appears_in_a_link(self):
         from apps.links.serializers import ShortLinkSerializer
         self.assertNotIn("trynobot.com", ShortLinkSerializer(self.link).data["short_url"])
 
-    @override_settings(SHORTLINK_BASE="", FRONTEND_URL="https://www.trynobot.com")
+    @override_settings(FRONTEND_URL="https://www.trynobot.com")
     def test_decoy_is_not_served_from_the_brand_domain(self):
         import json
         from apps.links.sync import _payload
         self.assertNotIn("trynobot.com", json.loads(_payload(self.link))["decoy_url"])
 
-    @override_settings(SHORTLINK_BASE="")
     def test_service_reports_unavailable_and_gates_the_feature(self):
         from apps.billing.models import link_shortener_enabled, redirects_available
+        ShortDomain.objects.update(active=False)
         self.assertFalse(redirects_available())
         self.assertFalse(link_shortener_enabled(self.org.id))
 
-    @override_settings(SHORTLINK_BASE=SHORT)
     def test_service_is_available_once_a_short_domain_is_set(self):
         from apps.billing.models import redirects_available
         self.assertTrue(redirects_available())
 
 
-@override_settings(SHORTLINK_BASE="")
 class RedirectsPausedApiTest(TestCase):
     def setUp(self):
         self.c = APIClient()
@@ -453,6 +465,8 @@ class RedirectsPausedApiTest(TestCase):
         self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
         orgs = self.c.get("/api/organizations/").json()
         self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+        _domain()
+        ShortDomain.objects.update(active=False)   # every domain retired
 
     def test_list_reports_an_empty_base(self):
         self.assertEqual(self.c.get("/api/links/").json()["base"], "")
@@ -463,3 +477,60 @@ class RedirectsPausedApiTest(TestCase):
                                         "destination_url": "https://example.com"}, format="json")
         self.assertEqual(r.status_code, 403)
         self.assertIn("unavailable", r.json()["detail"].lower())
+
+
+class MultiDomainTest(TestCase):
+    """Links live on a chosen domain; a slug is only meaningful with its host."""
+
+    def setUp(self):
+        self.org = _workspace("owner@multi.example")
+        self.cc = _domain("trynb.cc")
+        self.link = _domain("trynb.link", is_default=False)
+
+    def test_same_slug_can_exist_on_two_domains(self):
+        a = ShortLink.objects.create(organization=self.org, domain=self.cc, slug="promo",
+                                     destination_url="https://a.example")
+        b = ShortLink.objects.create(organization=self.org, domain=self.link, slug="promo",
+                                     destination_url="https://b.example")
+        self.assertNotEqual(a.pk, b.pk)
+
+    def test_a_slug_cannot_repeat_on_the_same_domain(self):
+        from django.db import IntegrityError, transaction
+        ShortLink.objects.create(organization=self.org, domain=self.cc, slug="dup",
+                                 destination_url="https://a.example")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ShortLink.objects.create(organization=self.org, domain=self.cc, slug="dup",
+                                     destination_url="https://b.example")
+
+    def test_redis_key_includes_the_host(self):
+        link = ShortLink.objects.create(organization=self.org, domain=self.link, slug="k1",
+                                        destination_url="https://a.example")
+        self.assertEqual(link.host_slug(), "trynb.link/k1")
+
+    def test_short_url_uses_the_links_own_domain(self):
+        from apps.links.serializers import ShortLinkSerializer
+        link = ShortLink.objects.create(organization=self.org, domain=self.link, slug="k2",
+                                        destination_url="https://a.example")
+        self.assertEqual(ShortLinkSerializer(link).data["short_url"], "https://trynb.link/k2")
+
+    def test_decoy_is_served_from_the_links_own_domain(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=self.link, slug="k3",
+                                        destination_url="https://a.example")
+        self.assertEqual(json.loads(_payload(link))["decoy_url"], "https://trynb.link/decoy.html")
+
+    def test_retiring_a_domain_kills_its_links_but_not_others(self):
+        from apps.billing.models import redirects_available
+        self.assertTrue(redirects_available())
+        ShortDomain.objects.update(active=False)
+        self.assertFalse(redirects_available())
+
+    def test_a_workspace_only_sees_shared_domains_and_its_own(self):
+        other = _workspace("someone@else.example")
+        mine = ShortDomain.objects.create(host="mine.example", organization=self.org,
+                                          active=True, verified_at=timezone.now())
+        hosts = set(ShortDomain.for_org(self.org.id).values_list("host", flat=True))
+        self.assertIn("trynb.cc", hosts)          # shared pool
+        self.assertIn(mine.host, hosts)           # own domain
+        self.assertNotIn(mine.host, set(ShortDomain.for_org(other.id).values_list("host", flat=True)))

@@ -5,8 +5,8 @@ from rest_framework.response import Response
 
 from apps.organizations.models import OrganizationMember
 from .abuse import extract_slug, process_report
-from .models import AbuseReport, ShortLink
-from .serializers import ShortLinkSerializer
+from .models import AbuseReport, ShortDomain, ShortLink
+from .serializers import ShortDomainSerializer, ShortLinkSerializer
 from .sync import publish_link, unpublish_link, scan_and_flag
 from rest_framework.permissions import IsAuthenticated
 from apps.billing.permissions import HasWorkspaceAccess
@@ -37,17 +37,29 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         domain (the old /l/ form on the main site instead of the short domain).
         """
         response = super().list(request, *args, **kwargs)
-        base = (getattr(settings, "SHORTLINK_BASE", "") or "").rstrip("/")
-        if isinstance(response.data, dict):
-            response.data["base"] = base          # "" => redirects are switched off
+        if not isinstance(response.data, dict):
+            return response
+        org = request.query_params.get("organization")
+        domains = ShortDomain.for_org(org) if org else ShortDomain.objects.none()
+        response.data["domains"] = ShortDomainSerializer(domains, many=True).data
+        # Kept for the create-form preview: the default domain, or "" when the
+        # service has no usable domain at all.
+        default = ShortDomain.default_for(org) if org else None
+        response.data["base"] = default.base if default else ""
         return response
 
-    def perform_create(self, serializer):
-        org = serializer.validated_data["organization"]
-        from apps.billing.models import link_shortener_enabled, redirect_limit, redirects_available
+    def create(self, request, *args, **kwargs):
+        # Checked before validation: with no usable domain there is nothing to
+        # validate against, and "unavailable" is a clearer answer than a field error.
+        from apps.billing.models import redirects_available
         if not redirects_available():
             raise PermissionDenied(
                 "Redirects are temporarily unavailable. No new links can be created right now.")
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        org = serializer.validated_data["organization"]
+        from apps.billing.models import link_shortener_enabled, redirect_limit
         if not link_shortener_enabled(org.id):
             raise PermissionDenied(
                 "Redirects are a paid feature. Start a plan on the Billing page to create them.")
@@ -62,21 +74,21 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         self._require_manager(serializer.instance.organization_id)
-        old_slug = serializer.instance.slug
+        old_slug, old_host = serializer.instance.slug, serializer.instance.host()
         link = serializer.save()
         # A renamed redirect must stop answering on its old slug. publish_link
         # only writes the new key, so without this the old URL keeps redirecting
         # out of Redis forever — including one renamed to disown an abused link.
-        if link.slug != old_slug:
-            unpublish_link(old_slug)
+        if link.slug != old_slug or link.host() != old_host:
+            unpublish_link(old_slug, old_host)
         scan_and_flag(link)
         publish_link(link)
 
     def perform_destroy(self, instance):
         self._require_manager(instance.organization_id)
-        slug = instance.slug
+        slug, host = instance.slug, instance.host()
         instance.delete()
-        unpublish_link(slug)
+        unpublish_link(slug, host)
 
 
 # --- Public abuse reporting (no account required) -------------------------
