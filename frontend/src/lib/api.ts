@@ -379,7 +379,7 @@ export const webhookApi = {
 
 // ---- billing ----
 export type BillingInterval = "weekly" | "monthly";
-export interface Plan { id: number; slug: string; name: string; price: number; price_monthly: number; monthly_events: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; }
+export interface Plan { id: number; slug: string; name: string; price: number; price_monthly: number; monthly_events: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; max_websites_monthly: number; max_redirects_monthly: number; }
 export interface AccessState {
   locked: boolean;
   reason: "active" | "trialing" | "trial_expired" | "period_ended" | "canceled";

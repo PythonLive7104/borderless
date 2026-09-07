@@ -52,7 +52,10 @@ export default function Links() {
   // Usage against the plan's cap. Mirrors redirect_limit() on the server, which
   // is what actually refuses the create — 0 means the tier has no allowance.
   const used = rows.length;
-  const cap = sub?.plan.max_redirects ?? 0;
+  // Cap for the interval this workspace is actually billed on, not the weekly one.
+  const cap = (sub?.interval === "monthly" && sub?.plan.max_redirects_monthly)
+    ? sub.plan.max_redirects_monthly
+    : (sub?.plan.max_redirects ?? 0);
   const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
   // Served by the API (SHORTLINK_BASE) so a brand-new workspace with no links

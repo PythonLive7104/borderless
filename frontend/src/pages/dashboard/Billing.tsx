@@ -64,6 +64,9 @@ export default function Billing() {
   const [interval, setBillingInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
   const priceOf = (p: Plan) => (monthly ? p.price_monthly : p.price);
+  // 0 on a monthly cap means "same as weekly" — mirrors Plan.redirects_for().
+  const redirectsOf = (p: Plan) => (monthly && p.max_redirects_monthly ? p.max_redirects_monthly : p.max_redirects);
+  const websitesOf = (p: Plan) => (monthly && p.max_websites_monthly ? p.max_websites_monthly : p.max_websites);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -200,8 +203,8 @@ export default function Billing() {
 
               {/* redirects / domains caps */}
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Spec icon={<ILink width={13} />} label="Redirects" value={p.max_redirects} />
-                <Spec icon={<IGlobe width={13} />} label="Domains" value={p.max_websites} />
+                <Spec icon={<ILink width={13} />} label="Redirects" value={redirectsOf(p)} />
+                <Spec icon={<IGlobe width={13} />} label="Domains" value={websitesOf(p)} />
               </div>
 
               {/* features */}
@@ -238,7 +241,7 @@ export default function Billing() {
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">
               {target.slug === sub.plan.slug ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
-              {" "}({target.max_redirects || "∞"} redirects, {target.max_websites || "∞"} domains).
+              {" "}({redirectsOf(target) || "∞"} redirects, {websitesOf(target) || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
               You'll be taken to our secure checkout (Bachs) — card, mobile money or crypto. Access starts as

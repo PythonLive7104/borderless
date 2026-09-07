@@ -1185,6 +1185,8 @@ const PLANS = [
     cta: "Get Basic",
     redirects: "2",
     domains: "5",
+    redirectsMonthly: "5",
+    domainsMonthly: "10",
     access: "7 days of access",
     groups: [{ items: BASE }]
   },
@@ -1197,6 +1199,8 @@ const PLANS = [
     highlight: true,
     redirects: "5",
     domains: "10",
+    redirectsMonthly: "10",
+    domainsMonthly: "20",
     access: "7 days of access",
     groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }]
   },
@@ -1209,6 +1213,8 @@ const PLANS = [
     ribbon: "TOP VALUE",
     redirects: "10",
     domains: "20",
+    redirectsMonthly: "20",
+    domainsMonthly: "40",
     access: "7 days of access",
     groups: [
       { items: BASE },
@@ -1298,11 +1304,11 @@ function Pricing() {
             /* @__PURE__ */ jsxs("div", { className: "border-t border-line pt-5 text-sm", children: [
               /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
                 /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Redirects" }),
-                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: p.redirects })
+                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: monthly ? p.redirectsMonthly : p.redirects })
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
                 /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Domains" }),
-                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: p.domains })
+                /* @__PURE__ */ jsx("span", { className: "font-semibold", children: monthly ? p.domainsMonthly : p.domains })
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
                 /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Access" }),
@@ -1953,7 +1959,7 @@ const Campaigns = lazy(() => import("./assets/Campaigns--os7P6Xa.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-e8019AW8.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-94JgXgqf.js"));
 const Shield = lazy(() => import("./assets/Shield-BN0AhoiG.js"));
-const Links = lazy(() => import("./assets/Links-D67d9gN4.js"));
+const Links = lazy(() => import("./assets/Links-laFD3H47.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-DbWVaBH9.js"));
 const Visitors = lazy(() => import("./assets/Visitors-BMh4aGkk.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-ADLssgZ4.js"));
@@ -1963,7 +1969,7 @@ const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
 const ApiKeys = lazy(() => import("./assets/ApiKeys-CXHXJmPy.js"));
 const Webhooks = lazy(() => import("./assets/Webhooks-CFTmFttc.js"));
-const Billing = lazy(() => import("./assets/Billing-BRPFpWws.js"));
+const Billing = lazy(() => import("./assets/Billing-CX8xA7A1.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
 const Team = lazy(() => import("./assets/Team-CWlGO-QT.js"));
 const Settings = lazy(() => import("./assets/Settings-DHvQu9ge.js"));

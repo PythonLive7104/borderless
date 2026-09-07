@@ -45,7 +45,7 @@ function Links() {
   const serviceUp = linkBase !== "";
   const linkEnabled = serviceUp && !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
   const used = rows.length;
-  const cap = (sub == null ? void 0 : sub.plan.max_redirects) ?? 0;
+  const cap = (sub == null ? void 0 : sub.interval) === "monthly" && (sub == null ? void 0 : sub.plan.max_redirects_monthly) ? sub.plan.max_redirects_monthly : (sub == null ? void 0 : sub.plan.max_redirects) ?? 0;
   const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id) => {
     var _a2;

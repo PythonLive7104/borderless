@@ -6,7 +6,8 @@ class PlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plan
         fields = ["id", "slug", "name", "price", "price_monthly", "monthly_events",
-                  "retention_days", "team_members", "max_websites", "max_redirects"]
+                  "retention_days", "team_members", "max_websites", "max_redirects",
+                  "max_websites_monthly", "max_redirects_monthly"]
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):

@@ -54,6 +54,8 @@ function Billing() {
   const [interval, setBillingInterval] = useState("weekly");
   const monthly = interval === "monthly";
   const priceOf = (p) => monthly ? p.price_monthly : p.price;
+  const redirectsOf = (p) => monthly && p.max_redirects_monthly ? p.max_redirects_monthly : p.max_redirects;
+  const websitesOf = (p) => monthly && p.max_websites_monthly ? p.max_websites_monthly : p.max_websites;
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -207,8 +209,8 @@ function Billing() {
           " days of access"
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "mt-4 grid grid-cols-2 gap-3", children: [
-          /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(ILink, { width: 13 }), label: "Redirects", value: p.max_redirects }),
-          /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(IGlobe, { width: 13 }), label: "Domains", value: p.max_websites })
+          /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(ILink, { width: 13 }), label: "Redirects", value: redirectsOf(p) }),
+          /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(IGlobe, { width: 13 }), label: "Domains", value: websitesOf(p) })
         ] }),
         /* @__PURE__ */ jsx("ul", { className: "mt-4 flex-1 space-y-2 text-sm", children: feats.map((f) => /* @__PURE__ */ jsxs("li", { className: `flex gap-2 ${f.muted ? "text-fg-dim" : "text-fg-muted"}`, children: [
           f.muted ? /* @__PURE__ */ jsx(CheckHollow, {}) : /* @__PURE__ */ jsx(CheckFull, {}),
@@ -247,9 +249,9 @@ function Billing() {
         ] }),
         " ",
         "(",
-        target.max_redirects || "∞",
+        redirectsOf(target) || "∞",
         " redirects, ",
-        target.max_websites || "∞",
+        websitesOf(target) || "∞",
         " domains)."
       ] }),
       /* @__PURE__ */ jsxs("p", { className: "rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted", children: [

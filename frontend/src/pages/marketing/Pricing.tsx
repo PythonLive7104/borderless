@@ -11,6 +11,8 @@ import CryptoIcons from "../../components/marketing/CryptoIcons";
 type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
   name: string; price: number; priceMonthly: number; tag: string; cta: string;
+  // Monthly buys a bigger allowance as well as a longer window.
+  redirectsMonthly: string; domainsMonthly: string;
   highlight?: boolean; ribbon?: string; warning?: string;
   redirects: string; domains: string; access: string;
   groups: Group[];
@@ -35,17 +37,17 @@ const PRO_ADD: string[] = [
 const PLANS: Plan[] = [
   {
     name: "Basic", price: 25, priceMonthly: 50, tag: "Smart redirects with bot detection, for solo buyers",
-    cta: "Get Basic", redirects: "2", domains: "5", access: "7 days of access",
+    cta: "Get Basic", redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", access: "7 days of access",
     groups: [{ items: BASE }],
   },
   {
     name: "Plus", price: 40, priceMonthly: 100, tag: "More links & domains for growing campaigns",
-    cta: "Get Plus", highlight: true, redirects: "5", domains: "10", access: "7 days of access",
+    cta: "Get Plus", highlight: true, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", access: "7 days of access",
     groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }],
   },
   {
     name: "Pro", price: 70, priceMonthly: 150, tag: "Top limits & dedicated support for agencies",
-    cta: "Get Pro", ribbon: "TOP VALUE", redirects: "10", domains: "20", access: "7 days of access",
+    cta: "Get Pro", ribbon: "TOP VALUE", redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", access: "7 days of access",
     groups: [
       { items: BASE },
       { label: "Everything in Plus, plus:", items: PRO_ADD, added: true },
@@ -164,8 +166,8 @@ export default function Pricing() {
               {/* limits + CTA pinned to bottom for card alignment */}
               <div className="mt-6 flex-1" />
               <div className="border-t border-line pt-5 text-sm">
-                <div className="flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{p.redirects}</span></div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Domains</span><span className="font-semibold">{p.domains}</span></div>
+                <div className="flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{monthly ? p.redirectsMonthly : p.redirects}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Domains</span><span className="font-semibold">{monthly ? p.domainsMonthly : p.domains}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>
               <Button to="/signup" variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {p.cta}</Button>

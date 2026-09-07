@@ -469,3 +469,48 @@ class SessionIdCaptureTest(TestCase):
     def test_missing_id_returns_empty_rather_than_raising(self):
         from apps.billing.views import _find_session_id
         self.assertEqual(_find_session_id({"checkout_url": "https://pay.example"}), "")
+
+
+class MonthlyCapsTest(TestCase):
+    """Monthly buys a bigger allowance, not just a longer window."""
+
+    EXPECTED = {           # slug: (weekly r/d, monthly r/d)
+        "basic": ((2, 5), (5, 10)),
+        "plus": ((5, 10), (10, 20)),
+        "pro": ((10, 20), (20, 40)),
+    }
+
+    def test_every_tier_has_the_right_caps_per_interval(self):
+        from apps.billing.models import Plan
+        for slug, ((wr, wd), (mr, md)) in self.EXPECTED.items():
+            p = Plan.objects.get(slug=slug)
+            self.assertEqual((p.redirects_for("weekly"), p.websites_for("weekly")), (wr, wd), slug)
+            self.assertEqual((p.redirects_for("monthly"), p.websites_for("monthly")), (mr, md), slug)
+
+    def test_monthly_is_never_smaller_than_weekly(self):
+        from apps.billing.models import Plan
+        for p in Plan.objects.all():
+            self.assertGreaterEqual(p.redirects_for("monthly"), p.redirects_for("weekly"), p.slug)
+            self.assertGreaterEqual(p.websites_for("monthly"), p.websites_for("weekly"), p.slug)
+
+    def test_an_unset_monthly_cap_falls_back_to_the_weekly_one(self):
+        from apps.billing.models import Plan
+        p = Plan.objects.get(slug="basic")
+        p.max_redirects_monthly = 0
+        self.assertEqual(p.redirects_for("monthly"), p.max_redirects)
+
+    def test_limits_follow_the_interval_the_workspace_is_billed_on(self):
+        from apps.billing.models import redirect_limit, website_limit
+        user = get_user_model().objects.create_user(
+            username="caps@example.com", email="caps@example.com", password="testpass123")
+        org = create_workspace(user, "Caps Co")
+
+        call_command("grant_plan", "--org", str(org.id), "--plan", "plus",
+                     "--interval", "weekly", verbosity=0)
+        self.assertEqual(redirect_limit(org.id), 5)
+        self.assertEqual(website_limit(org.id), 10)
+
+        call_command("grant_plan", "--org", str(org.id), "--plan", "plus",
+                     "--interval", "monthly", verbosity=0)
+        self.assertEqual(redirect_limit(org.id), 10)
+        self.assertEqual(website_limit(org.id), 20)

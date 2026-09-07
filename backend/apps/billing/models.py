@@ -26,9 +26,11 @@ class Plan(models.Model):
     monthly_events = models.BigIntegerField(help_text="Metered event limit per period")
     retention_days = models.IntegerField(default=30)
     team_members = models.IntegerField(default=3, help_text="0 = unlimited")
-    max_websites = models.IntegerField(default=0, help_text="Domains cap (0 = unlimited)")
+    max_websites = models.IntegerField(default=0, help_text="Domains cap on WEEKLY billing (0 = unlimited)")
+    max_websites_monthly = models.IntegerField(default=0, help_text="Domains cap on MONTHLY billing (0 = same as weekly)")
     max_campaigns = models.IntegerField(default=0, help_text="0 = unlimited")
-    max_redirects = models.IntegerField(default=0, help_text="Short-link (redirect) cap (0 = unlimited)")
+    max_redirects = models.IntegerField(default=0, help_text="Redirect cap on WEEKLY billing (0 = unlimited)")
+    max_redirects_monthly = models.IntegerField(default=0, help_text="Redirect cap on MONTHLY billing (0 = same as weekly)")
     sort = models.IntegerField(default=0)
     # Maps this plan to a product created in the Bachs dashboard. Checkout uses
     # it. Each interval is a separate Bachs product with its own price.
@@ -42,6 +44,22 @@ class Plan(models.Model):
 
     def __str__(self):
         return f"{self.name} (${self.price}/wk)"
+
+    def redirects_for(self, interval: str) -> int:
+        """Redirect cap for this tier on that interval.
+
+        Monthly buys a bigger allowance, not just a longer window, so the caps
+        are per-interval like the price. 0 on the monthly field means "same as
+        weekly", so a tier that doesn't differentiate needs no second value.
+        """
+        if interval == MONTHLY and self.max_redirects_monthly:
+            return self.max_redirects_monthly
+        return self.max_redirects
+
+    def websites_for(self, interval: str) -> int:
+        if interval == MONTHLY and self.max_websites_monthly:
+            return self.max_websites_monthly
+        return self.max_websites
 
     def price_for(self, interval: str) -> int:
         return self.price_monthly if interval == MONTHLY else self.price
@@ -188,16 +206,16 @@ def redirect_limit(organization_id) -> int:
     sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
     if not _paid_active(sub):
         return 0
-    return sub.plan.max_redirects
+    return sub.plan.redirects_for(sub.interval)
 
 
 def website_limit(organization_id) -> int:
     """Effective website/domain cap (0 = unlimited). Trial caps at 1; a paid
-    plan uses its max_websites."""
+    plan uses its cap for the interval it's on."""
     sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
     if not sub or sub.status == Subscription.Status.TRIALING:
         return TRIAL_MAX_WEBSITES
-    return sub.plan.max_websites
+    return sub.plan.websites_for(sub.interval)
 
 
 def campaign_limit(organization_id) -> int:

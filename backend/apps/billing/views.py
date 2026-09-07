@@ -104,7 +104,7 @@ class UsageView(views.APIView):
             "websites": {"used": n_sites, "limit": website_limit(org_id)},
             "domains": {"used": n_sites, "limit": website_limit(org_id)},
             "campaigns": {"used": n_campaigns, "limit": campaign_limit(org_id)},
-            "redirects": {"used": n_redirects, "limit": redirect_limit(org_id) or sub.plan.max_redirects},
+            "redirects": {"used": n_redirects, "limit": redirect_limit(org_id) or sub.plan.redirects_for(sub.interval)},
             "on_trial": on_trial,
             "retention_days": sub.plan.retention_days,
             "plan": PlanSerializer(sub.plan).data,
@@ -139,8 +139,8 @@ def _notify_activation(sub, plan):
         (
             f"Thanks for subscribing to {settings.BRAND_NAME}.\n\n"
             f"Plan: {plan.name} (${plan.price_for(sub.interval)}/{'month' if sub.interval == MONTHLY else 'week'})\n"
-            f"Included: {plan.max_redirects or '∞'} redirects, "
-            f"{plan.max_websites or '∞'} domains.\n"
+            f"Included: {plan.redirects_for(sub.interval) or '∞'} redirects, "
+            f"{plan.websites_for(sub.interval) or '∞'} domains.\n"
             f"Access through: {end:%b %d, %Y} ({sub.period_days}-day access; unused days roll over when you renew)\n\n"
             f"Manage your subscription any time at {settings.FRONTEND_URL}/dashboard/billing"
         ),
