@@ -20,7 +20,8 @@ def _org_ids(user):
 
 
 def _events(user, params):
-    qs = TrafficEvent.objects.filter(website__organization_id__in=_org_ids(user))
+    qs = TrafficEvent.objects.select_related("website").filter(
+        website__organization_id__in=_org_ids(user))
     if org := params.get("organization"):
         qs = qs.filter(website__organization_id=org)
     if website := params.get("website"):
@@ -107,7 +108,8 @@ class VisitorListView(generics.ListAPIView):
 
     def get_queryset(self):
         p = self.request.query_params
-        qs = Visitor.objects.filter(website__organization_id__in=_org_ids(self.request.user))
+        qs = Visitor.objects.select_related("website").filter(
+            website__organization_id__in=_org_ids(self.request.user))
         if org := p.get("organization"):
             qs = qs.filter(website__organization_id=org)
         if website := p.get("website"):

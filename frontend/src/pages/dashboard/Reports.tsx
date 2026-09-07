@@ -4,6 +4,7 @@ import { analyticsApi, downloadReportCsv, type ReportRow } from "../../lib/api";
 import RangeTabs from "../../components/dashboard/RangeTabs";
 import NoData from "../../components/dashboard/NoData";
 import PageNote from "../../components/dashboard/PageNote";
+import WebsitePicker from "../../components/dashboard/WebsitePicker";
 
 const DIM_LABELS: Record<string, string> = {
   country: "Country", device: "Device", browser: "Browser", os: "OS",
@@ -14,6 +15,7 @@ const DIM_LABELS: Record<string, string> = {
 export default function Reports() {
   const { current } = useWorkspace();
   const [range, setRange] = useState("30d");
+  const [website, setWebsite] = useState("");
   const [dimension, setDimension] = useState("country");
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [dims, setDims] = useState<string[]>([]);
@@ -22,8 +24,8 @@ export default function Reports() {
   useEffect(() => {
     if (!current) return;
     setLoading(true);
-    analyticsApi.report(current.id, dimension, range).then((d) => { setRows(d.rows); setDims(d.dimensions); }).finally(() => setLoading(false));
-  }, [current?.id, dimension, range]);
+    analyticsApi.report(current.id, dimension, range, website).then((d) => { setRows(d.rows); setDims(d.dimensions); }).finally(() => setLoading(false));
+  }, [current?.id, dimension, range, website]);
 
   return (
     <div>
@@ -33,6 +35,7 @@ export default function Reports() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-extrabold tracking-tight">Reports</h1>
           <p className="mt-1 text-sm text-fg-muted">Break traffic down by any dimension and export it.</p></div>
+        {current && <WebsitePicker orgId={current.id} value={website} onChange={setWebsite} />}
         <RangeTabs value={range} onChange={setRange} />
       </div>
 
@@ -42,7 +45,7 @@ export default function Reports() {
           className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand">
           {(dims.length ? dims : Object.keys(DIM_LABELS)).map((d) => <option key={d} value={d}>{DIM_LABELS[d] || d}</option>)}
         </select>
-        <button onClick={() => current && downloadReportCsv(current.id, dimension, range)}
+        <button onClick={() => current && downloadReportCsv(current.id, dimension, range, website)}
           className="ml-auto rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold hover:border-brand/40">↓ Export CSV</button>
       </div>
 

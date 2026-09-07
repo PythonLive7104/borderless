@@ -5,6 +5,7 @@ import { c as useWorkspace, z as analyticsApi } from "../entry-server.js";
 import { C as ClassBadge } from "./ClassBadge-B1OvS151.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import { P as Pager } from "./Pager-Dnb3DgGO.js";
+import { W as WebsitePicker } from "./WebsitePicker-Bej3wDvm.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
@@ -19,10 +20,12 @@ function ClickLog() {
   const { current } = useWorkspace();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [f, setF] = useState({ search: "", classification: "", action: "", type: "", min_risk: "" });
+  const [f, setF] = useState({ search: "", website: "", classification: "", action: "", type: "", min_risk: "" });
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const [multiSite, setMultiSite] = useState(false);
+  const showSite = multiSite && !f.website;
   async function load() {
     if (!current) return;
     setLoading(true);
@@ -51,6 +54,15 @@ function ClickLog() {
     /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Every classified event, newest first." }),
     /* @__PURE__ */ jsxs("div", { className: "mt-5 flex flex-wrap gap-2", children: [
       /* @__PURE__ */ jsx("input", { value: f.search, onChange: set("search"), placeholder: "Search IP, URL, visitor…", className: "w-56 rounded-xl border border-line bg-white px-4 py-2 text-sm outline-none focus:border-brand" }),
+      current && /* @__PURE__ */ jsx(
+        WebsitePicker,
+        {
+          orgId: current.id,
+          value: f.website,
+          onChange: (website) => setF({ ...f, website }),
+          onMulti: setMultiSite
+        }
+      ),
       /* @__PURE__ */ jsxs("select", { value: f.classification, onChange: set("classification"), className: "rounded-xl border border-line bg-white px-3 py-2 text-sm", children: [
         /* @__PURE__ */ jsx("option", { value: "", children: "All classes" }),
         /* @__PURE__ */ jsx("option", { value: "human", children: "Human" }),
@@ -78,6 +90,7 @@ function ClickLog() {
         /* @__PURE__ */ jsx("thead", { className: "border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim", children: /* @__PURE__ */ jsxs("tr", { children: [
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Time" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Type" }),
+          showSite && /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Site" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Country" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Device" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Risk" }),
@@ -87,6 +100,7 @@ function ClickLog() {
         /* @__PURE__ */ jsx("tbody", { className: "divide-y divide-line", children: rows.map((e) => /* @__PURE__ */ jsxs("tr", { className: "hover:bg-bg-soft", children: [
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3 whitespace-nowrap text-fg-muted", children: new Date(e.created_at).toLocaleString() }),
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3 capitalize", children: e.type }),
+          showSite && /* @__PURE__ */ jsx("td", { className: "px-4 py-3 text-fg-muted", children: e.website_name || "—" }),
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: e.country || "—" }),
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3 capitalize", children: e.device || "—" }),
           /* @__PURE__ */ jsx("td", { className: "px-4 py-3 font-mono font-bold", children: e.risk_score ?? "—" }),

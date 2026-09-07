@@ -5,6 +5,7 @@ import { analyticsApi, type EventRow } from "../../lib/api";
 import ClassBadge from "../../components/ui/ClassBadge";
 import NoData from "../../components/dashboard/NoData";
 import Pager from "../../components/ui/Pager";
+import WebsitePicker from "../../components/dashboard/WebsitePicker";
 
 const PAGE_SIZE = 25;
 
@@ -17,10 +18,13 @@ export default function ClickLog() {
   const { current } = useWorkspace();
   const [rows, setRows] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [f, setF] = useState({ search: "", classification: "", action: "", type: "", min_risk: "" });
+  const [f, setF] = useState({ search: "", website: "", classification: "", action: "", type: "", min_risk: "" });
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const set = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
+  // Only worth a column when several sites are mixed together in the list.
+  const [multiSite, setMultiSite] = useState(false);
+  const showSite = multiSite && !f.website;
 
   async function load() {
     if (!current) return;
@@ -42,6 +46,8 @@ export default function ClickLog() {
 
       <div className="mt-5 flex flex-wrap gap-2">
         <input value={f.search} onChange={set("search")} placeholder="Search IP, URL, visitor…" className="w-56 rounded-xl border border-line bg-white px-4 py-2 text-sm outline-none focus:border-brand" />
+        {current && <WebsitePicker orgId={current.id} value={f.website}
+          onChange={(website) => setF({ ...f, website })} onMulti={setMultiSite} />}
         <select value={f.classification} onChange={set("classification")} className="rounded-xl border border-line bg-white px-3 py-2 text-sm">
           <option value="">All classes</option><option value="human">Human</option><option value="suspicious">Suspicious</option><option value="bot">Bot</option><option value="fraud">Fraud</option>
         </select>
@@ -62,13 +68,14 @@ export default function ClickLog() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
-                <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">Device</th><th className="px-4 py-3">Risk</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Action</th></tr>
+                <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Type</th>{showSite && <th className="px-4 py-3">Site</th>}<th className="px-4 py-3">Country</th><th className="px-4 py-3">Device</th><th className="px-4 py-3">Risk</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.map((e) => (
                   <tr key={e.id} className="hover:bg-bg-soft">
                     <td className="px-4 py-3 whitespace-nowrap text-fg-muted">{new Date(e.created_at).toLocaleString()}</td>
                     <td className="px-4 py-3 capitalize">{e.type}</td>
+                    {showSite && <td className="px-4 py-3 text-fg-muted">{e.website_name || "—"}</td>}
                     <td className="px-4 py-3">{e.country || "—"}</td>
                     <td className="px-4 py-3 capitalize">{e.device || "—"}</td>
                     <td className="px-4 py-3 font-mono font-bold">{e.risk_score ?? "—"}</td>

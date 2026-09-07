@@ -303,12 +303,13 @@ export interface Overview {
 export interface VisitorRow {
   id: number; visitor_id: string; ip: string | null; country: string; device: string; browser: string; os: string;
   first_seen: string; last_seen: string; events: number; max_risk: number | null; fingerprint: string;
+  website_name: string;
 }
 export interface EventRow {
   id: number; type: string; visitor_ref: string; ip: string | null; country: string;
   device: string; browser: string; os: string; url: string; referrer: string;
   risk_score: number | null; classification: string; action: string; tag: string;
-  fingerprint: string; fp_signals: string[]; ja3: string; utm_campaign: string; created_at: string;
+  fingerprint: string; fp_signals: string[]; ja3: string; utm_campaign: string; website_name: string; created_at: string;
 }
 export interface SourceRow { key: string; events: number; human: number; quality: number; }
 
@@ -316,21 +317,25 @@ const qs = (o: Record<string, any>) =>
   Object.entries(o).filter(([, v]) => v !== "" && v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 
 export const analyticsApi = {
-  overview: (orgId: number, range = "7d") => http.get<Overview>(`/analytics/overview/?${qs({ organization: orgId, range })}`),
+  overview: (orgId: number, range = "7d", website = "") =>
+    http.get<Overview>(`/analytics/overview/?${qs({ organization: orgId, range, website })}`),
   visitors: (orgId: number, params: Record<string, any> = {}) =>
     http.get<{ count: number; results: VisitorRow[] }>(`/analytics/visitors/?${qs({ organization: orgId, ...params })}`),
   visitor: (id: number) => http.get<{ visitor: VisitorRow; sessions: number; events: EventRow[] }>(`/analytics/visitors/${id}/`),
   events: (orgId: number, params: Record<string, any> = {}) =>
     http.get<{ count: number; results: EventRow[] }>(`/analytics/events/?${qs({ organization: orgId, ...params })}`),
-  sources: (orgId: number, range = "7d") => http.get<{ sources: SourceRow[] }>(`/analytics/sources/?${qs({ organization: orgId, range })}`),
-  report: (orgId: number, dimension: string, range = "7d") =>
-    http.get<{ dimension: string; rows: ReportRow[]; dimensions: string[] }>(`/analytics/report/?${qs({ organization: orgId, dimension, range })}`),
+  sources: (orgId: number, range = "7d", website = "") =>
+    http.get<{ sources: SourceRow[] }>(`/analytics/sources/?${qs({ organization: orgId, range, website })}`),
+  report: (orgId: number, dimension: string, range = "7d", website = "") =>
+    http.get<{ dimension: string; rows: ReportRow[]; dimensions: string[] }>(`/analytics/report/?${qs({ organization: orgId, dimension, range, website })}`),
 };
 export interface ReportRow { key: string; events: number; visitors: number; human: number; conversions: number; quality: number; }
 
 // CSV download (uses the stored token; browser saves the file)
-export async function downloadReportCsv(orgId: number, dimension: string, range: string) {
-  const res = await fetch(`/api/analytics/report/?${qs({ organization: orgId, dimension, range, export: "csv" })}`, {
+export async function downloadReportCsv(orgId: number, dimension: string, range: string, website = "") {
+  // Exports what's on screen: a CSV covering the whole workspace while the page
+  // shows one site would be quietly wrong.
+  const res = await fetch(`/api/analytics/report/?${qs({ organization: orgId, dimension, range, website, export: "csv" })}`, {
     headers: tokens.access ? { Authorization: `Bearer ${tokens.access}` } : {},
   });
   const blob = await res.blob();

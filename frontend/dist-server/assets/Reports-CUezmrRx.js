@@ -4,6 +4,7 @@ import { c as useWorkspace, z as analyticsApi, Q as downloadReportCsv } from "..
 import { R as RangeTabs } from "./RangeTabs-BPSt5JoP.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
+import { W as WebsitePicker } from "./WebsitePicker-Bej3wDvm.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
@@ -21,6 +22,7 @@ const DIM_LABELS = {
 function Reports() {
   const { current } = useWorkspace();
   const [range, setRange] = useState("30d");
+  const [website, setWebsite] = useState("");
   const [dimension, setDimension] = useState("country");
   const [rows, setRows] = useState([]);
   const [dims, setDims] = useState([]);
@@ -28,11 +30,11 @@ function Reports() {
   useEffect(() => {
     if (!current) return;
     setLoading(true);
-    analyticsApi.report(current.id, dimension, range).then((d) => {
+    analyticsApi.report(current.id, dimension, range, website).then((d) => {
       setRows(d.rows);
       setDims(d.dimensions);
     }).finally(() => setLoading(false));
-  }, [current == null ? void 0 : current.id, dimension, range]);
+  }, [current == null ? void 0 : current.id, dimension, range, website]);
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsxs(PageNote, { id: "reports", children: [
       "Build a quick report by choosing what to group your traffic by — country, device, source, and so on. You'll see visitors, quality and conversions for each. Click ",
@@ -44,6 +46,7 @@ function Reports() {
         /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Reports" }),
         /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Break traffic down by any dimension and export it." })
       ] }),
+      current && /* @__PURE__ */ jsx(WebsitePicker, { orgId: current.id, value: website, onChange: setWebsite }),
       /* @__PURE__ */ jsx(RangeTabs, { value: range, onChange: setRange })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "mt-5 flex flex-wrap items-center gap-2", children: [
@@ -60,7 +63,7 @@ function Reports() {
       /* @__PURE__ */ jsx(
         "button",
         {
-          onClick: () => current && downloadReportCsv(current.id, dimension, range),
+          onClick: () => current && downloadReportCsv(current.id, dimension, range, website),
           className: "ml-auto rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold hover:border-brand/40",
           children: "↓ Export CSV"
         }

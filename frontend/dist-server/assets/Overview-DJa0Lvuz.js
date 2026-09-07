@@ -5,6 +5,7 @@ import { ResponsiveContainer, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, A
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { Link } from "react-router-dom";
 import { x as websiteApi, y as linkApi, e as IGlobe, i as ILink, c as useWorkspace, z as analyticsApi } from "../entry-server.js";
+import { W as WebsitePicker } from "./WebsitePicker-Bej3wDvm.js";
 import { R as RangeTabs } from "./RangeTabs-BPSt5JoP.js";
 import { S as StatCard } from "./StatCard-ChLtMs89.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
@@ -93,13 +94,14 @@ function Panel({ title, children }) {
 function Overview() {
   const { current } = useWorkspace();
   const [range, setRange] = useState("7d");
+  const [website, setWebsite] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   useLivePoll((silent) => {
     if (!current) return;
     if (!silent) setLoading(true);
-    analyticsApi.overview(current.id, range).then(setData).finally(() => setLoading(false));
-  }, [current == null ? void 0 : current.id, range]);
+    analyticsApi.overview(current.id, range, website).then(setData).finally(() => setLoading(false));
+  }, [current == null ? void 0 : current.id, range, website]);
   const t = data == null ? void 0 : data.totals;
   const hasData = ((t == null ? void 0 : t.events) ?? 0) > 0;
   return /* @__PURE__ */ jsxs("div", { children: [
@@ -116,10 +118,14 @@ function Overview() {
         /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Dashboard" }),
         /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
           current == null ? void 0 : current.name,
-          " · traffic overview"
+          " · traffic overview",
+          website && " · one website"
         ] })
       ] }),
-      /* @__PURE__ */ jsx(RangeTabs, { value: range, onChange: setRange })
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
+        current && /* @__PURE__ */ jsx(WebsitePicker, { orgId: current.id, value: website, onChange: setWebsite }),
+        /* @__PURE__ */ jsx(RangeTabs, { value: range, onChange: setRange })
+      ] })
     ] }),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-20", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsxs("div", { className: "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4", children: [

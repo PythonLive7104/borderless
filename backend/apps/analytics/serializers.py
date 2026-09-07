@@ -5,19 +5,21 @@ from apps.traffic.models import Visitor, TrafficEvent
 class EventSerializer(serializers.ModelSerializer):
     utm_campaign = serializers.CharField(source="session.utm_campaign", read_only=True)
     visitor_ref = serializers.CharField(source="visitor.visitor_id", read_only=True)
+    website_name = serializers.CharField(source="website.name", read_only=True, default="")
 
     class Meta:
         model = TrafficEvent
         fields = ["id", "type", "visitor_ref", "ip", "country", "device", "browser", "os",
                   "url", "referrer", "risk_score", "classification", "action", "tag",
-                  "fingerprint", "fp_signals", "ja3", "utm_campaign", "created_at"]
+                  "fingerprint", "fp_signals", "ja3", "utm_campaign", "website_name", "created_at"]
 
 
 class VisitorSerializer(serializers.ModelSerializer):
     events = serializers.IntegerField(source="event_count", read_only=True)
     max_risk = serializers.IntegerField(read_only=True)
+    website_name = serializers.CharField(source="website.name", read_only=True, default="")
 
     class Meta:
         model = Visitor
         fields = ["id", "visitor_id", "ip", "country", "device", "browser", "os", "fingerprint",
-                  "first_seen", "last_seen", "events", "max_risk"]
+                  "first_seen", "last_seen", "events", "max_risk", "website_name"]

@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import PageNote from "../../components/dashboard/PageNote";
 import GetStarted from "../../components/dashboard/GetStarted";
+import WebsitePicker from "../../components/dashboard/WebsitePicker";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type Overview as OverviewT } from "../../lib/api";
 import RangeTabs from "../../components/dashboard/RangeTabs";
@@ -29,14 +30,15 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 export default function Overview() {
   const { current } = useWorkspace();
   const [range, setRange] = useState("7d");
+  const [website, setWebsite] = useState("");
   const [data, setData] = useState<OverviewT | null>(null);
   const [loading, setLoading] = useState(true);
 
   useLivePoll((silent) => {
     if (!current) return;
     if (!silent) setLoading(true);
-    analyticsApi.overview(current.id, range).then(setData).finally(() => setLoading(false));
-  }, [current?.id, range]);
+    analyticsApi.overview(current.id, range, website).then(setData).finally(() => setLoading(false));
+  }, [current?.id, range, website]);
 
   const t = data?.totals;
   const hasData = (t?.events ?? 0) > 0;
@@ -48,9 +50,12 @@ export default function Overview() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-fg-muted">{current?.name} · traffic overview</p>
+          <p className="mt-1 text-sm text-fg-muted">{current?.name} · traffic overview{website && " · one website"}</p>
         </div>
-        <RangeTabs value={range} onChange={setRange} />
+        <div className="flex flex-wrap items-center gap-2">
+          {current && <WebsitePicker orgId={current.id} value={website} onChange={setWebsite} />}
+          <RangeTabs value={range} onChange={setRange} />
+        </div>
       </div>
 
       {loading ? (

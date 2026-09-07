@@ -4,6 +4,7 @@ import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type VisitorRow } from "../../lib/api";
 import NoData from "../../components/dashboard/NoData";
+import WebsitePicker from "../../components/dashboard/WebsitePicker";
 import Pager from "../../components/ui/Pager";
 
 const PAGE_SIZE = 25;
@@ -17,6 +18,7 @@ export default function Visitors() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [device, setDevice] = useState("");
+  const [website, setWebsite] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
 
@@ -24,12 +26,12 @@ export default function Visitors() {
     if (!current) return;
     setLoading(true);
     try {
-      const res = await analyticsApi.visitors(current.id, { search, device, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+      const res = await analyticsApi.visitors(current.id, { search, device, website, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
       setRows(res.results); setTotal(res.count);
     } finally { setLoading(false); }
   }
-  useEffect(() => { setPage(0); /* eslint-disable-next-line */ }, [search, device]);
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [current?.id, search, device, page]);
+  useEffect(() => { setPage(0); /* eslint-disable-next-line */ }, [search, device, website]);
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [current?.id, search, device, website, page]);
 
   return (
     <div>
@@ -40,6 +42,7 @@ export default function Visitors() {
       <div className="mt-5 flex flex-wrap gap-2">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search visitor ID or IP…"
           className="w-64 rounded-xl border border-line bg-white px-4 py-2 text-sm outline-none focus:border-brand" />
+        {current && <WebsitePicker orgId={current.id} value={website} onChange={setWebsite} />}
         <select value={device} onChange={(e) => setDevice(e.target.value)}
           className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand">
           <option value="">All devices</option><option value="mobile">Mobile</option><option value="desktop">Desktop</option><option value="tablet">Tablet</option>

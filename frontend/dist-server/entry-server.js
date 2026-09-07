@@ -231,15 +231,15 @@ const ruleApi = {
 };
 const qs = (o) => Object.entries(o).filter(([, v]) => v !== "" && v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 const analyticsApi = {
-  overview: (orgId, range = "7d") => http.get(`/analytics/overview/?${qs({ organization: orgId, range })}`),
+  overview: (orgId, range = "7d", website = "") => http.get(`/analytics/overview/?${qs({ organization: orgId, range, website })}`),
   visitors: (orgId, params = {}) => http.get(`/analytics/visitors/?${qs({ organization: orgId, ...params })}`),
   visitor: (id) => http.get(`/analytics/visitors/${id}/`),
   events: (orgId, params = {}) => http.get(`/analytics/events/?${qs({ organization: orgId, ...params })}`),
-  sources: (orgId, range = "7d") => http.get(`/analytics/sources/?${qs({ organization: orgId, range })}`),
-  report: (orgId, dimension, range = "7d") => http.get(`/analytics/report/?${qs({ organization: orgId, dimension, range })}`)
+  sources: (orgId, range = "7d", website = "") => http.get(`/analytics/sources/?${qs({ organization: orgId, range, website })}`),
+  report: (orgId, dimension, range = "7d", website = "") => http.get(`/analytics/report/?${qs({ organization: orgId, dimension, range, website })}`)
 };
-async function downloadReportCsv(orgId, dimension, range) {
-  const res = await fetch(`/api/analytics/report/?${qs({ organization: orgId, dimension, range, export: "csv" })}`, {
+async function downloadReportCsv(orgId, dimension, range, website = "") {
+  const res = await fetch(`/api/analytics/report/?${qs({ organization: orgId, dimension, range, website, export: "csv" })}`, {
     headers: tokens.access ? { Authorization: `Bearer ${tokens.access}` } : {}
   });
   const blob = await res.blob();
@@ -1952,7 +1952,7 @@ const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
 const DashboardLayout = lazy(() => import("./assets/DashboardLayout-HS1wGJvX.js"));
-const Overview = lazy(() => import("./assets/Overview-BBpL0_9e.js"));
+const Overview = lazy(() => import("./assets/Overview-DJa0Lvuz.js"));
 const Websites = lazy(() => import("./assets/Websites-DJuuzOxc.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-Bf-7FWvI.js"));
 const Campaigns = lazy(() => import("./assets/Campaigns--os7P6Xa.js"));
@@ -1961,9 +1961,9 @@ const TrafficRules = lazy(() => import("./assets/TrafficRules-94JgXgqf.js"));
 const Shield = lazy(() => import("./assets/Shield-BN0AhoiG.js"));
 const Links = lazy(() => import("./assets/Links-laFD3H47.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-DbWVaBH9.js"));
-const Visitors = lazy(() => import("./assets/Visitors-BMh4aGkk.js"));
+const Visitors = lazy(() => import("./assets/Visitors-Dnde2L6d.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-ADLssgZ4.js"));
-const ClickLog = lazy(() => import("./assets/ClickLog-DTYsEUc_.js"));
+const ClickLog = lazy(() => import("./assets/ClickLog-Ci5VY1dZ.js"));
 const TrafficSources = lazy(() => import("./assets/TrafficSources-BArXg2R-.js"));
 const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
@@ -1973,7 +1973,7 @@ const Billing = lazy(() => import("./assets/Billing-CX8xA7A1.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
 const Team = lazy(() => import("./assets/Team-CWlGO-QT.js"));
 const Settings = lazy(() => import("./assets/Settings-DHvQu9ge.js"));
-const Reports = lazy(() => import("./assets/Reports-BZsPLPwv.js"));
+const Reports = lazy(() => import("./assets/Reports-CUezmrRx.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
 const AdminOverview = lazy(() => import("./assets/AdminOverview-Bi8GBsOo.js"));
 const AdminUsers = lazy(() => import("./assets/AdminUsers-BS8Mquko.js"));

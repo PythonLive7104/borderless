@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { c as useWorkspace, z as analyticsApi } from "../entry-server.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
+import { W as WebsitePicker } from "./WebsitePicker-Bej3wDvm.js";
 import { P as Pager } from "./Pager-Dnb3DgGO.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
@@ -15,13 +16,14 @@ function Visitors() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [device, setDevice] = useState("");
+  const [website, setWebsite] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   async function load() {
     if (!current) return;
     setLoading(true);
     try {
-      const res = await analyticsApi.visitors(current.id, { search, device, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+      const res = await analyticsApi.visitors(current.id, { search, device, website, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
       setRows(res.results);
       setTotal(res.count);
     } finally {
@@ -30,11 +32,11 @@ function Visitors() {
   }
   useEffect(() => {
     setPage(0);
-  }, [search, device]);
+  }, [search, device, website]);
   useEffect(() => {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
-  }, [current == null ? void 0 : current.id, search, device, page]);
+  }, [current == null ? void 0 : current.id, search, device, website, page]);
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsxs(PageNote, { id: "visitors", children: [
       "Everyone who visits your sites appears here with a ",
@@ -57,6 +59,7 @@ function Visitors() {
           className: "w-64 rounded-xl border border-line bg-white px-4 py-2 text-sm outline-none focus:border-brand"
         }
       ),
+      current && /* @__PURE__ */ jsx(WebsitePicker, { orgId: current.id, value: website, onChange: setWebsite }),
       /* @__PURE__ */ jsxs(
         "select",
         {
