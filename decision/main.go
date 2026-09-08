@@ -912,8 +912,6 @@ const challengeHTML = `<!doctype html>
  #label{position:relative;z-index:1;mix-blend-mode:normal}
  #hold.armed #label{color:#fff}
  #pct{display:block;margin-top:.75rem;font-size:.8rem;color:#8b93a3;font-variant-numeric:tabular-nums}
- .tag{display:block;margin-top:1.25rem;font-size:.68rem;letter-spacing:.08em;
-  text-transform:uppercase;color:#8b93a3}
  noscript p{color:#dc2626}
 </style></head><body>
  <main class="card">
@@ -924,7 +922,6 @@ const challengeHTML = `<!doctype html>
   </button>
   <span id="pct" role="status" aria-live="polite">0%%</span>
   <noscript><p>JavaScript is required to continue.</p></noscript>
-  <span class="tag">Protected by TryNoBot</span>
  </main>
  <script>
   // The destination is wired up in JS and only after a real, timed hold, so a
