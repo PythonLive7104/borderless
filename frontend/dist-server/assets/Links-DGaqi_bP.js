@@ -15,7 +15,8 @@ const randSlug = (len = 10) => {
   for (let i = 0; i < len; i++) s += SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)];
   return s;
 };
-const clampLen = (n) => Math.min(48, Math.max(6, n || 6));
+const MAX_SLUG = 200;
+const clampLen = (n) => Math.min(MAX_SLUG, Math.max(6, n || 6));
 const BOT_OPTIONS = [
   { value: "decoy", label: "A decoy page", desc: "Looks like a real page and wastes their time." },
   { value: "notfound", label: "Nothing — a 404", desc: "Looks like the link doesn't exist." },
@@ -342,7 +343,7 @@ function Links() {
             {
               type: "range",
               min: 6,
-              max: 48,
+              max: MAX_SLUG,
               value: clampLen(form.slug.length),
               onChange: (e) => setForm({ ...form, slug: randSlug(Number(e.target.value)) }),
               className: "min-w-0 flex-1 accent-brand"
@@ -350,7 +351,8 @@ function Links() {
           ),
           /* @__PURE__ */ jsxs("span", { className: "w-12 shrink-0 text-right text-xs tabular-nums text-fg-dim", children: [
             form.slug.length,
-            "/48"
+            "/",
+            MAX_SLUG
           ] }),
           /* @__PURE__ */ jsx(Button, { type: "button", variant: "outline", onClick: () => setForm({ ...form, slug: randSlug(clampLen(form.slug.length || 10)) }), children: "Regenerate" })
         ] }),

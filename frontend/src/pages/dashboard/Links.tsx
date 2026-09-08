@@ -16,7 +16,8 @@ const randSlug = (len = 10) => {
   for (let i = 0; i < len; i++) s += SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)];
   return s;
 };
-const clampLen = (n: number) => Math.min(48, Math.max(6, n || 6));
+const MAX_SLUG = 200;
+const clampLen = (n: number) => Math.min(MAX_SLUG, Math.max(6, n || 6));
 
 const BOT_OPTIONS: { value: BotAction; label: string; desc: string }[] = [
   { value: "decoy", label: "A decoy page", desc: "Looks like a real page and wastes their time." },
@@ -285,10 +286,10 @@ export default function Links() {
             <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="offer"
               className="w-full rounded-xl border border-line bg-white px-4 py-2.5 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
             <div className="mt-2 flex items-center gap-3">
-              <input type="range" min={6} max={48} value={clampLen(form.slug.length)}
+              <input type="range" min={6} max={MAX_SLUG} value={clampLen(form.slug.length)}
                 onChange={(e) => setForm({ ...form, slug: randSlug(Number(e.target.value)) })}
                 className="min-w-0 flex-1 accent-brand" />
-              <span className="w-12 shrink-0 text-right text-xs tabular-nums text-fg-dim">{form.slug.length}/48</span>
+              <span className="w-12 shrink-0 text-right text-xs tabular-nums text-fg-dim">{form.slug.length}/{MAX_SLUG}</span>
               <Button type="button" variant="outline" onClick={() => setForm({ ...form, slug: randSlug(clampLen(form.slug.length || 10)) })}>Regenerate</Button>
             </div>
             <p className="mt-1 text-xs text-fg-dim">Drag for a random ending, or type your own. Longer is harder to guess.</p>

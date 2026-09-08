@@ -73,7 +73,7 @@ class ShortLink(models.Model):
     # workspaces on different domains can both use /promo.
     domain = models.ForeignKey(ShortDomain, on_delete=models.PROTECT, null=True, blank=True,
                                related_name="links")
-    slug = models.SlugField(max_length=64, default=gen_slug)
+    slug = models.SlugField(max_length=200, default=gen_slug)
     destination_url = models.URLField(max_length=2000)
     title = models.CharField(max_length=120, blank=True)
     active = models.BooleanField(default=True)
@@ -188,7 +188,7 @@ class AbuseReport(models.Model):
     # Kept even if the link is deleted, so the audit trail survives a cleanup.
     link = models.ForeignKey(ShortLink, on_delete=models.SET_NULL, null=True, blank=True,
                              related_name="abuse_reports")
-    slug = models.CharField(max_length=64, blank=True, db_index=True)
+    slug = models.CharField(max_length=200, blank=True, db_index=True)
     reported_url = models.CharField(max_length=2000)
     reason = models.CharField(max_length=16, choices=Reason.choices, default=Reason.PHISHING)
     details = models.TextField(blank=True)

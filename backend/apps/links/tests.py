@@ -548,3 +548,34 @@ class MultiDomainTest(TestCase):
         self.assertIn("trynb.cc", hosts)          # shared pool
         self.assertIn(mine.host, hosts)           # own domain
         self.assertNotIn(mine.host, set(ShortDomain.for_org(other.id).values_list("host", flat=True)))
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class LongSlugTest(TestCase):
+    """Slugs go up to 200 characters, and every layer has to agree."""
+
+    def setUp(self):
+        self.org = _workspace("owner@longslug.example")
+
+    def test_a_200_character_slug_is_accepted(self):
+        slug = "a" * 200
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug=slug,
+                                        destination_url="https://example.com")
+        link.refresh_from_db()
+        self.assertEqual(len(link.slug), 200)
+
+    def test_the_serializer_allows_the_same_length(self):
+        from apps.links.serializers import ShortLinkSerializer
+        f = ShortLinkSerializer().fields["slug"]
+        self.assertGreaterEqual(f.max_length, 200)
+
+    def test_a_long_slug_still_parses_out_of_a_reported_url(self):
+        # The abuse parser had its own 64-char ceiling; a long slug would have
+        # been silently unmatchable, so a report on it could never be actioned.
+        from apps.links.abuse import extract_slug
+        slug = "b" * 200
+        self.assertEqual(extract_slug(f"{SHORT}/{slug}"), slug)
+
+    def test_something_longer_than_the_limit_is_not_treated_as_a_slug(self):
+        from apps.links.abuse import extract_slug
+        self.assertEqual(extract_slug(f"{SHORT}/{'c' * 201}"), "")

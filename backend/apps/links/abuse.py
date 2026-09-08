@@ -21,7 +21,7 @@ from django.utils import timezone
 from .models import AbuseReport, ShortLink
 from .sync import publish_link, scan_and_flag
 
-SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,200}$")
 
 
 def _our_hosts() -> set:
