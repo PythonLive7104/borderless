@@ -20,6 +20,8 @@ ENV VITE_TAWK_SRC=$VITE_TAWK_SRC
 RUN npm run build
 
 FROM nginx:1.27-alpine
+# 00- prefix: real_ip must be in place for every server block that follows.
+COPY deploy/cloudflare-realip.conf /etc/nginx/conf.d/00-cloudflare-realip.conf
 COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY deploy/proxy.inc /etc/nginx/proxy.inc
 # Optional: serve the Link Shortener on a separate short domain (SHORT_DOMAIN).

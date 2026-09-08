@@ -2,12 +2,44 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { c as useWorkspace, A as useDialog, E as ipFilterApi, z as analyticsApi } from "../entry-server.js";
+import { c as useWorkspace, A as useDialog, z as analyticsApi, E as ipFilterApi } from "../entry-server.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import { W as WebsitePicker } from "./WebsitePicker-Bej3wDvm.js";
 import { P as Pager } from "./Pager-Dnb3DgGO.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
+function IpRuleToggle({ value, busy, onChange }) {
+  const seg = (key, label, active) => {
+    const on = value === key;
+    return /* @__PURE__ */ jsx(
+      "button",
+      {
+        type: "button",
+        disabled: busy,
+        "aria-pressed": on,
+        onClick: () => onChange(on ? null : key),
+        className: `px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${on ? active : "text-fg-dim hover:bg-bg-mute hover:text-fg"}`,
+        children: label
+      },
+      label
+    );
+  };
+  return /* @__PURE__ */ jsxs(
+    "span",
+    {
+      className: `inline-flex overflow-hidden rounded-full border border-line bg-white ${busy ? "opacity-60" : ""}`,
+      role: "group",
+      "aria-label": "IP rule",
+      children: [
+        seg("deny", "Block", "bg-danger text-white"),
+        /* @__PURE__ */ jsx("span", { className: "w-px bg-line", "aria-hidden": "true" }),
+        seg(null, "Auto", "bg-bg-mute text-fg"),
+        /* @__PURE__ */ jsx("span", { className: "w-px bg-line", "aria-hidden": "true" }),
+        seg("allow", "Allow", "bg-success text-white")
+      ]
+    }
+  );
+}
 const PAGE_SIZE = 25;
 const riskTone = (r) => r == null ? "text-fg-dim" : r >= 85 ? "text-red-600" : r >= 70 ? "text-orange-600" : r >= 40 ? "text-amber-600" : "text-emerald-600";
 function Visitors() {
@@ -17,47 +49,11 @@ function Visitors() {
   const [search, setSearch] = useState("");
   const [device, setDevice] = useState("");
   const [website, setWebsite] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const [busyIp, setBusyIp] = useState(null);
   const { confirm, notify } = useDialog();
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
-  async function setIpRule(v, kind) {
-    var _a;
-    if (!v.ip || !current) return;
-    if (kind === "deny" && !await confirm({
-      title: `Block ${v.ip}?`,
-      message: "Every visit from this address is refused straight away, across every website in this workspace.",
-      confirmLabel: "Block this IP"
-    })) return;
-    setBusyIp(v.ip);
-    try {
-      if (v.ip_rule) await ipFilterApi.remove(v.ip_rule.id);
-      await ipFilterApi.create({
-        organization: current.id,
-        value: v.ip,
-        kind,
-        note: `Added from Visitors · ${v.country || "unknown"}`
-      });
-      notify(kind === "deny" ? `${v.ip} is now blocked.` : `${v.ip} is now always allowed.`);
-      load();
-    } catch (e) {
-      notify(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not update that IP rule.", "danger");
-    } finally {
-      setBusyIp(null);
-    }
-  }
-  async function clearIpRule(v) {
-    if (!v.ip_rule) return;
-    setBusyIp(v.ip);
-    try {
-      await ipFilterApi.remove(v.ip_rule.id);
-      notify(`${v.ip} follows the normal rules again.`);
-      load();
-    } finally {
-      setBusyIp(null);
-    }
-  }
-  const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
   async function load() {
     if (!current) return;
     setLoading(true);
@@ -67,6 +63,33 @@ function Visitors() {
       setTotal(res.count);
     } finally {
       setLoading(false);
+    }
+  }
+  async function changeIpRule(v, next) {
+    var _a;
+    if (!v.ip || !current) return;
+    if (next === "deny" && !await confirm({
+      title: `Block ${v.ip}?`,
+      message: "Every visit from this address is refused straight away, across every website in this workspace.",
+      confirmLabel: "Block this IP"
+    })) return;
+    setBusyIp(v.ip);
+    try {
+      if (v.ip_rule) await ipFilterApi.remove(v.ip_rule.id);
+      if (next) {
+        await ipFilterApi.create({
+          organization: current.id,
+          value: v.ip,
+          kind: next,
+          note: `Added from Visitors · ${v.country || "unknown"}`
+        });
+      }
+      notify(next === "deny" ? `${v.ip} is now blocked.` : next === "allow" ? `${v.ip} is now always allowed.` : `${v.ip} follows the normal rules again.`);
+      load();
+    } catch (e) {
+      notify(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not update that IP rule.", "danger");
+    } finally {
+      setBusyIp(null);
     }
   }
   useEffect(() => {
@@ -127,32 +150,37 @@ function Visitors() {
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Last seen" }),
           canManage && /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "IP rule" })
         ] }) }),
-        /* @__PURE__ */ jsx("tbody", { className: "divide-y divide-line", children: rows.map((v) => /* @__PURE__ */ jsxs("tr", { className: "hover:bg-bg-soft", children: [
-          /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsx(Link, { to: `/dashboard/visitors/${v.id}`, className: "font-mono font-semibold hover:text-brand", children: v.visitor_id.slice(0, 14) }) }),
-          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 font-mono text-xs", children: v.ip || "—" }),
-          /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.country || "—" }),
-          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 capitalize", children: v.device || "—" }),
-          /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 text-fg-muted", children: [
-            v.browser,
-            " · ",
-            v.os
-          ] }),
-          /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.events }),
-          /* @__PURE__ */ jsx("td", { className: `px-4 py-3 font-bold ${riskTone(v.max_risk)}`, children: v.max_risk ?? "—" }),
-          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 text-fg-muted", children: new Date(v.last_seen).toLocaleString() }),
-          canManage && /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: !v.ip ? /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "—" }) : busyIp === v.ip ? /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "saving…" }) : v.ip_rule ? /* @__PURE__ */ jsxs("span", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-semibold ${v.ip_rule.kind === "deny" ? "bg-danger/10 text-red-600" : "bg-success/10 text-emerald-700"}`, children: v.ip_rule.kind === "deny" ? "Blocked" : "Always allowed" }),
-            v.ip_rule.value !== v.ip && /* @__PURE__ */ jsxs("span", { className: "font-mono text-[11px] text-fg-dim", children: [
-              "via ",
-              v.ip_rule.value
+        /* @__PURE__ */ jsx("tbody", { className: "divide-y divide-line", children: rows.map((v) => {
+          var _a;
+          return /* @__PURE__ */ jsxs("tr", { className: "hover:bg-bg-soft", children: [
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsx(Link, { to: `/dashboard/visitors/${v.id}`, className: "font-mono font-semibold hover:text-brand", children: v.visitor_id.slice(0, 14) }) }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 font-mono text-xs", children: v.ip || "—" }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.country || "—" }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 capitalize", children: v.device || "—" }),
+            /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 text-fg-muted", children: [
+              v.browser,
+              " · ",
+              v.os
             ] }),
-            /* @__PURE__ */ jsx("button", { onClick: () => clearIpRule(v), className: "text-xs text-fg-dim hover:text-fg hover:underline", children: "Clear" })
-          ] }) : /* @__PURE__ */ jsxs("span", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsx("button", { onClick: () => setIpRule(v, "deny"), className: "text-xs font-semibold text-red-500 hover:underline", children: "Block" }),
-            /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "·" }),
-            /* @__PURE__ */ jsx("button", { onClick: () => setIpRule(v, "allow"), className: "text-xs font-semibold text-emerald-600 hover:underline", children: "Allow" })
-          ] }) })
-        ] }, v.id)) })
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.events }),
+            /* @__PURE__ */ jsx("td", { className: `px-4 py-3 font-bold ${riskTone(v.max_risk)}`, children: v.max_risk ?? "—" }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 text-fg-muted", children: new Date(v.last_seen).toLocaleString() }),
+            canManage && /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: !v.ip ? /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "—" }) : /* @__PURE__ */ jsxs("span", { className: "flex items-center gap-2", children: [
+              /* @__PURE__ */ jsx(
+                IpRuleToggle,
+                {
+                  value: ((_a = v.ip_rule) == null ? void 0 : _a.kind) ?? null,
+                  busy: busyIp === v.ip,
+                  onChange: (next) => changeIpRule(v, next)
+                }
+              ),
+              v.ip_rule && v.ip_rule.value !== v.ip && /* @__PURE__ */ jsxs("span", { className: "font-mono text-[11px] text-fg-dim", children: [
+                "via ",
+                v.ip_rule.value
+              ] })
+            ] }) })
+          ] }, v.id);
+        }) })
       ] }) }) }),
       /* @__PURE__ */ jsx(Pager, { page, pageSize: PAGE_SIZE, total, onPage: setPage })
     ] })
