@@ -162,7 +162,7 @@ export default function Links() {
           <div className="flex flex-col items-end gap-1">
             <Button onClick={openCreate} disabled={atCap}>+ New redirect</Button>
             {atCap && (
-              <span className="text-xs text-fg-muted">
+              <span className="max-w-full text-right text-xs text-fg-muted">
                 {sub?.plan.name} includes {cap}. <a href="/dashboard/billing" className="font-semibold text-brand hover:underline">Upgrade</a> for more.
               </span>
             )}
@@ -199,17 +199,18 @@ export default function Links() {
           {rows.map((l) => (
             <div key={l.id} className="card shadow-soft p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1 basis-64">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold">{l.title || l.slug}</span>
+                    <span className="min-w-0 break-all font-bold">{l.title || l.slug}</span>
                     {l.url_safe === false && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Unsafe — disabled</span>}
                     {!l.active && l.url_safe !== false && <span className="rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim">Paused</span>}
                   </div>
-                  <button onClick={() => copy(l)} className="mt-1 flex items-center gap-2 text-sm text-brand hover:underline">
-                    <span className="font-mono">{l.short_url}</span>
-                    <span className="text-xs text-fg-dim">{copied === l.id ? "Copied ✓" : "Copy"}</span>
+                  <button onClick={() => copy(l)}
+                    className="mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline">
+                    <span className="min-w-0 break-all font-mono">{l.short_url}</span>
+                    <span className="shrink-0 text-xs text-fg-dim">{copied === l.id ? "Copied ✓" : "Copy"}</span>
                   </button>
-                  <div className="mt-1 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
+                  <div className="mt-1 min-w-0 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
                   <div className="mt-1 text-xs text-fg-dim">
                     Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
@@ -220,7 +221,7 @@ export default function Links() {
                       Forwards {l.forward_param_keys || "all params"}</b></>}
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-sm">
+                <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                   <div className="text-center"><div className="font-bold tabular-nums">{l.clicks}</div><div className="text-[11px] text-fg-dim">clicks</div></div>
                   <div className="text-center"><div className="font-bold tabular-nums text-emerald-600">{l.human_clicks}</div><div className="text-[11px] text-fg-dim">human</div></div>
                   <div className="text-center"><div className="font-bold tabular-nums text-red-500">{l.bot_clicks}</div><div className="text-[11px] text-fg-dim">bot</div></div>
@@ -284,7 +285,7 @@ export default function Links() {
               <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-amber-800">
                 Changing the ending breaks the old link
                 {editing.clicks > 0 && <> — it already has <b>{editing.clicks}</b> click{editing.clicks === 1 ? "" : "s"}</>}.
-                Anyone who already has <span className="font-mono">{editing.slug}</span> will get a 404.
+                Anyone who already has <span className="break-all font-mono">{editing.slug}</span> will get a 404.
               </p>
             )}
           </div>

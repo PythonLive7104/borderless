@@ -169,7 +169,7 @@ function Links() {
       ] }),
       canManage && linkEnabled && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
         /* @__PURE__ */ jsx(Button, { onClick: openCreate, disabled: atCap, children: "+ New redirect" }),
-        atCap && /* @__PURE__ */ jsxs("span", { className: "text-xs text-fg-muted", children: [
+        atCap && /* @__PURE__ */ jsxs("span", { className: "max-w-full text-right text-xs text-fg-muted", children: [
           sub == null ? void 0 : sub.plan.name,
           " includes ",
           cap,
@@ -196,17 +196,24 @@ function Links() {
       ] }),
       canManage ? /* @__PURE__ */ jsx(Button, { to: "/dashboard/billing", className: "mt-4", children: "Upgrade to unlock →" }) : /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-fg-dim", children: "Ask an owner or admin to upgrade the workspace." })
     ] }) : rows.length === 0 ? /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-6", children: /* @__PURE__ */ jsx(NoData, { msg: "No links yet. Create one to start filtering clicks." }) }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => /* @__PURE__ */ jsx("div", { className: "card shadow-soft p-5", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
-      /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+      /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
-          /* @__PURE__ */ jsx("span", { className: "font-bold", children: l.title || l.slug }),
+          /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
           l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Unsafe — disabled" }),
           !l.active && l.url_safe !== false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
         ] }),
-        /* @__PURE__ */ jsxs("button", { onClick: () => copy(l), className: "mt-1 flex items-center gap-2 text-sm text-brand hover:underline", children: [
-          /* @__PURE__ */ jsx("span", { className: "font-mono", children: l.short_url }),
-          /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: copied === l.id ? "Copied ✓" : "Copy" })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "mt-1 truncate text-xs text-fg-dim", children: [
+        /* @__PURE__ */ jsxs(
+          "button",
+          {
+            onClick: () => copy(l),
+            className: "mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline",
+            children: [
+              /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-mono", children: l.short_url }),
+              /* @__PURE__ */ jsx("span", { className: "shrink-0 text-xs text-fg-dim", children: copied === l.id ? "Copied ✓" : "Copy" })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxs("div", { className: "mt-1 min-w-0 truncate text-xs text-fg-dim", children: [
           "→ ",
           l.destination_url
         ] }),
@@ -238,7 +245,7 @@ function Links() {
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-4 text-sm", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm", children: [
         /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
           /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums", children: l.clicks }),
           /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "clicks" })
@@ -332,7 +339,7 @@ function Links() {
             editing.clicks === 1 ? "" : "s"
           ] }),
           ". Anyone who already has ",
-          /* @__PURE__ */ jsx("span", { className: "font-mono", children: editing.slug }),
+          /* @__PURE__ */ jsx("span", { className: "break-all font-mono", children: editing.slug }),
           " will get a 404."
         ] })
       ] }),
