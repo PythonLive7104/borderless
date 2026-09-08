@@ -22,6 +22,23 @@ const BOT_OPTIONS = [
   { value: "blank", label: "A blank page", desc: "Quietly gives them nothing." },
   { value: "off", label: "Send them through too", desc: "No filtering — bots also reach your destination." }
 ];
+const CHALLENGE_STYLES = [
+  {
+    value: "hold",
+    label: "Press and hold",
+    desc: "Hold a button for five seconds while a bar fills. The strongest of the three — software won't wait."
+  },
+  {
+    value: "checkbox",
+    label: "Tick a box",
+    desc: "A single click on an “I am human” box. Fastest for real visitors, and the most familiar."
+  },
+  {
+    value: "slide",
+    label: "Slide to continue",
+    desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages."
+  }
+];
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 function Links() {
   var _a, _b, _c;
@@ -39,7 +56,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -70,7 +87,7 @@ function Links() {
     setErr("");
     setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
     setOpen(true);
   }
   function openEdit(l) {
@@ -83,6 +100,7 @@ function Links() {
       bot_action: l.bot_action,
       website: l.website ? String(l.website) : "",
       challenge: !!l.challenge,
+      challenge_style: l.challenge_style || "hold",
       forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "",
       block_vpn: !!l.block_vpn,
@@ -101,6 +119,7 @@ function Links() {
       slug: form.slug || void 0,
       bot_action: form.bot_action,
       challenge: form.challenge,
+      challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
       domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
@@ -195,84 +214,90 @@ function Links() {
         ] }) : "."
       ] }),
       canManage ? /* @__PURE__ */ jsx(Button, { to: "/dashboard/billing", className: "mt-4", children: "Upgrade to unlock →" }) : /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-fg-dim", children: "Ask an owner or admin to upgrade the workspace." })
-    ] }) : rows.length === 0 ? /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-6", children: /* @__PURE__ */ jsx(NoData, { msg: "No links yet. Create one to start filtering clicks." }) }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => /* @__PURE__ */ jsx("div", { className: "card shadow-soft p-5", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
-      /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
-        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
-          /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
-          l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Unsafe — disabled" }),
-          !l.active && l.url_safe !== false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
-        ] }),
-        /* @__PURE__ */ jsxs(
-          "button",
-          {
-            onClick: () => copy(l),
-            className: "mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline",
-            children: [
-              /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-mono", children: l.short_url }),
-              /* @__PURE__ */ jsx("span", { className: "shrink-0 text-xs text-fg-dim", children: copied === l.id ? "Copied ✓" : "Copy" })
-            ]
-          }
-        ),
-        /* @__PURE__ */ jsxs("div", { className: "mt-1 min-w-0 truncate text-xs text-fg-dim", children: [
-          "→ ",
-          l.destination_url
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-fg-dim", children: [
-          "Bots get: ",
-          /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: BOT_LABEL[l.bot_action] }),
-          l.website && /* @__PURE__ */ jsxs(Fragment, { children: [
-            " · Rules: ",
-            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: siteName(l.website) || "a website" })
+    ] }) : rows.length === 0 ? /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-6", children: /* @__PURE__ */ jsx(NoData, { msg: "No links yet. Create one to start filtering clicks." }) }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => {
+      var _a2;
+      return /* @__PURE__ */ jsx("div", { className: "card shadow-soft p-5", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
+            /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
+            l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Unsafe — disabled" }),
+            !l.active && l.url_safe !== false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
           ] }),
-          domains.length > 1 && l.domain_host && /* @__PURE__ */ jsxs(Fragment, { children: [
-            " · ",
-            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: l.domain_host })
-          ] }),
-          l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
-            " · ",
-            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
-          ] }),
-          l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
-            " · ",
-            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Human check on" })
-          ] }),
-          l.forward_params && /* @__PURE__ */ jsxs(Fragment, { children: [
-            " · ",
-            /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
-              "Forwards ",
-              l.forward_param_keys || "all params"
-            ] })
-          ] })
-        ] })
-      ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm", children: [
-        /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
-          /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums", children: l.clicks }),
-          /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "clicks" })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
-          /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-emerald-600", children: l.human_clicks }),
-          /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "human" })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
-          /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-red-500", children: l.bot_clicks }),
-          /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "bot" })
-        ] }),
-        canManage && /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsx(
+          /* @__PURE__ */ jsxs(
             "button",
             {
-              onClick: () => toggle(l),
-              title: l.active ? "Active — click to pause" : "Paused — click to activate",
-              className: `h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`,
-              children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
+              onClick: () => copy(l),
+              className: "mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline",
+              children: [
+                /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-mono", children: l.short_url }),
+                /* @__PURE__ */ jsx("span", { className: "shrink-0 text-xs text-fg-dim", children: copied === l.id ? "Copied ✓" : "Copy" })
+              ]
             }
           ),
-          /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
-          /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
+          /* @__PURE__ */ jsxs("div", { className: "mt-1 min-w-0 truncate text-xs text-fg-dim", children: [
+            "→ ",
+            l.destination_url
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-fg-dim", children: [
+            "Bots get: ",
+            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: BOT_LABEL[l.bot_action] }),
+            l.website && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · Rules: ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: siteName(l.website) || "a website" })
+            ] }),
+            domains.length > 1 && l.domain_host && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: l.domain_host })
+            ] }),
+            l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
+            ] }),
+            l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
+                "Human check: ",
+                (_a2 = CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))) == null ? void 0 : _a2.label
+              ] })
+            ] }),
+            l.forward_params && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
+                "Forwards ",
+                l.forward_param_keys || "all params"
+              ] })
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm", children: [
+          /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums", children: l.clicks }),
+            /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "clicks" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-emerald-600", children: l.human_clicks }),
+            /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "human" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-red-500", children: l.bot_clicks }),
+            /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "bot" })
+          ] }),
+          canManage && /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => toggle(l),
+                title: l.active ? "Active — click to pause" : "Paused — click to activate",
+                className: `h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`,
+                children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
+              }
+            ),
+            /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
+            /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
+          ] })
         ] })
-      ] })
-    ] }) }, l.id)) }),
+      ] }) }, l.id);
+    }) }),
     /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: editing ? "Edit redirect" : "Create a redirect", size: "lg", children: /* @__PURE__ */ jsxs("form", { onSubmit: save, className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 px-4 py-3", children: [
         /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "Your link" }),
@@ -383,6 +408,32 @@ function Links() {
           /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Ask visitors to confirm they're human" }),
           /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: `Shows a "I'm not a robot" button before the redirect. Only people we'd already let through see it — bots still get the handling above — so it catches automation the score missed. Confirmed visitors aren't asked again for 30 minutes.` })
         ] })
+      ] }),
+      form.challenge && /* @__PURE__ */ jsxs("div", { className: "-mt-1 rounded-xl border border-line bg-bg-soft p-3.5", children: [
+        /* @__PURE__ */ jsx("span", { className: "mb-2 block text-sm font-semibold", children: "Which check should they get?" }),
+        /* @__PURE__ */ jsx("div", { className: "space-y-2", children: CHALLENGE_STYLES.map((o) => /* @__PURE__ */ jsxs(
+          "label",
+          {
+            className: `flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${form.challenge_style === o.value ? "border-brand bg-brand/5" : "border-line bg-white hover:border-brand/40"}`,
+            children: [
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  type: "radio",
+                  name: "challenge_style",
+                  className: "mt-0.5",
+                  checked: form.challenge_style === o.value,
+                  onChange: () => setForm({ ...form, challenge_style: o.value })
+                }
+              ),
+              /* @__PURE__ */ jsxs("span", { children: [
+                /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: o.label }),
+                /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: o.desc })
+              ] })
+            ]
+          },
+          o.value
+        )) })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.forward_params ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
         /* @__PURE__ */ jsx(

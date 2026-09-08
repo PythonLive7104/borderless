@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, websiteApi, billingApi, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
+import { linkApi, websiteApi, billingApi, type ChallengeStyle, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -24,6 +24,15 @@ const BOT_OPTIONS: { value: BotAction; label: string; desc: string }[] = [
   { value: "blank", label: "A blank page", desc: "Quietly gives them nothing." },
   { value: "off", label: "Send them through too", desc: "No filtering — bots also reach your destination." },
 ];
+const CHALLENGE_STYLES: { value: ChallengeStyle; label: string; desc: string }[] = [
+  { value: "hold", label: "Press and hold",
+    desc: "Hold a button for five seconds while a bar fills. The strongest of the three — software won't wait." },
+  { value: "checkbox", label: "Tick a box",
+    desc: "A single click on an \u201cI am human\u201d box. Fastest for real visitors, and the most familiar." },
+  { value: "slide", label: "Slide to continue",
+    desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages." },
+];
+
 const BOT_LABEL: Record<BotAction, string> = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 
 export default function Links() {
@@ -42,8 +51,8 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -75,7 +84,7 @@ export default function Links() {
   function openCreate() {
     setErr(""); setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -83,7 +92,8 @@ export default function Links() {
     setForm({
       destination_url: l.destination_url, title: l.title || "", slug: l.slug,
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
-      challenge: !!l.challenge, forward_params: !!l.forward_params,
+      challenge: !!l.challenge, challenge_style: l.challenge_style || "hold",
+      forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn,
       domain: l.domain ? String(l.domain) : "",
     });
@@ -97,6 +107,7 @@ export default function Links() {
       slug: form.slug || undefined,
       bot_action: form.bot_action,
       challenge: form.challenge,
+      challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
       domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
@@ -216,7 +227,7 @@ export default function Links() {
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
                     {domains.length > 1 && l.domain_host && <> · <b className="text-fg-muted">{l.domain_host}</b></>}
                     {l.block_vpn && <> · <b className="text-fg-muted">VPN/RDP blocked</b></>}
-                    {l.challenge && <> · <b className="text-fg-muted">Human check on</b></>}
+                    {l.challenge && <> · <b className="text-fg-muted">Human check: {CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))?.label}</b></>}
                     {l.forward_params && <> · <b className="text-fg-muted">
                       Forwards {l.forward_param_keys || "all params"}</b></>}
                   </div>
@@ -331,6 +342,26 @@ export default function Links() {
               </span>
             </span>
           </label>
+
+          {form.challenge && (
+            <div className="-mt-1 rounded-xl border border-line bg-bg-soft p-3.5">
+              <span className="mb-2 block text-sm font-semibold">Which check should they get?</span>
+              <div className="space-y-2">
+                {CHALLENGE_STYLES.map((o) => (
+                  <label key={o.value}
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${form.challenge_style === o.value ? "border-brand bg-brand/5" : "border-line bg-white hover:border-brand/40"}`}>
+                    <input type="radio" name="challenge_style" className="mt-0.5"
+                      checked={form.challenge_style === o.value}
+                      onChange={() => setForm({ ...form, challenge_style: o.value })} />
+                    <span>
+                      <span className="block text-sm font-semibold">{o.label}</span>
+                      <span className="block text-xs text-fg-muted">{o.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.forward_params ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
             <input type="checkbox" checked={form.forward_params} className="mt-0.5"

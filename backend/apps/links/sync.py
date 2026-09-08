@@ -20,7 +20,8 @@ def _payload(link) -> str:
         "slug": link.slug,
         "bot_action": link.bot_action,          # off | decoy | notfound | blank
         "decoy_url": (_bot_base(link) + "/decoy.html") if link.domain_id else "",
-        "challenge": bool(link.challenge),      # human click-to-continue check
+        "challenge": bool(link.challenge),      # human check before redirecting
+        "challenge_style": link.challenge_style or "hold",
         "forward_params": bool(link.forward_params),
         "forward_keys": link.forward_keys(),
         "block_vpn": bool(link.block_vpn),

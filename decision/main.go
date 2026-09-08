@@ -476,7 +476,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		BotAction   string `json:"bot_action"` // off | decoy | notfound | blank
 		DecoyURL    string `json:"decoy_url"`
 		Active      bool   `json:"active"`
-		Challenge   bool   `json:"challenge"`
+		Challenge      bool   `json:"challenge"`
+		ChallengeStyle string `json:"challenge_style"` // hold | checkbox | slide
 		ForwardQS   bool     `json:"forward_params"`
 		ForwardKeys []string `json:"forward_keys"`
 		BlockVPN    bool     `json:"block_vpn"`
@@ -587,7 +588,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 
 	switch mode {
 	case "challenge":
-		writeChallengePage(w, slug, r.URL.RawQuery)
+		writeChallengePage(w, slug, r.URL.RawQuery, link.ChallengeStyle)
 	case "block":
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Access denied"))
@@ -798,6 +799,28 @@ const challengeTTL = 30 * time.Minute
 // Client-only timing would be trivial to skip by calling the endpoint directly.
 const holdSeconds = 5
 const holdSlack = 1 * time.Second // clock skew / rounding
+
+// Minimum time between being served the page and coming back, per style. The
+// hold style animates five seconds; the checkbox only has to outlast an
+// instant automated POST, and asking a person to wait would just be friction.
+func minDwell(style string) time.Duration {
+	switch style {
+	case "checkbox":
+		return 1 * time.Second
+	case "slide":
+		// A drag across the track takes a moment even when done briskly.
+		return 1500 * time.Millisecond
+	}
+	return holdSeconds * time.Second
+}
+
+func normStyle(s string) string {
+	switch s {
+	case "checkbox", "slide":
+		return s
+	}
+	return "hold"
+}
 const challengePageTTL = 10 * time.Minute
 
 func challengeSecret() string {
@@ -849,10 +872,13 @@ func (h *handler) challenge(w http.ResponseWriter, r *http.Request) {
 
 	var iat int64
 	fmt.Sscanf(q.Get("iat"), "%d", &iat)
+	style := normStyle(q.Get("style"))
 	age := time.Since(time.Unix(iat, 0))
+	// The style is part of the signature: without that, a bot served the 5s
+	// hold could simply come back claiming "checkbox" and clear the 1s bar.
 	ok := iat > 0 &&
-		hmac.Equal([]byte(sign("hc-iss", iat)), []byte(q.Get("sig"))) &&
-		age >= holdSeconds*time.Second-holdSlack &&
+		hmac.Equal([]byte(sign("hc-iss|"+style, iat)), []byte(q.Get("sig"))) &&
+		age >= minDwell(style)-holdSlack &&
 		age <= challengePageTTL
 	carry := q.Get("q")
 	if len(carry) > 2048 {
@@ -860,7 +886,7 @@ func (h *handler) challenge(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok {
 		// Too fast, forged, or a stale page: start over rather than pass.
-		writeChallengePage(w, slug, carry)
+		writeChallengePage(w, slug, carry, style)
 		return
 	}
 
@@ -879,17 +905,25 @@ func (h *handler) challenge(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, back, http.StatusFound)
 }
 
-func writeChallengePage(w http.ResponseWriter, slug, rawQuery string) {
+func writeChallengePage(w http.ResponseWriter, slug, rawQuery, style string) {
 	iat := time.Now().Unix()
 	if len(rawQuery) > 2048 {
 		rawQuery = ""
 	}
+	style = normStyle(style)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, challengeHTML,
-		template.HTMLEscapeString(slug), iat, sign("hc-iss", iat), holdSeconds*1000, rawQuery)
+	tpl := challengeHTML
+	switch style {
+	case "checkbox":
+		tpl = checkboxHTML
+	case "slide":
+		tpl = slideHTML
+	}
+	fmt.Fprintf(w, tpl, template.HTMLEscapeString(slug), iat,
+		sign("hc-iss|"+style, iat), int(minDwell(style)/time.Millisecond), rawQuery, style)
 }
 
 const challengeHTML = `<!doctype html>
@@ -927,7 +961,7 @@ const challengeHTML = `<!doctype html>
   // The destination is wired up in JS and only after a real, timed hold, so a
   // scraper reading the HTML has nothing to follow. The server independently
   // rejects anything that comes back faster than the hold — see challenge().
-  var slug = %q, iat = %d, sig = %q, need = %d, qs = %q;
+  var slug = %q, iat = %d, sig = %q, need = %d, qs = %q, style = %q;
   var btn = document.getElementById("hold"), fill = document.getElementById("fill"),
       label = document.getElementById("label"), pct = document.getElementById("pct");
   var raf = 0, started = 0, done = false;
@@ -952,6 +986,7 @@ const challengeHTML = `<!doctype html>
     // rides the redirect chain to the destination on its own.
     location.href = "/v1/challenge?to=" + encodeURIComponent(slug) +
                     "&iat=" + iat + "&sig=" + encodeURIComponent(sig) +
+                    "&style=" + encodeURIComponent(style) +
                     (qs ? "&q=" + encodeURIComponent(qs) : "") + location.hash;
   }
   function start(e) {
@@ -981,5 +1016,164 @@ const challengeHTML = `<!doctype html>
   btn.addEventListener("keyup", function (e) {
     if (e.key === " " || e.key === "Enter") stop();
   });
+ </script>
+</body></html>`
+
+// The checkbox alternative to press-and-hold. Same signed round trip and the
+// same server-side dwell check — only the interaction differs, so an operator
+// can pick whichever suits their audience.
+const checkboxHTML = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Just a moment…</title>
+<style>
+ :root{color-scheme:light}*{box-sizing:border-box}
+ body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.5rem;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#f1f3f5;color:#1f2937}
+ .card{max-width:24rem;width:100%%;text-align:center;background:#fff;
+  border-radius:1rem;padding:2.5rem 2rem;box-shadow:0 10px 40px -18px rgba(15,23,42,.3)}
+ .icon{width:76px;height:76px;margin:0 auto .5rem;display:block}
+ h1{font-size:1.35rem;color:#1e3a8a;margin:.75rem 0 .5rem;letter-spacing:-.01em}
+ p{color:#4b5563;font-size:.95rem;margin:0 0 1.5rem}
+ #box{display:inline-flex;align-items:center;gap:.7rem;background:#f8fafc;
+  border:1px solid #e2e8f0;border-radius:.6rem;padding:.75rem 1.1rem;cursor:pointer;
+  font:600 .95rem system-ui;color:#1f2937;-webkit-user-select:none;user-select:none}
+ #box:hover{border-color:#94a3b8}
+ #box:disabled{cursor:default;opacity:.85}
+ .tick{width:22px;height:22px;border:2px solid #334155;border-radius:.35rem;
+  display:grid;place-items:center;background:#fff;flex:0 0 auto}
+ .tick svg{width:14px;height:14px;opacity:0;transition:opacity .15s}
+ #box.done .tick{background:#2563eb;border-color:#2563eb}
+ #box.done .tick svg{opacity:1}
+ .spin{width:16px;height:16px;border:2px solid #cbd5e1;border-top-color:#2563eb;
+  border-radius:50%%;animation:sp .6s linear infinite}
+ @keyframes sp{to{transform:rotate(360deg)}}
+ @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+ noscript p{color:#dc2626}
+</style></head><body>
+ <main class="card">
+  <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#2f6fd0"/><stop offset="1" stop-color="#5eb3f0"/>
+    </linearGradient></defs>
+    <path d="M32 6c-7 0-12 5-12 12v6h7v-6c0-3 2-5 5-5s5 2 5 5v6h7v-6c0-7-5-12-12-12z" fill="#2f6fd0"/>
+    <rect x="14" y="24" width="36" height="32" rx="8" fill="url(#g)"/>
+    <circle cx="32" cy="36" r="6" fill="#fff" opacity=".95"/>
+    <path d="M32 44c-6 0-10 4-11 8h22c-1-4-5-8-11-8z" fill="#fff" opacity=".95"/>
+  </svg>
+  <h1>Security Verification</h1>
+  <p>Click the checkbox to verify you are human</p>
+  <button id="box" type="button">
+    <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"
+      stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+    <span id="label">I am human</span>
+  </button>
+  <noscript><p>JavaScript is required to continue.</p></noscript>
+ </main>
+ <script>
+  // Destination wired in JS and only after a click, so a scraper reading the
+  // HTML has nothing to follow. The server independently rejects anything that
+  // comes back faster than the dwell time — see challenge().
+  var slug = %q, iat = %d, sig = %q, need = %d, qs = %q, style = %q;
+  var box = document.getElementById("box"), label = document.getElementById("label"), done = false;
+  box.addEventListener("click", function () {
+    if (done) return;
+    done = true;
+    box.classList.add("done");
+    box.disabled = true;
+    label.textContent = "Verifying…";
+    // Never leave before the server's minimum, or it bounces us back.
+    var wait = Math.max(need - (Date.now() - iat * 1000), 350);
+    setTimeout(function () {
+      label.innerHTML = '<span class="spin"></span>';
+      location.href = "/v1/challenge?to=" + encodeURIComponent(slug) +
+                      "&iat=" + iat + "&sig=" + encodeURIComponent(sig) +
+                      "&style=" + encodeURIComponent(style) +
+                      (qs ? "&q=" + encodeURIComponent(qs) : "") + location.hash;
+    }, wait);
+  });
+ </script>
+</body></html>`
+
+// Slide to continue: the third option. Language-free — nothing to read — which
+// matters for an audience spread across countries. Same signed round trip and
+// the same server-side dwell check as the other two.
+const slideHTML = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Just a moment…</title>
+<style>
+ :root{color-scheme:light}*{box-sizing:border-box}
+ body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.5rem;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#f1f3f5;color:#1f2937}
+ .card{max-width:25rem;width:100%%;text-align:center;background:#fff;border-radius:1rem;
+  padding:2.25rem 1.75rem;box-shadow:0 10px 40px -18px rgba(15,23,42,.3)}
+ h1{font-size:1.2rem;margin:0 0 .4rem;letter-spacing:-.01em}
+ p{color:#4b5563;font-size:.92rem;margin:0 0 1.5rem}
+ #track{position:relative;height:56px;border-radius:999px;background:#eef2f7;
+  border:1px solid #e2e8f0;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+ #fill{position:absolute;inset:0 auto 0 0;width:56px;background:#dbeafe;transition:width .18s}
+ #hint{position:absolute;inset:0;display:grid;place-items:center;font-size:.88rem;
+  color:#64748b;pointer-events:none}
+ #knob{position:absolute;top:4px;left:4px;width:48px;height:48px;border-radius:50%%;
+  background:#2563eb;display:grid;place-items:center;cursor:grab;box-shadow:0 4px 10px -3px rgba(37,99,235,.6)}
+ #knob:active{cursor:grabbing}
+ #track.done #knob{background:#16a34a}
+ #track.done #hint{color:#15803d}
+ svg{width:20px;height:20px}
+ noscript p{color:#dc2626}
+ @media (prefers-reduced-motion:reduce){#fill{transition:none}}
+</style></head><body>
+ <main class="card">
+  <h1>Confirm you're human</h1>
+  <p>Slide the button all the way to the right.</p>
+  <div id="track">
+    <span id="fill"></span>
+    <span id="hint">Slide to continue</span>
+    <span id="knob">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </span>
+  </div>
+  <noscript><p>JavaScript is required to continue.</p></noscript>
+ </main>
+ <script>
+  var slug = %q, iat = %d, sig = %q, need = %d, qs = %q, style = %q;
+  var track = document.getElementById("track"), knob = document.getElementById("knob"),
+      fill = document.getElementById("fill"), hint = document.getElementById("hint");
+  var dragging = false, startX = 0, x = 0, done = false;
+  function maxX() { return track.clientWidth - knob.offsetWidth - 8; }
+  function place(v) {
+    x = Math.max(0, Math.min(maxX(), v));
+    knob.style.left = (x + 4) + "px";
+    fill.style.width = (x + 56) + "px";
+  }
+  function down(e) { if (done) return; dragging = true; startX = (e.touches ? e.touches[0].clientX : e.clientX) - x; }
+  function move(e) {
+    if (!dragging || done) return;
+    e.preventDefault();
+    place((e.touches ? e.touches[0].clientX : e.clientX) - startX);
+  }
+  function up() {
+    if (!dragging || done) return;
+    dragging = false;
+    if (x < maxX() - 4) { place(0); return; }   // didn't reach the end — snap back
+    done = true;
+    track.classList.add("done");
+    hint.textContent = "Verified";
+    // Never leave before the server's minimum, or it bounces us back.
+    var wait = Math.max(need - (Date.now() - iat * 1000), 250);
+    setTimeout(function () {
+      location.href = "/v1/challenge?to=" + encodeURIComponent(slug) +
+                      "&iat=" + iat + "&sig=" + encodeURIComponent(sig) +
+                      "&style=" + encodeURIComponent(style) +
+                      (qs ? "&q=" + encodeURIComponent(qs) : "") + location.hash;
+    }, wait);
+  }
+  knob.addEventListener("mousedown", down); knob.addEventListener("touchstart", down, {passive:true});
+  window.addEventListener("mousemove", move); window.addEventListener("touchmove", move, {passive:false});
+  window.addEventListener("mouseup", up);    window.addEventListener("touchend", up);
  </script>
 </body></html>`

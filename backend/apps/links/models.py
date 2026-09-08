@@ -94,6 +94,17 @@ class ShortLink(models.Model):
         default=False,
         help_text="Ask visitors to confirm they're human before redirecting.")
 
+    class ChallengeStyle(models.TextChoices):
+        HOLD = "hold", "Press and hold (5 seconds)"
+        CHECKBOX = "checkbox", "Tick a box"
+        SLIDE = "slide", "Slide to continue"
+
+    # Which check the visitor gets. All three are verified the same way on the
+    # server; they differ only in the interaction, so pick whichever suits the
+    # audience. The minimum dwell time is enforced per style in the engine.
+    challenge_style = models.CharField(max_length=10, choices=ChallengeStyle.choices,
+                                       default=ChallengeStyle.HOLD)
+
     # Pass ?utm_source=…&rid=… from the short link through to the destination.
     # Off by default: forwarding is what personalised survey/campaign links need,
     # but those params often carry PII, so it's an explicit opt-in per link.

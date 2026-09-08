@@ -158,8 +158,10 @@ export const websiteApi = {
 // ---- short links ----
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
 export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; }
+export type ChallengeStyle = "hold" | "checkbox" | "slide";
 export interface ShortLink {
   domain: number | null;
+  challenge_style: ChallengeStyle;
   domain_host: string;
   challenge: boolean;
   forward_params: boolean;

@@ -319,6 +319,20 @@ class ChallengeFlagTest(TestCase):
                                         destination_url="https://example.com", challenge=True)
         self.assertTrue(json.loads(_payload(link))["challenge"])
 
+    def test_style_defaults_to_press_and_hold(self):
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="c4",
+                                        destination_url="https://example.com", challenge=True)
+        self.assertEqual(link.challenge_style, "hold")
+
+    def test_each_style_reaches_the_engine(self):
+        import json
+        from apps.links.sync import _payload
+        for i, style in enumerate(("hold", "checkbox", "slide")):
+            link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug=f"cs{i}",
+                                            destination_url="https://example.com",
+                                            challenge=True, challenge_style=style)
+            self.assertEqual(json.loads(_payload(link))["challenge_style"], style)
+
     def test_payload_stays_false_when_off(self):
         import json
         from apps.links.sync import _payload
