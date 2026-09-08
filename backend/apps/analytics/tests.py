@@ -103,3 +103,59 @@ class WebsiteScopedAnalyticsTest(TestCase):
                                       revenue=amount, currency="USD", created_at=tz.now())
         self.assertEqual(self._overview()["totals"]["revenue"], 100.0)
         self.assertEqual(self._overview(website=self.a.id)["totals"]["revenue"], 10.0)
+
+
+class VisitorIpRuleTest(TestCase):
+    """Visitors show whether their IP is on the workspace allow/deny list, so
+    the list can offer to change it."""
+
+    def setUp(self):
+        from django.utils import timezone as tz
+        user = get_user_model().objects.create_user(
+            username="ip@example.com", email="ip@example.com", password="testpass123")
+        self.org = create_workspace(user, "IP Co")
+        self.site = Website.objects.create(organization=self.org, name="S", domain="s.example")
+        for ip in ("1.2.3.4", "10.0.0.7", "8.8.8.8"):
+            v = Visitor.objects.create(website=self.site, visitor_id=f"v-{ip}", ip=ip)
+            sess = Session.objects.create(website=self.site, visitor=v, session_id=f"s-{ip}")
+            TrafficEvent.objects.create(website=self.site, visitor=v, session=sess, type="pageview",
+                                        classification="human", action="allow", created_at=tz.now())
+        self.c = APIClient()
+        self.c.force_authenticate(user=user)
+
+    def _rows(self):
+        r = self.c.get(f"/api/analytics/visitors/?organization={self.org.id}").json()
+        return {row["ip"]: row["ip_rule"] for row in r["results"]}
+
+    def test_no_entries_means_no_rule_on_any_visitor(self):
+        self.assertEqual(set(self._rows().values()), {None})
+
+    def test_an_exact_deny_is_reported(self):
+        from apps.rules.models import IPListEntry
+        e = IPListEntry.objects.create(organization=self.org, value="1.2.3.4", kind="deny")
+        rows = self._rows()
+        self.assertEqual(rows["1.2.3.4"], {"id": e.id, "kind": "deny", "value": "1.2.3.4"})
+        self.assertIsNone(rows["8.8.8.8"])
+
+    def test_a_cidr_range_covers_an_ip_it_does_not_name(self):
+        # The browser can't reasonably test CIDR membership, which is why this
+        # is resolved server-side.
+        from apps.rules.models import IPListEntry
+        IPListEntry.objects.create(organization=self.org, value="10.0.0.0/8", kind="allow")
+        rows = self._rows()
+        self.assertEqual(rows["10.0.0.7"]["kind"], "allow")
+        self.assertEqual(rows["10.0.0.7"]["value"], "10.0.0.0/8")
+        self.assertIsNone(rows["1.2.3.4"])
+
+    def test_an_inactive_entry_is_ignored(self):
+        from apps.rules.models import IPListEntry
+        IPListEntry.objects.create(organization=self.org, value="1.2.3.4", kind="deny", active=False)
+        self.assertIsNone(self._rows()["1.2.3.4"])
+
+    def test_another_workspaces_entry_does_not_leak(self):
+        from apps.rules.models import IPListEntry
+        other = get_user_model().objects.create_user(
+            username="o2@example.com", email="o2@example.com", password="testpass123")
+        other_org = create_workspace(other, "Other")
+        IPListEntry.objects.create(organization=other_org, value="1.2.3.4", kind="deny")
+        self.assertIsNone(self._rows()["1.2.3.4"])

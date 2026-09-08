@@ -122,6 +122,18 @@ class VisitorListView(generics.ListAPIView):
             qs = qs.filter(Q(visitor_id__icontains=s) | Q(ip__icontains=s))
         return qs.annotate(event_count=Count("events"), max_risk=Max("events__risk_score")).order_by("-last_seen")
 
+    def get_serializer_context(self):
+        """Load the workspace's IP allow/deny entries once for the whole page,
+        rather than testing each visitor's IP against the database row by row."""
+        ctx = super().get_serializer_context()
+        from apps.rules.models import IPListEntry
+        entries = IPListEntry.objects.filter(active=True)
+        org = self.request.query_params.get("organization")
+        entries = entries.filter(organization_id=org) if org else entries.filter(
+            organization_id__in=_org_ids(self.request.user))
+        ctx["ip_entries"] = list(entries)
+        return ctx
+
 
 class VisitorDetailView(views.APIView):
     def get(self, request, pk):

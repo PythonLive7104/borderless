@@ -304,6 +304,7 @@ export interface VisitorRow {
   id: number; visitor_id: string; ip: string | null; country: string; device: string; browser: string; os: string;
   first_seen: string; last_seen: string; events: number; max_risk: number | null; fingerprint: string;
   website_name: string;
+  ip_rule: { id: number; kind: IPKind; value: string } | null;
 }
 export interface EventRow {
   id: number; type: string; visitor_ref: string; ip: string | null; country: string;

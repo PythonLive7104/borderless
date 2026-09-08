@@ -18,8 +18,30 @@ class VisitorSerializer(serializers.ModelSerializer):
     events = serializers.IntegerField(source="event_count", read_only=True)
     max_risk = serializers.IntegerField(read_only=True)
     website_name = serializers.CharField(source="website.name", read_only=True, default="")
+    # Whether this visitor's IP is on the workspace allow/deny list, and which
+    # entry matched — so the list can offer to change it. Matched server-side
+    # because entries may be CIDR ranges, which the browser can't sensibly test.
+    ip_rule = serializers.SerializerMethodField()
+
+    def get_ip_rule(self, obj):
+        entries = self.context.get("ip_entries") or []
+        if not obj.ip or not entries:
+            return None
+        import ipaddress
+        try:
+            addr = ipaddress.ip_address(obj.ip)
+        except ValueError:
+            return None
+        for entry in entries:
+            try:
+                net = ipaddress.ip_network(entry.value, strict=False)
+            except ValueError:
+                continue
+            if addr in net:
+                return {"id": entry.id, "kind": entry.kind, "value": entry.value}
+        return None
 
     class Meta:
         model = Visitor
         fields = ["id", "visitor_id", "ip", "country", "device", "browser", "os", "fingerprint",
-                  "first_seen", "last_seen", "events", "max_risk", "website_name"]
+                  "first_seen", "last_seen", "events", "max_risk", "website_name", "ip_rule"]
