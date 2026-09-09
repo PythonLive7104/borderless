@@ -1,13 +1,93 @@
-import { jsxs, jsx } from "react/jsx-runtime";
-import { useState } from "react";
-import { u as useAuth, B as Button, a as authApi } from "../entry-server.js";
+import { jsx, jsxs } from "react/jsx-runtime";
+import { useState, useEffect } from "react";
+import { A as useDialog, B as Button, Q as telegramApi, u as useAuth, c as useWorkspace, a as authApi } from "../entry-server.js";
 import { u as useTour } from "./TourContext-CngGBo1N.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";
-const TABS = ["Profile", "Security", "Notifications"];
+function TelegramConnect({ orgId }) {
+  const [status, setStatus] = useState(null);
+  const [deepLink, setDeepLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const { confirm, notify } = useDialog();
+  async function load() {
+    try {
+      setStatus(await telegramApi.status(orgId));
+    } catch {
+      setStatus(null);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, [orgId]);
+  async function generate() {
+    var _a;
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await telegramApi.connect(orgId);
+      setDeepLink(r.deep_link);
+      if (!r.deep_link) setErr("The bot's username isn't configured yet, so a link can't be built.");
+    } catch (e) {
+      setErr(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not create a connect link.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function disconnect() {
+    if (!await confirm({
+      title: "Disconnect Telegram?",
+      message: "The bot will stop responding in that chat. You can reconnect any time.",
+      confirmLabel: "Disconnect"
+    })) return;
+    await telegramApi.disconnect(orgId);
+    setDeepLink("");
+    notify("Telegram disconnected.");
+    load();
+  }
+  if (!status || !status.enabled) return null;
+  return /* @__PURE__ */ jsx("div", { className: "mt-6 border-t border-line pt-5", children: /* @__PURE__ */ jsxs("div", { className: "grid gap-3 sm:grid-cols-3", children: [
+    /* @__PURE__ */ jsxs("div", { className: "sm:col-span-1", children: [
+      /* @__PURE__ */ jsx("div", { className: "text-sm font-semibold", children: "Telegram bot" }),
+      /* @__PURE__ */ jsx("div", { className: "mt-0.5 text-xs text-fg-muted", children: "Create redirects and check your traffic from a chat, with the same plan limits as here." })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "sm:col-span-2", children: [
+      status.connected ? /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-3", children: [
+        /* @__PURE__ */ jsxs("span", { className: "rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-emerald-700", children: [
+          "Connected",
+          status.username ? ` · @${status.username}` : ""
+        ] }),
+        /* @__PURE__ */ jsx("button", { onClick: disconnect, className: "text-xs font-semibold text-red-500 hover:underline", children: "Disconnect" })
+      ] }) : deepLink ? /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 p-4", children: [
+        /* @__PURE__ */ jsx("p", { className: "text-sm font-semibold", children: "Open this link to finish connecting" }),
+        /* @__PURE__ */ jsx(
+          "a",
+          {
+            href: deepLink,
+            target: "_blank",
+            rel: "noreferrer",
+            className: "mt-2 block break-all font-mono text-sm text-brand hover:underline",
+            children: deepLink
+          }
+        ),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-xs text-fg-muted", children: "It works once and expires in 15 minutes. Come back and refresh this page after tapping Start." }),
+        /* @__PURE__ */ jsxs("div", { className: "mt-3 flex gap-2", children: [
+          /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => {
+            var _a;
+            (_a = navigator.clipboard) == null ? void 0 : _a.writeText(deepLink);
+            notify("Link copied.");
+          }, children: "Copy link" }),
+          /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: load, children: "I've connected" })
+        ] })
+      ] }) : /* @__PURE__ */ jsx(Button, { onClick: generate, disabled: busy, children: busy ? "Creating…" : "Connect Telegram" }),
+      err && /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-red-600", children: err })
+    ] })
+  ] }) });
+}
+const TABS = ["Profile", "Security", "Notifications", "Connections"];
 const TIMEZONES = ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Africa/Lagos", "Asia/Dubai", "Asia/Singapore"];
 const LANGUAGES = [
   ["en", "English"],
@@ -37,6 +117,7 @@ function Row({ title, desc, children }) {
 function Settings() {
   var _a, _b, _c;
   const { user, refreshUser } = useAuth();
+  const { current } = useWorkspace();
   const { startTour } = useTour();
   const [tab, setTab] = useState("Profile");
   const [toast, setToast] = useState("");
@@ -80,7 +161,8 @@ function Settings() {
       tab === "Notifications" && /* @__PURE__ */ jsx(NotificationsTab, { onSaved: () => {
         refreshUser();
         flash("Preferences saved.");
-      } })
+      } }),
+      tab === "Connections" && (current ? /* @__PURE__ */ jsx(TelegramConnect, { orgId: current.id }) : /* @__PURE__ */ jsx("p", { className: "text-sm text-fg-muted", children: "Pick a workspace first." }))
     ] })
   ] });
 }

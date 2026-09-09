@@ -5,8 +5,10 @@ import { authApi, type NotificationPrefs } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Field from "../../components/auth/Field";
 import PageNote from "../../components/dashboard/PageNote";
+import TelegramConnect from "../../components/dashboard/TelegramConnect";
+import { useWorkspace } from "../../context/WorkspaceContext";
 
-const TABS = ["Profile", "Security", "Notifications"] as const;
+const TABS = ["Profile", "Security", "Notifications", "Connections"] as const;
 type Tab = typeof TABS[number];
 
 const TIMEZONES = ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Africa/Lagos", "Asia/Dubai", "Asia/Singapore"];
@@ -36,6 +38,7 @@ function Row({ title, desc, children }: { title: string; desc: string; children:
 
 export default function Settings() {
   const { user, refreshUser } = useAuth();
+  const { current } = useWorkspace();
   const { startTour } = useTour();
   const [tab, setTab] = useState<Tab>("Profile");
   const [toast, setToast] = useState("");
@@ -81,6 +84,11 @@ export default function Settings() {
         {tab === "Profile" && <ProfileTab onSaved={() => { refreshUser(); flash("Profile saved."); }} />}
         {tab === "Security" && <SecurityTab onSaved={() => flash("Password updated.")} />}
         {tab === "Notifications" && <NotificationsTab onSaved={() => { refreshUser(); flash("Preferences saved."); }} />}
+        {tab === "Connections" && (
+          current
+            ? <TelegramConnect orgId={current.id} />
+            : <p className="text-sm text-fg-muted">Pick a workspace first.</p>
+        )}
       </div>
     </div>
   );

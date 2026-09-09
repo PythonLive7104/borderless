@@ -22,4 +22,5 @@ urlpatterns = [
     path("api/v1/conversions/", PublicConversionView.as_view()),
     path("api/v1/bot-check/", BotCheckView.as_view()),
     path("api/v1/abuse/", AbuseReportView.as_view()),
+    path("api/telegram/", include("apps.telegrambot.urls")),
 ]

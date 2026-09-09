@@ -269,6 +269,11 @@ const webhookApi = {
   deliveries: (id) => http.get(`/integrations/webhooks/${id}/deliveries/`),
   events: () => http.get("/integrations/events/")
 };
+const telegramApi = {
+  status: (orgId) => http.get(`/telegram/connect/?organization=${orgId}`),
+  connect: (orgId) => http.post("/telegram/connect/", { organization: orgId }),
+  disconnect: (orgId) => http.del(`/telegram/connect/?organization=${orgId}`)
+};
 const billingApi = {
   plans: () => http.get("/billing/plans/"),
   subscription: (orgId) => http.get(`/billing/subscription/?organization=${orgId}`),
@@ -1972,14 +1977,14 @@ const Webhooks = lazy(() => import("./assets/Webhooks-CFTmFttc.js"));
 const Billing = lazy(() => import("./assets/Billing-CX8xA7A1.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
 const Team = lazy(() => import("./assets/Team-CWlGO-QT.js"));
-const Settings = lazy(() => import("./assets/Settings-DHvQu9ge.js"));
-const Reports = lazy(() => import("./assets/Reports-CUezmrRx.js"));
+const Settings = lazy(() => import("./assets/Settings-CKEcSqpG.js"));
+const Reports = lazy(() => import("./assets/Reports-FISPYRQz.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
-const AdminOverview = lazy(() => import("./assets/AdminOverview-Bi8GBsOo.js"));
-const AdminUsers = lazy(() => import("./assets/AdminUsers-BS8Mquko.js"));
-const AdminOrgs = lazy(() => import("./assets/AdminOrgs-9suuwPPk.js"));
-const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-DNAUNrmg.js"));
-const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-BOhqnnXn.js"));
+const AdminOverview = lazy(() => import("./assets/AdminOverview-D6-INi4v.js"));
+const AdminUsers = lazy(() => import("./assets/AdminUsers-DyEZ0hLp.js"));
+const AdminOrgs = lazy(() => import("./assets/AdminOrgs-DA_h-hs4.js"));
+const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-D7dJ1vej.js"));
+const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-ByGive-3.js"));
 const spinner = /* @__PURE__ */ jsx("div", { className: "grid min-h-screen place-items-center", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
 function AppRoutes() {
   return /* @__PURE__ */ jsx(Suspense, { fallback: spinner, children: /* @__PURE__ */ jsxs(Routes, { children: [
@@ -2064,9 +2069,10 @@ export {
   keysApi as N,
   webhookApi as O,
   IntervalToggle as P,
-  downloadReportCsv as Q,
+  telegramApi as Q,
   RULE_FIELDS as R,
-  adminApi as S,
+  downloadReportCsv as S,
+  adminApi as T,
   authApi as a,
   BRAND$1 as b,
   useWorkspace as c,

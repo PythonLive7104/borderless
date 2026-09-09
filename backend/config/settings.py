@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.analytics",
     "apps.intelligence",
     "apps.links",
+    "apps.telegrambot",
 ]
 
 MIDDLEWARE = [
@@ -217,3 +218,9 @@ SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")
 # themselves — only a confirmed threat scan does — so watch the triage queue.
 ABUSE_EMAIL = os.getenv("ABUSE_EMAIL", "")
 ABUSE_NOTIFY_EMAIL = os.getenv("ABUSE_NOTIFY_EMAIL", "") or ABUSE_EMAIL
+
+# Telegram bot. The webhook is only reachable when BOTH the secret in the URL
+# and the secret Telegram echoes back in a header match, so make it long.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")  # without the @

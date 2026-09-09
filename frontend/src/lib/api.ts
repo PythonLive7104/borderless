@@ -405,6 +405,14 @@ export interface Usage {
   on_trial: boolean;
   retention_days: number; plan: Plan;
 }
+export interface TelegramStatus { enabled: boolean; connected: boolean; username: string; }
+export const telegramApi = {
+  status: (orgId: number) => http.get<TelegramStatus>(`/telegram/connect/?organization=${orgId}`),
+  connect: (orgId: number) =>
+    http.post<{ token: string; deep_link: string; expires_in_minutes: number }>("/telegram/connect/", { organization: orgId }),
+  disconnect: (orgId: number) => http.del(`/telegram/connect/?organization=${orgId}`),
+};
+
 export const billingApi = {
   plans: () => http.get<Plan[]>("/billing/plans/"),
   subscription: (orgId: number) => http.get<Subscription>(`/billing/subscription/?organization=${orgId}`),
