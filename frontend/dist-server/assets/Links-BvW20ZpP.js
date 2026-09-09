@@ -1,5 +1,6 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { A as useDialog, c as useWorkspace, B as Button, y as linkApi, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
@@ -8,7 +9,6 @@ import { F as Field } from "./Field-Cq1XQP8x.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
-import "react-router-dom";
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const randSlug = (len = 10) => {
   let s = "";
@@ -40,11 +40,28 @@ const CHALLENGE_STYLES = [
     desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages."
   }
 ];
+function LockedBanner({ planName, canManage }) {
+  return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-brand/5 p-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+      /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "🔒 Redirects are on every paid plan" }),
+      /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+        "This is what you'd get: bot-filtered campaign links with click analytics",
+        planName ? /* @__PURE__ */ jsxs(Fragment, { children: [
+          " — you're on ",
+          /* @__PURE__ */ jsx("b", { children: planName }),
+          "."
+        ] }) : "."
+      ] })
+    ] }),
+    canManage ? /* @__PURE__ */ jsx(Button, { to: "/dashboard/billing", children: "Choose a plan →" }) : /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "Ask an owner or admin to upgrade." })
+  ] });
+}
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 function Links() {
   var _a, _b, _c;
   const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -84,6 +101,15 @@ function Links() {
     }
   }
   useLivePoll(load, [current == null ? void 0 : current.id]);
+  async function explainLocked() {
+    if (await confirm({
+      title: "Redirects need a paid plan",
+      message: "Every paid plan includes them — bot-filtered links with click analytics, VPN blocking and a human check. Your trial covers the antibot side only.",
+      confirmLabel: "See plans",
+      cancelLabel: "Not now",
+      tone: "brand"
+    })) navigate("/dashboard/billing");
+  }
   function openCreate() {
     setErr("");
     setEditing(null);
@@ -187,8 +213,16 @@ function Links() {
         ] }),
         /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Redirect links with built-in bot filtering & click analytics." })
       ] }),
-      canManage && linkEnabled && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
-        /* @__PURE__ */ jsx(Button, { onClick: openCreate, disabled: atCap, children: "+ New redirect" }),
+      canManage && serviceUp && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+        /* @__PURE__ */ jsx(
+          Button,
+          {
+            onClick: linkEnabled ? openCreate : explainLocked,
+            disabled: atCap,
+            variant: linkEnabled ? "primary" : "outline",
+            children: linkEnabled ? "+ New redirect" : "🔒 New redirect"
+          }
+        ),
         atCap && /* @__PURE__ */ jsxs("span", { className: "max-w-full text-right text-xs text-fg-muted", children: [
           sub == null ? void 0 : sub.plan.name,
           " includes ",
@@ -203,19 +237,45 @@ function Links() {
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl", children: "⏸️" }),
       /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirects are paused" }),
       /* @__PURE__ */ jsx("p", { className: "mx-auto mt-2 max-w-md text-sm text-fg-muted", children: "The redirect service is temporarily unavailable, so no links are being served and none can be created. Your existing links and their stats are safe and will work again as soon as it's back." })
-    ] }) : !linkEnabled ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center", children: [
-      /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl", children: "🔗" }),
-      /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirection is a paid feature" }),
-      /* @__PURE__ */ jsxs("p", { className: "mx-auto mt-2 max-w-md text-sm text-fg-muted", children: [
-        "Create bot-filtered campaign redirects with click analytics. It's included on every paid plan",
-        sub ? /* @__PURE__ */ jsxs(Fragment, { children: [
-          " — you're on ",
-          /* @__PURE__ */ jsx("b", { children: sub.plan.name }),
-          "."
-        ] }) : "."
+    ] }) : rows.length === 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      !linkEnabled && /* @__PURE__ */ jsx(LockedBanner, { planName: sub == null ? void 0 : sub.plan.name, canManage }),
+      /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-4 p-5 opacity-70", children: [
+        /* @__PURE__ */ jsx("div", { className: "mb-3 inline-block rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-dim", children: "Example" }),
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
+          /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
+            /* @__PURE__ */ jsx("span", { className: "break-all font-bold", children: "Summer promo" }),
+            /* @__PURE__ */ jsxs("div", { className: "mt-1 break-all font-mono text-sm text-brand", children: [
+              linkBase || "https://trynb.cc",
+              "/k3f9xq"
+            ] }),
+            /* @__PURE__ */ jsx("div", { className: "mt-1 truncate text-xs text-fg-dim", children: "→ https://your-offer.com/landing" }),
+            /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-fg-dim", children: [
+              "Bots get: ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Decoy page" }),
+              " · ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" }),
+              " · ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Human check: Press and hold" })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm", children: [
+            /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+              /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums", children: "1,284" }),
+              /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "clicks" })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+              /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-emerald-600", children: "1,097" }),
+              /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "human" })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+              /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-red-500", children: "187" }),
+              /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "bot" })
+            ] })
+          ] })
+        ] })
       ] }),
-      canManage ? /* @__PURE__ */ jsx(Button, { to: "/dashboard/billing", className: "mt-4", children: "Upgrade to unlock →" }) : /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-fg-dim", children: "Ask an owner or admin to upgrade the workspace." })
-    ] }) : rows.length === 0 ? /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-6", children: /* @__PURE__ */ jsx(NoData, { msg: "No links yet. Create one to start filtering clicks." }) }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => {
+      linkEnabled && /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-3", children: /* @__PURE__ */ jsx(NoData, { msg: "No links yet. Create one to start filtering clicks." }) })
+    ] }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => {
       var _a2;
       return /* @__PURE__ */ jsx("div", { className: "card shadow-soft p-5", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
         /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [

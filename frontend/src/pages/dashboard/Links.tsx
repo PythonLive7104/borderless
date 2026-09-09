@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { linkApi, websiteApi, billingApi, type ChallengeStyle, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
@@ -34,11 +35,29 @@ const CHALLENGE_STYLES: { value: ChallengeStyle; label: string; desc: string }[]
     desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages." },
 ];
 
+function LockedBanner({ planName, canManage }: { planName?: string; canManage: boolean }) {
+  return (
+    <div className="card shadow-soft mt-6 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-brand/5 p-5">
+      <div className="min-w-0">
+        <div className="text-sm font-bold">🔒 Redirects are on every paid plan</div>
+        <p className="mt-1 text-sm text-fg-muted">
+          This is what you'd get: bot-filtered campaign links with click analytics
+          {planName ? <> — you're on <b>{planName}</b>.</> : "."}
+        </p>
+      </div>
+      {canManage
+        ? <Button to="/dashboard/billing">Choose a plan →</Button>
+        : <span className="text-xs text-fg-dim">Ask an owner or admin to upgrade.</span>}
+    </div>
+  );
+}
+
 const BOT_LABEL: Record<BotAction, string> = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 
 export default function Links() {
   const { confirm, notify } = useDialog();
   const { current } = useWorkspace();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -81,6 +100,19 @@ export default function Links() {
     } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);
+
+  // Clicking while unpaid explains why, rather than doing nothing. A disabled
+  // button looks broken and tells them nothing.
+  async function explainLocked() {
+    if (await confirm({
+      title: "Redirects need a paid plan",
+      message: "Every paid plan includes them — bot-filtered links with click analytics, "
+             + "VPN blocking and a human check. Your trial covers the antibot side only.",
+      confirmLabel: "See plans",
+      cancelLabel: "Not now",
+      tone: "brand",
+    })) navigate("/dashboard/billing");
+  }
 
   function openCreate() {
     setErr(""); setEditing(null);
@@ -170,9 +202,12 @@ export default function Links() {
           </div>
           <p className="mt-1 text-sm text-fg-muted">Redirect links with built-in bot filtering &amp; click analytics.</p>
         </div>
-        {canManage && linkEnabled && (
+        {canManage && serviceUp && (
           <div className="flex flex-col items-end gap-1">
-            <Button onClick={openCreate} disabled={atCap}>+ New redirect</Button>
+            <Button onClick={linkEnabled ? openCreate : explainLocked} disabled={atCap}
+              variant={linkEnabled ? "primary" : "outline"}>
+              {linkEnabled ? "+ New redirect" : "🔒 New redirect"}
+            </Button>
             {atCap && (
               <span className="max-w-full text-right text-xs text-fg-muted">
                 {sub?.plan.name} includes {cap}. <a href="/dashboard/billing" className="font-semibold text-brand hover:underline">Upgrade</a> for more.
@@ -193,19 +228,34 @@ export default function Links() {
             again as soon as it's back.
           </p>
         </div>
-      ) : !linkEnabled ? (
-        <div className="card shadow-soft mt-6 border-brand/30 bg-brand/5 p-8 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-2xl">🔗</div>
-          <h2 className="mt-3 text-lg font-bold">Redirection is a paid feature</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
-            Create bot-filtered campaign redirects with click analytics. It's included on every
-            paid plan{sub ? <> — you're on <b>{sub.plan.name}</b>.</> : "."}
-          </p>
-          {canManage
-            ? <Button to="/dashboard/billing" className="mt-4">Upgrade to unlock →</Button>
-            : <p className="mt-3 text-xs text-fg-dim">Ask an owner or admin to upgrade the workspace.</p>}
-        </div>
-       ) : rows.length === 0 ? <div className="card shadow-soft mt-6"><NoData msg="No links yet. Create one to start filtering clicks." /></div>
+       ) : rows.length === 0 ? (
+        <>
+          {!linkEnabled && <LockedBanner planName={sub?.plan.name} canManage={canManage} />}
+          {/* A worked example, clearly labelled. Hiding the page behind an
+              upsell told an unpaid visitor nothing about what they'd get. */}
+          <div className="card shadow-soft mt-4 p-5 opacity-70">
+            <div className="mb-3 inline-block rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-dim">
+              Example
+            </div>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 basis-64">
+                <span className="break-all font-bold">Summer promo</span>
+                <div className="mt-1 break-all font-mono text-sm text-brand">{linkBase || "https://trynb.cc"}/k3f9xq</div>
+                <div className="mt-1 truncate text-xs text-fg-dim">→ https://your-offer.com/landing</div>
+                <div className="mt-1 text-xs text-fg-dim">
+                  Bots get: <b className="text-fg-muted">Decoy page</b> · <b className="text-fg-muted">VPN/RDP blocked</b> · <b className="text-fg-muted">Human check: Press and hold</b>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <div className="text-center"><div className="font-bold tabular-nums">1,284</div><div className="text-[11px] text-fg-dim">clicks</div></div>
+                <div className="text-center"><div className="font-bold tabular-nums text-emerald-600">1,097</div><div className="text-[11px] text-fg-dim">human</div></div>
+                <div className="text-center"><div className="font-bold tabular-nums text-red-500">187</div><div className="text-[11px] text-fg-dim">bot</div></div>
+              </div>
+            </div>
+          </div>
+          {linkEnabled && <div className="card shadow-soft mt-3"><NoData msg="No links yet. Create one to start filtering clicks." /></div>}
+        </>
+       )
        : (
         <div className="mt-6 space-y-3">
           {rows.map((l) => (
