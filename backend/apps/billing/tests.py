@@ -514,3 +514,34 @@ class MonthlyCapsTest(TestCase):
                      "--interval", "monthly", verbosity=0)
         self.assertEqual(redirect_limit(org.id), 10)
         self.assertEqual(website_limit(org.id), 20)
+
+
+class CurrentPlanIsOnlyWhenPaidTest(TestCase):
+    """A workspace references a plan from signup, so the plan row alone must
+    never be taken to mean they bought it."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="cur@example.com", email="cur@example.com", password="testpass123")
+        self.org = create_workspace(user, "Cur Co")
+        self.sub = Subscription.objects.get(organization=self.org)
+
+    def test_a_trialing_workspace_already_points_at_a_plan(self):
+        # This is the state the dashboard was misreading as "current plan".
+        self.assertEqual(self.sub.status, Subscription.Status.TRIALING)
+        self.assertEqual(self.sub.plan.slug, "basic")
+        self.assertFalse(self.sub.access_state()["locked"])
+
+    def test_an_expired_workspace_still_points_at_a_plan(self):
+        self.sub.status = Subscription.Status.ACTIVE
+        self.sub.period_end = timezone.now() - timedelta(days=1)
+        self.sub.save()
+        state = self.sub.access_state()
+        self.assertTrue(state["locked"])          # nothing to "renew"
+        self.assertEqual(self.sub.plan.slug, "basic")
+
+    def test_only_an_active_in_window_subscription_is_genuinely_on_a_plan(self):
+        call_command("grant_plan", "--org", str(self.org.id), "--plan", "plus", verbosity=0)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, Subscription.Status.ACTIVE)
+        self.assertFalse(self.sub.access_state()["locked"])

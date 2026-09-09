@@ -240,13 +240,14 @@ function Links() {
     ] }) : rows.length === 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
       !linkEnabled && /* @__PURE__ */ jsx(LockedBanner, { planName: sub == null ? void 0 : sub.plan.name, canManage }),
       /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-4 p-5 opacity-70", children: [
-        /* @__PURE__ */ jsx("div", { className: "mb-3 inline-block rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-dim", children: "Example" }),
+        /* @__PURE__ */ jsx("div", { className: "mb-3 inline-block rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-dim", children: "Example — not a real link" }),
         /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
           /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
             /* @__PURE__ */ jsx("span", { className: "break-all font-bold", children: "Summer promo" }),
-            /* @__PURE__ */ jsxs("div", { className: "mt-1 break-all font-mono text-sm text-brand", children: [
+            /* @__PURE__ */ jsxs("div", { className: "mt-1 break-all font-mono text-sm text-fg-dim", children: [
               linkBase || "https://trynb.cc",
-              "/k3f9xq"
+              "/",
+              /* @__PURE__ */ jsx("span", { className: "italic", children: "your-link" })
             ] }),
             /* @__PURE__ */ jsx("div", { className: "mt-1 truncate text-xs text-fg-dim", children: "→ https://your-offer.com/landing" }),
             /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-fg-dim", children: [

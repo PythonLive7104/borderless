@@ -47,7 +47,7 @@ function Spec({ icon, label, value }) {
   ] });
 }
 function Billing() {
-  var _a;
+  var _a, _b;
   const { current } = useWorkspace();
   const [sub, setSub] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -148,8 +148,9 @@ function Billing() {
     }
   }
   if (loading || !sub) return /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-20", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
-  const isCurrentSlug = sub.plan.slug;
-  const daysLeft = ((_a = sub.access) == null ? void 0 : _a.days_left) ?? null;
+  const onPaidPlan = sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
+  const isCurrentSlug = onPaidPlan ? sub.plan.slug : "";
+  const daysLeft = ((_b = sub.access) == null ? void 0 : _b.days_left) ?? null;
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsxs(PageNote, { id: "billing", children: [
       "Every plan is ",
@@ -222,22 +223,28 @@ function Billing() {
             setTarget(p);
           }, children: [
             "Renew ",
-            p.name
+            p.name,
+            " (",
+            monthly ? "month" : "week",
+            ")"
           ] }) : /* @__PURE__ */ jsx("div", { className: "rounded-full bg-bg-mute py-2 text-center text-sm font-semibold text-fg-muted", children: "Current plan" }),
           /* @__PURE__ */ jsx(Link, { to: "/dashboard/shield", className: "mt-2 block text-center text-xs font-semibold text-fg-muted hover:text-brand", children: "Configure anti-bot" })
         ] }) : canManage ? /* @__PURE__ */ jsxs(Button, { onClick: () => {
           setErr("");
           setTarget(p);
         }, variant: p.price > sub.plan.price ? "primary" : "outline", className: "mt-5 w-full", children: [
-          "Switch to ",
+          onPaidPlan ? "Switch to" : "Get",
+          " ",
           p.name,
-          " (week)"
+          " (",
+          monthly ? "month" : "week",
+          ")"
         ] }) : /* @__PURE__ */ jsx("div", { className: "mt-5 text-center text-xs text-fg-dim", children: "Ask an admin to change plans" })
       ] }, p.id);
     }) }),
-    /* @__PURE__ */ jsx(Modal, { open: !!target, onClose: () => !busy && setTarget(null), title: target && target.slug === sub.plan.slug ? `Renew ${target.name}` : "Switch plan", children: target && sub && /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsx(Modal, { open: !!target, onClose: () => !busy && setTarget(null), title: target && target.slug === isCurrentSlug ? `Renew ${target.name}` : "Choose a plan", children: target && sub && /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("p", { className: "text-sm text-fg-muted", children: [
-        target.slug === sub.plan.slug ? "Renew" : "Move to",
+        target.slug === isCurrentSlug ? "Renew" : "Move to",
         " the ",
         /* @__PURE__ */ jsx("b", { children: target.name }),
         " plan at ",

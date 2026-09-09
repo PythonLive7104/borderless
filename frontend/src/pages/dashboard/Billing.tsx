@@ -141,7 +141,11 @@ export default function Billing() {
 
   if (loading || !sub) return <div className="grid place-items-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>;
 
-  const isCurrentSlug = sub.plan.slug;
+  // Every subscription references a plan from the moment the workspace is
+  // created, so the plan row alone doesn't mean they bought it. Only an active,
+  // in-window subscription counts as "current".
+  const onPaidPlan = sub.status === "active" && !sub.access?.locked;
+  const isCurrentSlug = onPaidPlan ? sub.plan.slug : "";
   const daysLeft = sub.access?.days_left ?? null;
 
   return (
@@ -219,7 +223,7 @@ export default function Billing() {
               {isCurrent ? (
                 <div className="mt-5">
                   {canManage ? (
-                    <Button className="w-full" onClick={() => { setErr(""); setTarget(p); }}>Renew {p.name}</Button>
+                    <Button className="w-full" onClick={() => { setErr(""); setTarget(p); }}>Renew {p.name} ({monthly ? "month" : "week"})</Button>
                   ) : (
                     <div className="rounded-full bg-bg-mute py-2 text-center text-sm font-semibold text-fg-muted">Current plan</div>
                   )}
@@ -227,7 +231,7 @@ export default function Billing() {
                 </div>
               ) : canManage ? (
                 <Button onClick={() => { setErr(""); setTarget(p); }} variant={p.price > sub.plan.price ? "primary" : "outline"}  /* tier order, not interval */ className="mt-5 w-full">
-                  Switch to {p.name} (week)
+                  {onPaidPlan ? "Switch to" : "Get"} {p.name} ({monthly ? "month" : "week"})
                 </Button>
               ) : <div className="mt-5 text-center text-xs text-fg-dim">Ask an admin to change plans</div>}
             </div>
@@ -236,11 +240,11 @@ export default function Billing() {
       </div>
 
       {/* Plan-switch / renew confirmation */}
-      <Modal open={!!target} onClose={() => !busy && setTarget(null)} title={target && target.slug === sub.plan.slug ? `Renew ${target.name}` : "Switch plan"}>
+      <Modal open={!!target} onClose={() => !busy && setTarget(null)} title={target && target.slug === isCurrentSlug ? `Renew ${target.name}` : "Choose a plan"}>
         {target && sub && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">
-              {target.slug === sub.plan.slug ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
+              {target.slug === isCurrentSlug ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
               {" "}({redirectsOf(target) || "∞"} redirects, {websitesOf(target) || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">

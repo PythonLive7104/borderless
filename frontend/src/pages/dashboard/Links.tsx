@@ -235,12 +235,14 @@ export default function Links() {
               upsell told an unpaid visitor nothing about what they'd get. */}
           <div className="card shadow-soft mt-4 p-5 opacity-70">
             <div className="mb-3 inline-block rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-dim">
-              Example
+              Example — not a real link
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1 basis-64">
                 <span className="break-all font-bold">Summer promo</span>
-                <div className="mt-1 break-all font-mono text-sm text-brand">{linkBase || "https://trynb.cc"}/k3f9xq</div>
+                <div className="mt-1 break-all font-mono text-sm text-fg-dim">
+                  {linkBase || "https://trynb.cc"}/<span className="italic">your-link</span>
+                </div>
                 <div className="mt-1 truncate text-xs text-fg-dim">→ https://your-offer.com/landing</div>
                 <div className="mt-1 text-xs text-fg-dim">
                   Bots get: <b className="text-fg-muted">Decoy page</b> · <b className="text-fg-muted">VPN/RDP blocked</b> · <b className="text-fg-muted">Human check: Press and hold</b>
