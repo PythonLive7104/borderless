@@ -32,6 +32,12 @@ server {
     gzip_types text/plain text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
 
+    # Renewal must work over HTTPS too. Behind a proxy with "Always Use HTTPS"
+    # (Cloudflare's orange cloud), the ACME challenge is redirected to 443 —
+    # without this it falls through to the SPA catch-all and returns index.html,
+    # so the cert fails to renew silently and expires ~60 days later.
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+
     location /api/    { set $up http://backend:8000;  proxy_pass $up; include /etc/nginx/proxy.inc; }
     location /admin/  { set $up http://backend:8000;  proxy_pass $up; include /etc/nginx/proxy.inc; }
     location /static/ { set $up http://backend:8000;  proxy_pass $up; include /etc/nginx/proxy.inc; }
