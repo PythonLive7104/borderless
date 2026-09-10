@@ -9,10 +9,13 @@ surface. We only allow http/https on standard ports, resolve the host and reject
 private/loopback/link-local/reserved IPs, and re-validate every redirect hop.
 """
 import ipaddress
+import re
 import socket
 import urllib.error
 import urllib.request
 from urllib.parse import urljoin, urlparse
+
+from django.conf import settings
 
 UA = "TryNoBotBotCheck/1.0 (+https://trynobot.com/bot-check)"
 MAX_BYTES = 600_000
@@ -28,6 +31,11 @@ SECURITY_HEADERS = [
 ]
 CDN_HINTS = ["cloudflare", "cf-ray", "akamai", "fastly", "sucuri", "incapsula",
             "imperva", "cloudfront", "stackpath", "bunnycdn"]
+# Our own tag, so the scanner doesn't grade a site we're already protecting as
+# undefended. The site-id attribute is the reliable marker; the script URL
+# differs between dev, staging and prod, so it's read from settings.
+OWN_HINTS = ["data-site-id=\"st_", "data-site-id='st_"]
+
 BOTMGMT_HINTS = ["datadome", "perimeterx", "px-", "kasada", "cloudflare bot",
                 "akamai bot", "botd", "fingerprintjs", "hcaptcha", "recaptcha",
                 "challenges.cloudflare", "turnstile"]
@@ -136,8 +144,16 @@ def run_check(url: str) -> dict:
     else:
         add("bad", "No CDN or WAF detected", "No Cloudflare/Akamai/Fastly-style edge protection was seen — bots reach your origin directly.", 25)
 
-    # bot management / fingerprinting
-    if any(h in body_l or h in hdr_blob for h in BOTMGMT_HINTS):
+    # bot management / fingerprinting. Ours is checked first and named, so a
+    # customer who has just installed the snippet sees it confirmed here.
+    # host+path, not just the filename — "bl.js" alone would credit any site
+    # that happens to ship a file by that name.
+    tracker = re.sub(r"^https?://", "", settings.TRACKER_URL or "").lower()
+    ours = any(h in body_l for h in OWN_HINTS) or (tracker and tracker in body_l)
+    if ours:
+        add("good", "TryNoBot is installed",
+            "Our tag is on this page — visitors are being scored on arrival.")
+    elif any(h in body_l or h in hdr_blob for h in BOTMGMT_HINTS):
         add("good", "Bot management present", "A bot-detection or challenge system was detected.")
     else:
         add("bad", "No bot detection detected", "Nothing was found that scores or challenges automated visitors — this is the gap TryNoBot fills.", 25)
