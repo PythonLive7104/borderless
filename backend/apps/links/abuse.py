@@ -126,6 +126,29 @@ def _abuse_inbox() -> str:
     return getattr(settings, "ABUSE_NOTIFY_EMAIL", "") or getattr(settings, "ABUSE_EMAIL", "")
 
 
+def _defang(value: str) -> str:
+    """Render a URL unclickable: hxxps://example[.]com/path.
+
+    Two reasons. Spam filters score a message by the reputation of the links in
+    it, so an abuse report — whose whole content is a URL someone just called
+    malicious — reads exactly like the phishing it's reporting, and lands in
+    junk. And nobody triaging a report should be one mis-click away from
+    opening live malware. This is standard practice in abuse and threat-intel
+    mail; anyone handling these reports will recognise it.
+    """
+    if not value:
+        return value
+    out = re.sub(r"^http(s?)://", r"hxxp\1://", value.strip(), flags=re.I)
+    # Only the host is neutered — the path stays readable for triage.
+    parts = out.split("/", 3)
+    if len(parts) > 2:
+        parts[2] = parts[2].replace(".", "[.]")
+        out = "/".join(parts)
+    else:
+        out = out.replace(".", "[.]")
+    return out
+
+
 def _notify_staff(report, link, action: str):
     to = _abuse_inbox()
     if not to:
@@ -135,10 +158,10 @@ def _notify_staff(report, link, action: str):
     send_mail(
         f"[abuse] {report.get_reason_display()} — /{report.slug or '?'} ({action})",
         (
-            f"Reported: {report.reported_url}\n"
+            f"Reported: {_defang(report.reported_url)}\n"
             f"Reason:   {report.get_reason_display()}\n"
             f"Action:   {action}\n\n"
-            f"Destination: {dest}\n"
+            f"Destination: {_defang(dest)}\n"
             f"Workspace:   {org}\n"
             f"Scan:        {report.scan_result or 'not run'}\n\n"
             f"Reporter: {report.reporter_email or 'anonymous'} ({report.reporter_ip or 'no ip'})\n"

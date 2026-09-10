@@ -1143,3 +1143,33 @@ class AllowedHostsTest(TestCase):
     def test_casing_and_padding_are_tolerated(self):
         from config.settings import build_allowed_hosts
         self.assertIn("korv.cc", build_allowed_hosts("trynobot.com", " KORV.CC ", "", ""))
+
+
+class DefangTest(TestCase):
+    """Abuse mail carries URLs someone just called malicious. Left clickable,
+    spam filters score the message on those links and it lands in junk — and
+    whoever triages it is one mis-click from live malware."""
+
+    def test_scheme_and_host_are_neutered_but_path_stays_readable(self):
+        from apps.links.abuse import _defang
+        self.assertEqual(_defang("https://evil.example.com/login?a=1"),
+                         "hxxps://evil[.]example[.]com/login?a=1")
+
+    def test_plain_http_too(self):
+        from apps.links.abuse import _defang
+        self.assertEqual(_defang("http://bad.test/x"), "hxxp://bad[.]test/x")
+
+    def test_a_bare_host_still_gets_defanged(self):
+        from apps.links.abuse import _defang
+        self.assertEqual(_defang("evil.example.com"), "evil[.]example[.]com")
+
+    def test_empty_and_placeholder_values_survive(self):
+        from apps.links.abuse import _defang
+        self.assertEqual(_defang(""), "")
+        self.assertEqual(_defang("(unknown link)"), "(unknown link)")
+
+    def test_the_notification_body_contains_no_clickable_url(self):
+        from apps.links.abuse import _defang
+        for raw in ("https://phish.example/login", "http://x.test"):
+            self.assertNotIn("http://", _defang(raw))
+            self.assertNotIn("https://", _defang(raw))
