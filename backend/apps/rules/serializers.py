@@ -14,7 +14,7 @@ class RuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrafficRule
-        fields = ["id", "organization", "website", "name", "priority", "action", "tag", "redirect_url",
+        fields = ["id", "organization", "website", "short_link", "name", "priority", "action", "tag", "redirect_url",
                   "active", "conditions", "created_at"]
         read_only_fields = ["created_at"]
 
@@ -31,6 +31,13 @@ class RuleSerializer(serializers.ModelSerializer):
         if not conditions:
             raise serializers.ValidationError("A rule needs at least one condition.")
         return conditions
+
+    def validate_short_link(self, link):
+        """A rule may only be attached to a redirect in the same workspace."""
+        org = self.initial_data.get("organization") or getattr(self.instance, "organization_id", None)
+        if link and org and str(link.organization_id) != str(org):
+            raise serializers.ValidationError("That redirect isn't in this workspace.")
+        return link
 
     def validate(self, attrs):
         website = attrs.get("website")

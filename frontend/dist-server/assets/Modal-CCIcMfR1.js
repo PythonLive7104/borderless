@@ -1,5 +1,5 @@
 import { jsxs, jsx } from "react/jsx-runtime";
-const SIZES = { md: "max-w-md", lg: "max-w-lg", xl: "max-w-2xl" };
+const SIZES = { md: "max-w-md", lg: "max-w-xl", xl: "max-w-3xl", wide: "max-w-5xl" };
 function Modal({ open, onClose, title, children, size = "md" }) {
   if (!open) return null;
   return /* @__PURE__ */ jsxs("div", { className: "fixed inset-0 z-50 grid place-items-center p-4", children: [

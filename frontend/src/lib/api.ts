@@ -236,7 +236,7 @@ export const variantApi = {
 export type RuleAction = "allow" | "redirect" | "block" | "review" | "tag";
 export interface RuleCondition { id?: number; field: string; operator: string; value: string; }
 export interface TrafficRule {
-  id: number; organization: number; website: number | null; name: string; priority: number;
+  id: number; organization: number; website: number | null; short_link: number | null; name: string; priority: number;
   action: RuleAction; tag: string; redirect_url: string; active: boolean;
   conditions: RuleCondition[]; created_at: string;
 }
@@ -289,7 +289,8 @@ export const ipFilterApi = {
 };
 
 export const ruleApi = {
-  list: (orgId: number) => http.get<{ results: TrafficRule[] }>(`/rules/?organization=${orgId}`),
+  list: (orgId: number, shortLink?: number) =>
+    http.get<{ results: TrafficRule[] }>(`/rules/?${qs({ organization: orgId, short_link: shortLink })}`),
   create: (p: Partial<TrafficRule> & { organization: number }) => http.post<TrafficRule>("/rules/", p),
   update: (id: number, p: Partial<TrafficRule>) => http.patch<TrafficRule>(`/rules/${id}/`, p),
   remove: (id: number) => http.del(`/rules/${id}/`),

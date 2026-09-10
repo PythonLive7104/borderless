@@ -1,6 +1,8 @@
 import { type ReactNode } from "react";
 
-const SIZES = { md: "max-w-md", lg: "max-w-lg", xl: "max-w-2xl" };
+// Rule builders need real width: a condition row is three selects plus a
+// value, and cramming that into 2xl made every dropdown unreadable.
+const SIZES = { md: "max-w-md", lg: "max-w-xl", xl: "max-w-3xl", wide: "max-w-5xl" };
 
 export default function Modal({ open, onClose, title, children, size = "md" }: {
   open: boolean; onClose: () => void; title: string; children: ReactNode;

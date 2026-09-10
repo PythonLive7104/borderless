@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { c as useWorkspace, B as Button, C as campaignApi, x as websiteApi, d as billingApi } from "../entry-server.js";
-import { M as Modal } from "./Modal-CEHlixCW.js";
+import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";

@@ -25,9 +25,21 @@ def _payload(link) -> str:
         "forward_params": bool(link.forward_params),
         "forward_keys": link.forward_keys(),
         "block_vpn": bool(link.block_vpn),
+        # Rules attached to this redirect specifically. The engine prefers
+        # these over the attached website's rules.
+        "rules": _link_rules(link),
         # a link that's inactive OR flagged unsafe stops redirecting
         "active": bool(link.active and link.url_safe is not False),
     })
+
+
+def _link_rules(link) -> str:
+    try:
+        from apps.rules.sync import build_link_payload
+        payload = build_link_payload(link)
+        return "" if payload == "[]" else payload
+    except Exception:
+        return ""
 
 
 def publish_link(link):

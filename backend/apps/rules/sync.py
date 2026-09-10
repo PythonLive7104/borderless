@@ -15,13 +15,7 @@ def _r():
     return _client
 
 
-def build_payload(org_id, website_id=None) -> str:
-    """Rules that apply to one website: its own rules PLUS workspace-wide rules
-    (website is null), ordered by priority."""
-    from django.db.models import Q
-    rules = (TrafficRule.objects.filter(organization_id=org_id, active=True)
-             .filter(Q(website__isnull=True) | Q(website_id=website_id))
-             .prefetch_related("conditions").order_by("priority", "id"))
+def _serialize(rules) -> str:
     out = []
     for r in rules:
         out.append({
@@ -30,6 +24,25 @@ def build_payload(org_id, website_id=None) -> str:
                            for c in r.conditions.all()],
         })
     return json.dumps(out)
+
+
+def build_link_payload(link) -> str:
+    """Rules attached to one redirect. Only its own — a workspace-wide website
+    rule shouldn't silently apply to a short link the user never associated
+    with that site."""
+    rules = (TrafficRule.objects.filter(short_link=link, active=True)
+             .prefetch_related("conditions").order_by("priority", "id"))
+    return _serialize(rules)
+
+
+def build_payload(org_id, website_id=None) -> str:
+    """Rules that apply to one website: its own rules PLUS workspace-wide rules
+    (website is null), ordered by priority."""
+    from django.db.models import Q
+    rules = (TrafficRule.objects.filter(organization_id=org_id, active=True, short_link__isnull=True)
+             .filter(Q(website__isnull=True) | Q(website_id=website_id))
+             .prefetch_related("conditions").order_by("priority", "id"))
+    return _serialize(rules)
 
 
 def build_ipfilter_payload(org_id) -> str:

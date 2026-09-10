@@ -1,14 +1,255 @@
-import { jsxs, jsx, Fragment } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { A as useDialog, c as useWorkspace, y as linkApi, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
+import { A as useDialog, B as Button, R as RULE_FIELDS, F as ruleApi, c as useWorkspace, y as linkApi, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
-import { M as Modal } from "./Modal-CEHlixCW.js";
+import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
+import { A as ACTION_META, a as actionTone, f as fieldLabel, o as opLabel, v as valueLabel, e as emptyCond, b as opsFor, C as CondValue, c as ACTIONS, R as REDIRECT_PRESETS, d as REDIRECT_ORIGIN } from "./ruleFields-BHbrkhqx.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
+const blank = () => ({
+  name: "",
+  priority: "100",
+  action: "block",
+  tag: "",
+  redirect_url: "",
+  conditions: [emptyCond()]
+});
+function RedirectRulesModal({ link, orgId, onClose, onSaved }) {
+  const [rules, setRules] = useState([]);
+  const [form, setForm] = useState(blank());
+  const [editingId, setEditingId] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const { confirm } = useDialog();
+  async function load() {
+    if (!link) return;
+    try {
+      setRules((await ruleApi.list(orgId, link.id)).results);
+    } catch {
+      setRules([]);
+    }
+  }
+  useEffect(() => {
+    load();
+    setAdding(false);
+    setEditingId(null);
+  }, [link == null ? void 0 : link.id]);
+  if (!link) return null;
+  const linkId = link.id;
+  const setCond = (i, patch) => setForm({ ...form, conditions: form.conditions.map((c, j) => j === i ? { ...c, ...patch } : c) });
+  function startAdd() {
+    setForm(blank());
+    setEditingId(null);
+    setAdding(true);
+    setErr("");
+  }
+  function startEdit(r) {
+    setForm({
+      name: r.name,
+      priority: String(r.priority),
+      action: r.action,
+      tag: r.tag || "",
+      redirect_url: r.redirect_url || "",
+      conditions: r.conditions.map((c) => ({ field: c.field, operator: c.operator, value: c.value }))
+    });
+    setEditingId(r.id);
+    setAdding(true);
+    setErr("");
+  }
+  async function submit(e) {
+    var _a, _b, _c;
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    const payload = {
+      organization: orgId,
+      short_link: linkId,
+      website: null,
+      name: form.name || "Rule",
+      priority: Number(form.priority) || 100,
+      action: form.action,
+      tag: form.tag,
+      redirect_url: form.redirect_url,
+      conditions: form.conditions.filter((c) => c.value !== "")
+    };
+    try {
+      if (editingId) await ruleApi.update(editingId, payload);
+      else await ruleApi.create(payload);
+      setAdding(false);
+      setEditingId(null);
+      await load();
+      onSaved();
+    } catch (e2) {
+      setErr(((_a = e2 == null ? void 0 : e2.data) == null ? void 0 : _a.detail) || ((_c = (_b = e2 == null ? void 0 : e2.data) == null ? void 0 : _b.conditions) == null ? void 0 : _c[0]) || "Could not save that rule.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(r) {
+    if (!await confirm({
+      title: "Delete this rule?",
+      message: "Traffic matching it will no longer be filtered on this redirect.",
+      confirmLabel: "Delete rule"
+    })) return;
+    await ruleApi.remove(r.id);
+    await load();
+    onSaved();
+  }
+  return /* @__PURE__ */ jsx(
+    Modal,
+    {
+      open: !!link,
+      onClose,
+      size: "wide",
+      title: `Rules for ${link.domain_host || ""}/${link.slug}`,
+      children: /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+        /* @__PURE__ */ jsxs("p", { className: "rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted", children: [
+          "Rules run top to bottom and the ",
+          /* @__PURE__ */ jsx("b", { children: "first match wins" }),
+          ". They're checked on every click of this redirect, before anyone reaches your destination — so you can block by country, device, OS, browser, risk score, VPN and more. These apply to this link only."
+        ] }),
+        rules.length > 0 && /* @__PURE__ */ jsx("div", { className: "space-y-2", children: rules.map((r) => /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2", children: [
+            /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
+              /* @__PURE__ */ jsx("span", { className: "rounded-md bg-bg-mute px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-fg-dim", children: r.priority }),
+              /* @__PURE__ */ jsx("span", { className: "font-semibold", children: r.name }),
+              /* @__PURE__ */ jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-semibold ${actionTone[r.action]}`, children: ACTION_META[r.action].label })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 text-xs", children: [
+              /* @__PURE__ */ jsx("button", { onClick: () => startEdit(r), className: "font-semibold text-brand hover:underline", children: "Edit" }),
+              /* @__PURE__ */ jsx("button", { onClick: () => remove(r), className: "font-semibold text-red-500 hover:underline", children: "Delete" })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "mt-2 flex flex-wrap items-center gap-1.5 text-xs", children: [
+            /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "IF" }),
+            r.conditions.map((c, i) => /* @__PURE__ */ jsxs("span", { className: "rounded-md bg-bg-soft px-2 py-0.5", children: [
+              /* @__PURE__ */ jsx("b", { children: fieldLabel(c.field) }),
+              " ",
+              opLabel(c.operator),
+              " ",
+              /* @__PURE__ */ jsx("b", { children: valueLabel(c.field, c.value) })
+            ] }, i))
+          ] })
+        ] }, r.id)) }),
+        !adding ? /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+          rules.length === 0 && /* @__PURE__ */ jsx("span", { className: "text-sm text-fg-muted", children: "No rules yet — this redirect uses the bot handling you chose when creating it." }),
+          /* @__PURE__ */ jsx(Button, { onClick: startAdd, variant: "outline", className: "ml-auto", children: "+ Add a rule" })
+        ] }) : /* @__PURE__ */ jsxs("form", { onSubmit: submit, className: "space-y-4 rounded-xl border border-line bg-bg-soft p-4", children: [
+          /* @__PURE__ */ jsxs("div", { className: "grid gap-3 sm:grid-cols-2", children: [
+            /* @__PURE__ */ jsx(Field, { label: "Rule name", value: form.name, onChange: (v) => setForm({ ...form, name: v }), placeholder: "Block mobile from Nigeria" }),
+            /* @__PURE__ */ jsx(Field, { label: "Priority", type: "number", value: form.priority, onChange: (v) => setForm({ ...form, priority: v }) })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line bg-white p-3", children: [
+            /* @__PURE__ */ jsxs("div", { className: "mb-2 flex items-center justify-between", children: [
+              /* @__PURE__ */ jsx("span", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "IF all conditions match" }),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => setForm({ ...form, conditions: [...form.conditions, emptyCond()] }),
+                  className: "text-xs font-semibold text-brand hover:underline",
+                  children: "+ condition"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxs("p", { className: "mb-2.5 rounded-lg bg-brand/5 px-3 py-2 text-[11px] leading-relaxed text-fg-muted", children: [
+              "A visitor must match ",
+              /* @__PURE__ */ jsx("b", { children: "every" }),
+              " condition for this rule to act, so each one you add catches ",
+              /* @__PURE__ */ jsx("b", { children: "fewer" }),
+              " visitors, not more. Start with one."
+            ] }),
+            /* @__PURE__ */ jsx("div", { className: "space-y-2", children: form.conditions.map((c, i) => /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5", children: [
+              /* @__PURE__ */ jsx(
+                "select",
+                {
+                  value: c.field,
+                  onChange: (e) => setCond(i, { field: e.target.value }),
+                  className: "min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand",
+                  children: RULE_FIELDS.map(([v, l]) => /* @__PURE__ */ jsx("option", { value: v, children: l }, v))
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "select",
+                {
+                  value: c.operator,
+                  onChange: (e) => setCond(i, { operator: e.target.value }),
+                  className: "rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand",
+                  children: opsFor(c.field).map(([v, l]) => /* @__PURE__ */ jsx("option", { value: v, children: l }, v))
+                }
+              ),
+              /* @__PURE__ */ jsx(CondValue, { c, onChange: (v) => setCond(i, { value: v }) }),
+              form.conditions.length > 1 && /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => setForm({ ...form, conditions: form.conditions.filter((_, j) => j !== i) }),
+                  className: "text-fg-dim hover:text-red-500",
+                  "aria-label": "Remove condition",
+                  children: /* @__PURE__ */ jsx("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx("path", { d: "M18 6L6 18M6 6l12 12" }) })
+                }
+              )
+            ] }, i)) })
+          ] }),
+          /* @__PURE__ */ jsxs("label", { className: "block", children: [
+            /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "THEN do this" }),
+            /* @__PURE__ */ jsx(
+              "select",
+              {
+                value: form.action,
+                onChange: (e) => setForm({ ...form, action: e.target.value }),
+                className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand",
+                children: ACTIONS.map((a) => /* @__PURE__ */ jsx("option", { value: a, children: ACTION_META[a].label }, a))
+              }
+            ),
+            /* @__PURE__ */ jsx("p", { className: "mt-1.5 rounded-lg bg-white px-3 py-2 text-xs text-fg-muted", children: ACTION_META[form.action].desc })
+          ] }),
+          form.action === "redirect" && /* @__PURE__ */ jsxs("label", { className: "block", children: [
+            /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "Send them to this page" }),
+            /* @__PURE__ */ jsxs("div", { className: "mb-2 flex flex-wrap items-center gap-1.5", children: [
+              /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "Ready-made:" }),
+              REDIRECT_PRESETS.map((pr) => {
+                const url = REDIRECT_ORIGIN + pr.path;
+                return /* @__PURE__ */ jsx(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => setForm({ ...form, redirect_url: url }),
+                    className: `rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${form.redirect_url === url ? "border-brand bg-brand/10 text-brand" : "border-line hover:border-brand hover:text-brand"}`,
+                    children: pr.label
+                  },
+                  pr.path
+                );
+              })
+            ] }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                type: "url",
+                value: form.redirect_url,
+                required: true,
+                onChange: (e) => setForm({ ...form, redirect_url: e.target.value }),
+                placeholder: "…or your own page URL",
+                className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand"
+              }
+            )
+          ] }),
+          form.action === "tag" && /* @__PURE__ */ jsx(Field, { label: "Label to attach", value: form.tag, onChange: (v) => setForm({ ...form, tag: v }), placeholder: "fb-traffic" }),
+          err && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600", children: err }),
+          /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+            /* @__PURE__ */ jsx(Button, { type: "button", variant: "outline", className: "flex-1", onClick: () => setAdding(false), disabled: busy, children: "Cancel" }),
+            /* @__PURE__ */ jsx(Button, { type: "submit", className: "flex-1", disabled: busy, children: busy ? "Saving…" : editingId ? "Save changes" : "Add rule" })
+          ] })
+        ] })
+      ] })
+    }
+  );
+}
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const randSlug = (len = 10) => {
   let s = "";
@@ -133,6 +374,7 @@ function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [rulesFor, setRulesFor] = useState(null);
   const [linkBase, setLinkBase] = useState("");
   const [domains, setDomains] = useState([]);
   const [priv, setPriv] = useState({ owned: [], available: 0 });
@@ -451,13 +693,23 @@ function Links() {
                 children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
               }
             ),
+            /* @__PURE__ */ jsx("button", { onClick: () => setRulesFor(l), className: "text-brand hover:underline", children: "Rules" }),
             /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
             /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
           ] })
         ] })
       ] }) }, l.id);
     }) }),
-    /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: editing ? "Edit redirect" : "Create a redirect", size: "lg", children: /* @__PURE__ */ jsxs("form", { onSubmit: save, className: "space-y-4", children: [
+    current && /* @__PURE__ */ jsx(
+      RedirectRulesModal,
+      {
+        link: rulesFor,
+        orgId: current.id,
+        onClose: () => setRulesFor(null),
+        onSaved: load
+      }
+    ),
+    /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: editing ? "Edit redirect" : "Create a redirect", size: "xl", children: /* @__PURE__ */ jsxs("form", { onSubmit: save, className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 px-4 py-3", children: [
         /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "Your link" }),
         /* @__PURE__ */ jsxs("div", { className: "mt-0.5 break-all font-mono text-sm font-semibold text-brand", children: [

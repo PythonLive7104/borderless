@@ -10,79 +10,10 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import { useDialog } from "../../context/DialogContext";
-
-const ACTIONS: RuleAction[] = ["allow", "redirect", "block", "review", "tag"];
-
-// Ready-made pages we host, so users don't have to build their own "blocked" page.
-const REDIRECT_ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
-const REDIRECT_PRESETS: { label: string; path: string }[] = [
-  { label: "Access denied", path: "/blocked.html" },
-  { label: "Unauthorised access", path: "/unauthorized.html" },
-  { label: "404 Not found", path: "/not-found.html" },
-];
-const actionTone: Record<RuleAction, string> = {
-  allow: "bg-success/10 text-emerald-700",
-  redirect: "bg-indigo-500/10 text-indigo-600",
-  block: "bg-danger/10 text-red-600",
-  review: "bg-warning/10 text-amber-700",
-  tag: "bg-brand/10 text-brand",
-};
-// Plain-English meaning of each action, shown to guide non-technical users.
-const ACTION_META: Record<RuleAction, { label: string; desc: string }> = {
-  allow: { label: "Allow", desc: "Let the visitor through normally. Use this to always trust certain traffic." },
-  redirect: { label: "Redirect (turn them away)", desc: "The only action that stops a visitor in real time: their browser is sent to a URL you choose (e.g. a blank or safe page), so bots and fraud never reach your real page. Use this to actually keep bad traffic out." },
-  block: { label: "Block (label only)", desc: "Marks the visitor as blocked in your Click Log and reports — but with the tracking snippet they still load the page. To truly turn a visitor away in real time, use “Redirect” instead." },
-  review: { label: "Flag for review", desc: "Don't stop anyone — just mark these visits so you can inspect them later in Visitors / Click Log." },
-  tag: { label: "Add a label (tag)", desc: "Attach a label of your choice for filtering and reports. The visitor is not affected." },
-};
-const fieldLabel = (f: string) => RULE_FIELDS.find(([v]) => v === f)?.[1] || f;
-const opLabel = (o: string) => RULE_OPS.find(([v]) => v === o)?.[1] || o;
-// Show the friendly label for a stored value (e.g. "mobile" -> "Mobile", "RU" -> "Russia").
-function valueLabel(field: string, value: string): string {
-  const opts = FIELD_VALUE_OPTIONS[field];
-  if (opts) return opts.find(([v]) => v === value)?.[1] || value;
-  if (field === "country") return COUNTRIES.find(([v]) => v === value)?.[1] || value;
-  return value;
-}
-
-// Operators that make sense per field type.
-const NUM_OPS = ["gte", "gt", "lte", "lt", "eq", "ne"];
-const ENUM_OPS = ["eq", "ne", "in"];
-const TEXT_OPS = ["eq", "ne", "contains", "in"];
-const NUMERIC_FIELDS = ["risk_score", "requests_per_min"];
-function opsFor(field: string): readonly (readonly [string, string])[] {
-  let allow: string[];
-  if (NUMERIC_FIELDS.includes(field)) allow = NUM_OPS;
-  else if (FIELD_VALUE_OPTIONS[field] || field === "country") allow = ENUM_OPS;
-  else allow = TEXT_OPS;
-  return RULE_OPS.filter(([v]) => allow.includes(v));
-}
-const emptyCond = (): RuleCondition => ({ field: "risk_score", operator: "gte", value: "" });
-
-// A value editor that adapts to the chosen field.
-function CondValue({ c, onChange }: { c: RuleCondition; onChange: (v: string) => void }) {
-  const cls = "min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand";
-  const opts = FIELD_VALUE_OPTIONS[c.field];
-  if (c.field === "risk_score")
-    return <input type="number" min={0} max={100} value={c.value} onChange={(e) => onChange(e.target.value)} placeholder="0–100" required className={cls} />;
-  if (c.field === "requests_per_min")
-    return <input type="number" min={1} value={c.value} onChange={(e) => onChange(e.target.value)} placeholder="e.g. 30" required className={cls} />;
-  if (c.field === "country")
-    return (
-      <select value={c.value} onChange={(e) => onChange(e.target.value)} required className={cls}>
-        <option value="">Country…</option>
-        {COUNTRIES.map(([v, l]) => <option key={v} value={v}>{l} ({v})</option>)}
-      </select>
-    );
-  if (opts)
-    return (
-      <select value={c.value} onChange={(e) => onChange(e.target.value)} required className={cls}>
-        <option value="">Choose…</option>
-        {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
-    );
-  return <input value={c.value} onChange={(e) => onChange(e.target.value)} placeholder="value" required className={cls} />;
-}
+import {
+  ACTIONS, ACTION_META, REDIRECT_ORIGIN, REDIRECT_PRESETS, actionTone,
+  fieldLabel, valueLabel, opLabel, opsFor, emptyCond, CondValue,
+} from "../../components/dashboard/ruleFields";
 
 export default function TrafficRules() {
   const { confirm } = useDialog();
@@ -302,7 +233,7 @@ export default function TrafficRules() {
         </div>
       )}
 
-      <Modal open={open} onClose={closeModal} size="xl" title={editingId ? "Edit traffic rule" : "New traffic rule"}>
+      <Modal open={open} onClose={closeModal} size="wide" title={editingId ? "Edit traffic rule" : "New traffic rule"}>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Rule name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Block mobile bots" />

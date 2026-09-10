@@ -19,27 +19,43 @@ class RuleViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = TrafficRule.objects.filter(organization_id__in=self._member_org_ids()).prefetch_related("conditions")
         org = self.request.query_params.get("organization")
-        return qs.filter(organization_id=org) if org else qs
+        if org:
+            qs = qs.filter(organization_id=org)
+        link = self.request.query_params.get("short_link")
+        if link:
+            return qs.filter(short_link_id=link)
+        # The Traffic Rules page shows website rules only — a redirect's rules
+        # are managed from that redirect, and would be confusing mixed in here.
+        return qs.filter(short_link__isnull=True)
 
     def _require_manager(self, org_id):
         m = OrganizationMember.objects.filter(organization_id=org_id, user=self.request.user).first()
         if not m or not m.can_manage:
             raise PermissionDenied("Only Owners and Admins can modify rules.")
 
+    def _resync(self, rule):
+        if rule.short_link_id:
+            from apps.links.sync import publish_link
+            publish_link(rule.short_link)   # rules travel inside the link payload
+        else:
+            publish_org(rule.organization_id)
+
     def perform_create(self, serializer):
-        rule = serializer.save()
-        publish_org(rule.organization_id)
+        self._resync(serializer.save())
 
     def perform_update(self, serializer):
         self._require_manager(serializer.instance.organization_id)
-        rule = serializer.save()
-        publish_org(rule.organization_id)
+        self._resync(serializer.save())
 
     def perform_destroy(self, instance):
         self._require_manager(instance.organization_id)
-        org_id = instance.organization_id
+        org_id, link = instance.organization_id, instance.short_link
         instance.delete()
-        publish_org(org_id)
+        if link:
+            from apps.links.sync import publish_link
+            publish_link(link)
+        else:
+            publish_org(org_id)
 
 
 from .models import IPListEntry
@@ -79,6 +95,10 @@ class IPListEntryViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._require_manager(instance.organization_id)
-        org_id = instance.organization_id
+        org_id, link = instance.organization_id, instance.short_link
         instance.delete()
-        publish_org(org_id)
+        if link:
+            from apps.links.sync import publish_link
+            publish_link(link)
+        else:
+            publish_org(org_id)

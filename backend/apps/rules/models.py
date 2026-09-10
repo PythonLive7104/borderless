@@ -32,6 +32,12 @@ class TrafficRule(models.Model):
     website = models.ForeignKey("websites.Website", on_delete=models.CASCADE, null=True, blank=True,
                                 related_name="site_rules",
                                 help_text="Which website this rule applies to. Empty = all websites in the workspace.")
+    # A rule can be scoped to a single redirect instead of a website. Redirect
+    # users often have no website at all, so inheriting a site's rules — the
+    # only option before — was no option for them.
+    short_link = models.ForeignKey("links.ShortLink", on_delete=models.CASCADE,
+                                   null=True, blank=True, related_name="rules",
+                                   help_text="Which redirect this rule applies to. Empty = not a redirect rule.")
     name = models.CharField(max_length=120)
     priority = models.IntegerField(default=100, help_text="Lower runs first; first match wins")
     action = models.CharField(max_length=8, choices=Action.choices, default=Action.REVIEW)

@@ -8,6 +8,7 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import NoData from "../../components/dashboard/NoData";
+import RedirectRulesModal from "../../components/dashboard/RedirectRulesModal";
 import { useDialog } from "../../context/DialogContext";
 
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
@@ -138,6 +139,7 @@ export default function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ShortLink | null>(null);
+  const [rulesFor, setRulesFor] = useState<ShortLink | null>(null);
   // "" means no short domain is configured — the service is off, and we must
   // never show a trynobot.com link as a stand-in.
   const [linkBase, setLinkBase] = useState("");
@@ -400,6 +402,7 @@ export default function Links() {
                         className={`h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`}>
                         <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}`} />
                       </button>
+                      <button onClick={() => setRulesFor(l)} className="text-brand hover:underline">Rules</button>
                       <button onClick={() => openEdit(l)} className="text-brand hover:underline">Edit</button>
                       <button onClick={() => remove(l.id)} className="text-red-500 hover:underline">Delete</button>
                     </>
@@ -411,7 +414,10 @@ export default function Links() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Edit redirect" : "Create a redirect"} size="lg">
+      {current && <RedirectRulesModal link={rulesFor} orgId={current.id}
+        onClose={() => setRulesFor(null)} onSaved={load} />}
+
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Edit redirect" : "Create a redirect"} size="xl">
         <form onSubmit={save} className="space-y-4">
           {/* live preview */}
           <div className="rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">

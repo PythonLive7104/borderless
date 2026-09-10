@@ -226,7 +226,7 @@ const ipFilterApi = {
   remove: (id) => http.del(`/rules/ip-filters/${id}/`)
 };
 const ruleApi = {
-  list: (orgId) => http.get(`/rules/?organization=${orgId}`),
+  list: (orgId, shortLink) => http.get(`/rules/?${qs({ organization: orgId, short_link: shortLink })}`),
   create: (p) => http.post("/rules/", p),
   update: (id, p) => http.patch(`/rules/${id}/`, p),
   remove: (id) => http.del(`/rules/${id}/`)
@@ -1960,13 +1960,13 @@ const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
 const DashboardLayout = lazy(() => import("./assets/DashboardLayout-HS1wGJvX.js"));
 const Overview = lazy(() => import("./assets/Overview-DJa0Lvuz.js"));
-const Websites = lazy(() => import("./assets/Websites-DJuuzOxc.js"));
+const Websites = lazy(() => import("./assets/Websites-B-T9YZvp.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-Bf-7FWvI.js"));
-const Campaigns = lazy(() => import("./assets/Campaigns--os7P6Xa.js"));
+const Campaigns = lazy(() => import("./assets/Campaigns-CWguQI14.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-e8019AW8.js"));
-const TrafficRules = lazy(() => import("./assets/TrafficRules-94JgXgqf.js"));
+const TrafficRules = lazy(() => import("./assets/TrafficRules-Ko6pzqjR.js"));
 const Shield = lazy(() => import("./assets/Shield-BN0AhoiG.js"));
-const Links = lazy(() => import("./assets/Links-CWqSqJZ7.js"));
+const Links = lazy(() => import("./assets/Links-BK8FTZ47.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-DbWVaBH9.js"));
 const Visitors = lazy(() => import("./assets/Visitors-hkQ4kUlZ.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-ADLssgZ4.js"));
@@ -1974,11 +1974,11 @@ const ClickLog = lazy(() => import("./assets/ClickLog-Ci5VY1dZ.js"));
 const TrafficSources = lazy(() => import("./assets/TrafficSources-BArXg2R-.js"));
 const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
-const ApiKeys = lazy(() => import("./assets/ApiKeys-CXHXJmPy.js"));
-const Webhooks = lazy(() => import("./assets/Webhooks-CFTmFttc.js"));
-const Billing = lazy(() => import("./assets/Billing-oaVarP_5.js"));
+const ApiKeys = lazy(() => import("./assets/ApiKeys-BX6ZLjCT.js"));
+const Webhooks = lazy(() => import("./assets/Webhooks-wCpF-bxu.js"));
+const Billing = lazy(() => import("./assets/Billing-BGXkoXZx.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-2hTZs7r8.js"));
-const Team = lazy(() => import("./assets/Team-CWlGO-QT.js"));
+const Team = lazy(() => import("./assets/Team-RHaHowsY.js"));
 const Settings = lazy(() => import("./assets/Settings-CKEcSqpG.js"));
 const Reports = lazy(() => import("./assets/Reports-FISPYRQz.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));

@@ -481,6 +481,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		ForwardQS   bool     `json:"forward_params"`
 		ForwardKeys []string `json:"forward_keys"`
 		BlockVPN    bool     `json:"block_vpn"`
+		Rules       string   `json:"rules"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
 		http.NotFound(w, r)
@@ -538,9 +539,17 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 
 	// If a website is attached, its Traffic Rules + IP allow/deny take precedence
 	// — granular control (country/device/OS/risk/JA3). Falls back to bot handling.
-	if link.TID != "" {
+	// Rules attached to the redirect itself win over an attached website's,
+	// because they were set for this link specifically. A redirect-only user
+	// has no website at all, so this is their only way to filter by country,
+	// device or OS.
+	ruleSrc := link.Rules
+	if ruleSrc == "" && link.TID != "" {
+		ruleSrc = h.st.GetRules(ctx, link.TID)
+	}
+	if ruleSrc != "" {
 		intel := linkIntel
-		action, _, redirect := rules.Evaluate(rules.Parse(h.st.GetRules(ctx, link.TID)), rules.Event{
+		action, _, redirect := rules.Evaluate(rules.Parse(ruleSrc), rules.Event{
 			RiskScore: result.Score, Rate: int(rate),
 			Fields: map[string]string{
 				"classification": result.Classification, "country": fp.Country,
@@ -552,11 +561,13 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 				"ja3": ja3,
 			},
 		})
-		switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, link.TID)), fp.IP) {
-		case ipfilter.Allow:
-			action, redirect = "allow", ""
-		case ipfilter.Deny:
-			action, redirect = "block", ""
+		if link.TID != "" {
+			switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, link.TID)), fp.IP) {
+			case ipfilter.Allow:
+				action, redirect = "allow", ""
+			case ipfilter.Deny:
+				action, redirect = "block", ""
+			}
 		}
 		switch action {
 		case "block":
