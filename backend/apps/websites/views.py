@@ -66,6 +66,7 @@ class WebsiteViewSet(viewsets.ModelViewSet):
         installed = w.last_event_at is not None
         return Response({
             "status": w.status,
+            "live_state": w.live_state(),
             "installed": installed,
             "last_event_at": w.last_event_at,
             "message": "Installation detected — you're receiving traffic." if installed

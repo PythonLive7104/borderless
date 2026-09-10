@@ -6,12 +6,17 @@ from .models import Website
 
 class WebsiteSerializer(serializers.ModelSerializer):
     snippet = serializers.SerializerMethodField()
+    live_state = serializers.SerializerMethodField()
 
     class Meta:
         model = Website
         fields = ["id", "organization", "name", "domain", "url", "tracking_id",
-                  "status", "last_event_at", "created_at", "strict_mode", "snippet"]
+                  "status", "live_state", "last_event_at", "created_at", "strict_mode",
+                  "snippet"]
         read_only_fields = ["tracking_id", "status", "last_event_at", "created_at"]
+
+    def get_live_state(self, obj) -> str:
+        return obj.live_state()
 
     def get_snippet(self, obj) -> str:
         # Strict mode drops `async`: an async script can't hide the page before

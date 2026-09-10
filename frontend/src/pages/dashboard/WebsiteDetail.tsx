@@ -41,7 +41,7 @@ export default function WebsiteDetail() {
           <h1 className="text-2xl font-extrabold tracking-tight">{site.name}</h1>
           <p className="text-sm text-fg-muted">{site.domain}</p>
         </div>
-        <StatusBadge status={site.status} />
+        <StatusBadge status={site.live_state} />
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
@@ -71,7 +71,7 @@ export default function WebsiteDetail() {
           <h2 className="text-sm font-bold uppercase tracking-wide text-fg-dim">Details</h2>
           <dl className="mt-3 space-y-3 text-sm">
             <div className="flex justify-between"><dt className="text-fg-muted">Tracking ID</dt><dd><code className="rounded bg-bg-mute px-1.5 py-0.5">{site.tracking_id}</code></dd></div>
-            <div className="flex justify-between"><dt className="text-fg-muted">Status</dt><dd><StatusBadge status={site.status} /></dd></div>
+            <div className="flex justify-between"><dt className="text-fg-muted">Status</dt><dd><StatusBadge status={site.live_state} /></dd></div>
             <div className="flex justify-between"><dt className="text-fg-muted">Last event</dt><dd>{site.last_event_at ? new Date(site.last_event_at).toLocaleString() : "—"}</dd></div>
             <div className="flex justify-between"><dt className="text-fg-muted">Created</dt><dd>{new Date(site.created_at).toLocaleDateString()}</dd></div>
           </dl>

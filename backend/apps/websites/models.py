@@ -44,6 +44,23 @@ class Website(models.Model):
     def __str__(self):
         return f"{self.name} ({self.tracking_id})"
 
+    # A site goes quiet when the snippet is removed, the tag breaks, or the site
+    # itself stops getting visitors. Stored status can't express that — it only
+    # ever moves forwards — so the badge is derived from when we last heard.
+    IDLE_AFTER_DAYS = 7
+
+    def live_state(self) -> str:
+        """What the dashboard badge should say right now."""
+        from django.utils import timezone
+        from datetime import timedelta
+        if self.status == self.Status.ERROR:
+            return "error"
+        if not self.last_event_at:
+            return "waiting"          # added, but nothing has ever reached us
+        if timezone.now() - self.last_event_at > timedelta(days=self.IDLE_AFTER_DAYS):
+            return "idle"             # was working; nothing recently
+        return "active"
+
     def mark_event(self):
         """Called by ingestion when an event arrives (Phase 5)."""
         from django.utils import timezone

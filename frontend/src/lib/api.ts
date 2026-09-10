@@ -138,9 +138,13 @@ export interface Invitation { id: number; email: string; role: Role; created_at:
 
 // ---- websites ----
 export type WebsiteStatus = "not_installed" | "detected" | "active" | "error";
+// What the badge shows: derived from when we last heard from the site, so a
+// site that goes quiet stops claiming to be protected.
+export type WebsiteState = "waiting" | "active" | "idle" | "error";
 export interface Website {
   id: number; organization: number; name: string; domain: string; url: string;
-  tracking_id: string; status: WebsiteStatus; last_event_at: string | null;
+  tracking_id: string; status: WebsiteStatus; live_state: WebsiteState;
+  last_event_at: string | null;
   created_at: string; snippet: string;
 }
 
@@ -151,7 +155,7 @@ export const websiteApi = {
     http.post<Website>("/websites/", payload),
   update: (id: number, payload: Partial<Website>) => http.patch<Website>(`/websites/${id}/`, payload),
   remove: (id: number) => http.del(`/websites/${id}/`),
-  verify: (id: number) => http.post<{ status: WebsiteStatus; installed: boolean; message: string; last_event_at: string | null }>(`/websites/${id}/verify/`),
+  verify: (id: number) => http.post<{ status: WebsiteStatus; live_state: WebsiteState; installed: boolean; message: string; last_event_at: string | null }>(`/websites/${id}/verify/`),
   verifyShield: (id: number) => http.post<{ active: boolean; last_check_at: string | null; message: string }>(`/websites/${id}/verify-shield/`),
 };
 

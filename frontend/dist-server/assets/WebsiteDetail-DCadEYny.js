@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { useParams, Link } from "react-router-dom";
 import { B as Button, x as websiteApi } from "../entry-server.js";
-import { S as StatusBadge } from "./StatusBadge-DCCbwkdF.js";
+import { S as StatusBadge } from "./StatusBadge-BjkD924O.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 function WebsiteDetail() {
@@ -51,7 +51,7 @@ function WebsiteDetail() {
         /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: site.name }),
         /* @__PURE__ */ jsx("p", { className: "text-sm text-fg-muted", children: site.domain })
       ] }),
-      /* @__PURE__ */ jsx(StatusBadge, { status: site.status })
+      /* @__PURE__ */ jsx(StatusBadge, { status: site.live_state })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "mt-6 grid gap-5 lg:grid-cols-3", children: [
       /* @__PURE__ */ jsxs("div", { className: "card shadow-soft p-6 lg:col-span-2", children: [
@@ -82,7 +82,7 @@ function WebsiteDetail() {
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
             /* @__PURE__ */ jsx("dt", { className: "text-fg-muted", children: "Status" }),
-            /* @__PURE__ */ jsx("dd", { children: /* @__PURE__ */ jsx(StatusBadge, { status: site.status }) })
+            /* @__PURE__ */ jsx("dd", { children: /* @__PURE__ */ jsx(StatusBadge, { status: site.live_state }) })
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
             /* @__PURE__ */ jsx("dt", { className: "text-fg-muted", children: "Last event" }),

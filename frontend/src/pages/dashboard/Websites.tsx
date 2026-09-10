@@ -9,6 +9,35 @@ import Field from "../../components/auth/Field";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { useDialog } from "../../context/DialogContext";
 
+// One plain sentence under the badge. A badge alone tells someone their site is
+// quiet; this tells them what to do about it.
+function stateHint(s: Website): string {
+  const seen = s.last_event_at ? new Date(s.last_event_at) : null;
+  const days = seen ? Math.floor((Date.now() - seen.getTime()) / 86_400_000) : 0;
+  switch (s.live_state) {
+    case "waiting":
+      return "Nothing has reached us yet. Paste the snippet into your site — the badge turns green on the first visitor.";
+    case "idle":
+      return days > 0
+        ? `Last visitor ${days} day${days === 1 ? "" : "s"} ago. If the site is still live, check the snippet is still on the page.`
+        : "No visitors recently. If the site is still live, check the snippet is still on the page.";
+    case "error":
+      return "We hit a problem checking this site. Open it for details.";
+    default:
+      return seen ? `Last visitor ${timeAgo(seen)}.` : "Protecting visitors.";
+  }
+}
+
+function timeAgo(d: Date): string {
+  const mins = Math.floor((Date.now() - d.getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 export default function Websites() {
   const { confirm } = useDialog();
   const { current } = useWorkspace();
@@ -86,8 +115,9 @@ export default function Websites() {
                   <Link to={`/dashboard/websites/${s.id}`} className="text-base font-bold hover:text-brand">{s.name}</Link>
                   <div className="text-sm text-fg-muted">{s.domain}</div>
                 </div>
-                <StatusBadge status={s.status} />
+                <StatusBadge status={s.live_state} />
               </div>
+              <p className="mt-2 text-xs text-fg-muted">{stateHint(s)}</p>
               <div className="mt-4 flex items-center justify-between">
                 <code className="rounded bg-bg-mute px-2 py-1 text-xs text-fg-muted">{s.tracking_id}</code>
                 <div className="flex gap-2">

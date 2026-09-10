@@ -5,9 +5,32 @@ import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { A as useDialog, c as useWorkspace, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
-import { S as StatusBadge } from "./StatusBadge-DCCbwkdF.js";
+import { S as StatusBadge } from "./StatusBadge-BjkD924O.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
+function stateHint(s) {
+  const seen = s.last_event_at ? new Date(s.last_event_at) : null;
+  const days = seen ? Math.floor((Date.now() - seen.getTime()) / 864e5) : 0;
+  switch (s.live_state) {
+    case "waiting":
+      return "Nothing has reached us yet. Paste the snippet into your site — the badge turns green on the first visitor.";
+    case "idle":
+      return days > 0 ? `Last visitor ${days} day${days === 1 ? "" : "s"} ago. If the site is still live, check the snippet is still on the page.` : "No visitors recently. If the site is still live, check the snippet is still on the page.";
+    case "error":
+      return "We hit a problem checking this site. Open it for details.";
+    default:
+      return seen ? `Last visitor ${timeAgo(seen)}.` : "Protecting visitors.";
+  }
+}
+function timeAgo(d) {
+  const mins = Math.floor((Date.now() - d.getTime()) / 6e4);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
 function Websites() {
   const { confirm } = useDialog();
   const { current } = useWorkspace();
@@ -92,8 +115,9 @@ function Websites() {
           /* @__PURE__ */ jsx(Link, { to: `/dashboard/websites/${s.id}`, className: "text-base font-bold hover:text-brand", children: s.name }),
           /* @__PURE__ */ jsx("div", { className: "text-sm text-fg-muted", children: s.domain })
         ] }),
-        /* @__PURE__ */ jsx(StatusBadge, { status: s.status })
+        /* @__PURE__ */ jsx(StatusBadge, { status: s.live_state })
       ] }),
+      /* @__PURE__ */ jsx("p", { className: "mt-2 text-xs text-fg-muted", children: stateHint(s) }),
       /* @__PURE__ */ jsxs("div", { className: "mt-4 flex items-center justify-between", children: [
         /* @__PURE__ */ jsx("code", { className: "rounded bg-bg-mute px-2 py-1 text-xs text-fg-muted", children: s.tracking_id }),
         /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
