@@ -94,3 +94,30 @@
     .card-hover:hover { transform: none; }
   }
 }
+
+@layer utilities {
+  /* A slow blue halo for a single call to action. One breath every 2.6s rather
+     than a fast blink: it should draw the eye on a page the user is reading,
+     not compete with it. Used sparingly — the moment two things pulse, neither
+     reads as important. */
+  .cta-glow {
+    animation: cta-glow 2.6s ease-in-out infinite;
+  }
+  @keyframes cta-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, .45),
+                  0 8px 20px -10px rgba(37, 99, 235, .55);
+    }
+    50% {
+      box-shadow: 0 0 0 9px rgba(37, 99, 235, 0),
+                  0 12px 28px -8px rgba(37, 99, 235, .8);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Keep the emphasis, drop the movement. */
+    .cta-glow {
+      animation: none;
+      box-shadow: 0 8px 22px -10px rgba(37, 99, 235, .6);
+    }
+  }
+}

@@ -343,7 +343,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
     ] }),
     canManage && owned > 0 && /* @__PURE__ */ jsx(Button, { onClick: buy, variant: "outline", disabled: busy, children: busy ? "Starting…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo` }),
     canManage && owned === 0 && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
-      /* @__PURE__ */ jsx(Button, { onClick: buy, variant: "outline", disabled: busy, children: busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
+      /* @__PURE__ */ jsx(Button, { onClick: buy, disabled: busy, className: busy ? "" : "cta-glow", children: busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
       msg && /* @__PURE__ */ jsx("span", { className: "max-w-xs text-right text-xs text-red-600", children: msg })
     ] })
   ] });

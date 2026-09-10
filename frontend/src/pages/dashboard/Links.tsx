@@ -102,7 +102,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }: {
       )}
       {canManage && owned === 0 && (
         <div className="flex flex-col items-end gap-1">
-          <Button onClick={buy} variant="outline" disabled={busy}>
+          <Button onClick={buy} disabled={busy} className={busy ? "" : "cta-glow"}>
             {busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
           </Button>
           {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
