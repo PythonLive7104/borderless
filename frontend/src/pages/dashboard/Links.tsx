@@ -564,6 +564,10 @@ export default function Links() {
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Apply a website's Traffic Rules? <span className="font-normal text-fg-dim">(optional, advanced)</span></span>
+            <p className="mb-2 rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted">
+              Want to block by <b>country, device, OS, browser or risk score</b> on this link alone?
+              You don't need a website — save the redirect, then tap <b>Rules</b> on it in the list.
+            </p>
             <select value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
               className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
               <option value="">No — just use the bot handling above</option>

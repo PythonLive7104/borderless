@@ -895,6 +895,13 @@ function Links() {
           "Apply a website's Traffic Rules? ",
           /* @__PURE__ */ jsx("span", { className: "font-normal text-fg-dim", children: "(optional, advanced)" })
         ] }),
+        /* @__PURE__ */ jsxs("p", { className: "mb-2 rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted", children: [
+          "Want to block by ",
+          /* @__PURE__ */ jsx("b", { children: "country, device, OS, browser or risk score" }),
+          " on this link alone? You don't need a website — save the redirect, then tap ",
+          /* @__PURE__ */ jsx("b", { children: "Rules" }),
+          " on it in the list."
+        ] }),
         /* @__PURE__ */ jsxs(
           "select",
           {
