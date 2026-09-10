@@ -266,6 +266,11 @@ export default function Links() {
         notify("Saved, but the destination was flagged as unsafe — the redirect is disabled.", "danger");
       } else {
         notify(editing ? "Redirect updated." : "Redirect created.");
+        // Offer rules straight after creating: this is the moment someone is
+        // thinking about who should reach the link, and the Rules button on the
+        // row was easy to miss otherwise. Skipped for a link we just disabled —
+        // filtering rules are beside the point there.
+        if (!editing) setRulesFor(saved);
       }
       load();
     } catch (e: any) { setErr(e.data?.slug?.[0] || e.data?.destination_url?.[0] || e.data?.detail || e.message); }

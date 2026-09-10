@@ -84,6 +84,12 @@ export default function RedirectRulesModal({ link, orgId, onClose, onSaved }: Pr
     <Modal open={!!link} onClose={onClose} size="wide"
            title={`Rules for ${link.domain_host || ""}/${link.slug}`}>
       <div className="space-y-4">
+        <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">Your link</div>
+          <div className="mt-0.5 break-all font-mono text-sm font-semibold text-fg">
+            {link.short_url}
+          </div>
+        </div>
         <p className="rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted">
           Rules run top to bottom and the <b>first match wins</b>. They're checked on every click of
           this redirect, before anyone reaches your destination — so you can block by country,
@@ -124,10 +130,11 @@ export default function RedirectRulesModal({ link, orgId, onClose, onSaved }: Pr
           <div className="flex items-center justify-between">
             {rules.length === 0 && (
               <span className="text-sm text-fg-muted">
-                No rules yet — this redirect uses the bot handling you chose when creating it.
+                <b className="text-fg">Your link already works.</b> Rules are optional — add one
+                to allow or block visitors by country, device, OS, browser or risk.
               </span>
             )}
-            <Button onClick={startAdd} variant="outline" className="ml-auto">+ Add a rule</Button>
+            <Button onClick={startAdd} variant="outline" className="ml-auto shrink-0">+ Add a rule</Button>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4 rounded-xl border border-line bg-bg-soft p-4">

@@ -108,6 +108,10 @@ function RedirectRulesModal({ link, orgId, onClose, onSaved }) {
       size: "wide",
       title: `Rules for ${link.domain_host || ""}/${link.slug}`,
       children: /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-success/30 bg-success/5 px-4 py-3", children: [
+          /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-emerald-700", children: "Your link" }),
+          /* @__PURE__ */ jsx("div", { className: "mt-0.5 break-all font-mono text-sm font-semibold text-fg", children: link.short_url })
+        ] }),
         /* @__PURE__ */ jsxs("p", { className: "rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted", children: [
           "Rules run top to bottom and the ",
           /* @__PURE__ */ jsx("b", { children: "first match wins" }),
@@ -137,8 +141,11 @@ function RedirectRulesModal({ link, orgId, onClose, onSaved }) {
           ] })
         ] }, r.id)) }),
         !adding ? /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
-          rules.length === 0 && /* @__PURE__ */ jsx("span", { className: "text-sm text-fg-muted", children: "No rules yet — this redirect uses the bot handling you chose when creating it." }),
-          /* @__PURE__ */ jsx(Button, { onClick: startAdd, variant: "outline", className: "ml-auto", children: "+ Add a rule" })
+          rules.length === 0 && /* @__PURE__ */ jsxs("span", { className: "text-sm text-fg-muted", children: [
+            /* @__PURE__ */ jsx("b", { className: "text-fg", children: "Your link already works." }),
+            " Rules are optional — add one to allow or block visitors by country, device, OS, browser or risk."
+          ] }),
+          /* @__PURE__ */ jsx(Button, { onClick: startAdd, variant: "outline", className: "ml-auto shrink-0", children: "+ Add a rule" })
         ] }) : /* @__PURE__ */ jsxs("form", { onSubmit: submit, className: "space-y-4 rounded-xl border border-line bg-bg-soft p-4", children: [
           /* @__PURE__ */ jsxs("div", { className: "grid gap-3 sm:grid-cols-2", children: [
             /* @__PURE__ */ jsx(Field, { label: "Rule name", value: form.name, onChange: (v) => setForm({ ...form, name: v }), placeholder: "Block mobile from Nigeria" }),
@@ -494,6 +501,7 @@ function Links() {
         notify("Saved, but the destination was flagged as unsafe — the redirect is disabled.", "danger");
       } else {
         notify(editing ? "Redirect updated." : "Redirect created.");
+        if (!editing) setRulesFor(saved);
       }
       load();
     } catch (e2) {
