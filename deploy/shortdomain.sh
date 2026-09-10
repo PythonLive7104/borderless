@@ -40,13 +40,24 @@ server {
     # renew silently, ~60 days later.
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
 
-    # Bare domain -> the main site (the short domain itself isn't a page).
-    location = / { return 302 https://${DOMAIN}; }
-    # Abuse reporting. Anyone who receives a malicious link finds it on THIS
-    # domain, so it has to answer here — if a complainant can't reach us they
-    # report the domain to the registrar, which suspends every customer's links.
-    location = /report { return 302 https://${DOMAIN}/report; }
-    location = /abuse  { return 302 https://${DOMAIN}/report; }
+    # Bare domain and abuse reporting are answered HERE, by a standalone page
+    # that links nowhere. These used to 302 to the main domain, which handed
+    # anyone investigating an abused link — and any blocklist that walks a
+    # redirect chain — the connection between this domain and the brand. That
+    # connection is the one thing putting short links on their own domain is
+    # supposed to prevent.
+    #
+    # A complainant still has to reach us: a domain with no visible way to
+    # report abuse gets reported to the registrar instead, and a registrar
+    # suspension takes every customer's links down at once.
+    location = /              { root /usr/share/nginx/html; try_files /short-report.html =404; }
+    location = /report        { root /usr/share/nginx/html; try_files /short-report.html =404; }
+    location = /abuse         { root /usr/share/nginx/html; try_files /short-report.html =404; }
+    # The form posts here, same-origin, so nothing in the page or the network
+    # tab names the main domain. Only this one endpoint is exposed.
+    location = /api/v1/abuse/ {
+        set \$up http://backend:8000; proxy_pass \$up; include /etc/nginx/proxy.inc;
+    }
     # Bot pages the engine may send bots to (served from the same static bundle).
     location = /decoy.html        { root /usr/share/nginx/html; }
     location = /not-found.html    { root /usr/share/nginx/html; }

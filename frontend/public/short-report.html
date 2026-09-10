@@ -1,0 +1,129 @@
+<!doctype html>
+<!--
+  Served at the root and at /report on every short-link domain.
+
+  Deliberately standalone: no framework bundle, no shared header, and no link
+  of any kind to the main site. The whole reason short links live on their own
+  domain is that abuse of a link must not reach the brand domain, and a 302
+  from here to there hands an investigator (or an automated blocklist walking
+  the redirect chain) the connection for free.
+
+  It still has to be genuinely useful to whoever lands here after receiving a
+  bad link — a domain with no way to report abuse gets suspended by the
+  registrar instead, which takes every customer's links down with it.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Report a link</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --fg:#12151c; --muted:#5a6272; --line:#e3e6ec;
+    --accent:#2563eb; --danger:#dc2626; --ok:#16a34a;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0e1116;--card:#161a21;--fg:#eef1f6;--muted:#98a1b3;--line:#252b35;--accent:#5b8cff;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+  main{width:100%;max-width:560px;background:var(--card);border:1px solid var(--line);
+       border-radius:16px;padding:28px}
+  h1{margin:0 0 6px;font-size:22px;letter-spacing:-.01em}
+  p.lead{margin:0 0 22px;color:var(--muted)}
+  label{display:block;margin:14px 0 6px;font-weight:600;font-size:14px}
+  input,select,textarea{width:100%;padding:11px 13px;border:1px solid var(--line);
+       border-radius:10px;background:var(--bg);color:var(--fg);font:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
+       box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+  textarea{min-height:90px;resize:vertical}
+  small{display:block;margin-top:5px;color:var(--muted);font-size:13px}
+  button{margin-top:20px;width:100%;padding:12px;border:0;border-radius:10px;
+       background:var(--accent);color:#fff;font:600 15px/1 inherit;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  #msg{margin-top:16px;padding:12px 14px;border-radius:10px;font-size:14px;display:none}
+  #msg.ok{display:block;background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok)}
+  #msg.bad{display:block;background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Report a link</h1>
+  <p class="lead">
+    This domain is used to shorten links. If a link on it took you somewhere
+    harmful or misleading, tell us here and we'll investigate it.
+  </p>
+
+  <form id="f">
+    <label for="url">The link you received</label>
+    <input id="url" name="url" required placeholder="e.g. /aB3xK9 or the full link" autocomplete="off">
+    <small>Paste it exactly as you received it.</small>
+
+    <label for="reason">What's wrong with it?</label>
+    <select id="reason" name="reason">
+      <option value="phishing">Phishing — it imitates a real company or login page</option>
+      <option value="malware">Malware — it tried to download or install something</option>
+      <option value="scam">Scam or fraud</option>
+      <option value="spam">Spam — I received this unsolicited</option>
+      <option value="other">Something else</option>
+    </select>
+
+    <label for="details">Anything else we should know <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+    <textarea id="details" name="details" placeholder="Where you received it, what happened when you opened it…"></textarea>
+
+    <label for="email">Your email <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+    <input id="email" name="email" type="email" autocomplete="email" placeholder="Only if you'd like a reply">
+
+    <button type="submit">Send report</button>
+  </form>
+
+  <div id="msg" role="status" aria-live="polite"></div>
+</main>
+
+<script>
+(function () {
+  var f = document.getElementById("f"), msg = document.getElementById("msg");
+  var btn = f.querySelector("button");
+
+  // Pre-fill when someone arrives from a link they're reporting, e.g.
+  // /report?u=/aB3xK9 — one less thing to copy by hand.
+  var u = new URLSearchParams(location.search).get("u");
+  if (u) document.getElementById("url").value = u;
+
+  function say(text, ok) { msg.textContent = text; msg.className = ok ? "ok" : "bad"; }
+
+  f.addEventListener("submit", function (e) {
+    e.preventDefault();
+    btn.disabled = true; say("Sending…", true);
+    // Same origin on purpose — the report never leaves this domain.
+    fetch("/api/v1/abuse/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: document.getElementById("url").value,
+        reason: document.getElementById("reason").value,
+        details: document.getElementById("details").value,
+        email: document.getElementById("email").value
+      })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (r.ok) {
+          f.style.display = "none";
+          say("Thanks — your report has been logged and we'll review this link.", true);
+        } else {
+          say(d.detail || "We couldn't send that. Please try again shortly.", false);
+          btn.disabled = false;
+        }
+      });
+    }).catch(function () {
+      say("We couldn't reach the server. Please try again shortly.", false);
+      btn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>
