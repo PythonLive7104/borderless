@@ -24,6 +24,7 @@ FROM nginx:1.27-alpine
 COPY deploy/cloudflare-realip.conf /etc/nginx/conf.d/00-cloudflare-realip.conf
 COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY deploy/proxy.inc /etc/nginx/proxy.inc
+COPY deploy/security-headers.inc /etc/nginx/security-headers.inc
 # Optional: serve the Link Shortener on a separate short domain (SHORT_DOMAIN).
 COPY deploy/shortdomain.sh /docker-entrypoint.d/30-shortdomain.sh
 # Optional: refuse traffic that didn't come through Cloudflare (opt-in via

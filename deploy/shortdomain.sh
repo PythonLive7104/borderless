@@ -36,6 +36,7 @@ server {
 
     # Empty unless ORIGIN_CLOUDFLARE_ONLY is set (deploy/originlock.sh).
     include /etc/nginx/originlock.inc;
+    include /etc/nginx/security-headers.inc;
 
     # Renewal must work over HTTPS too. Behind Cloudflare's "Always Use HTTPS"
     # the ACME challenge is redirected to 443, and without this it would fall
@@ -71,6 +72,7 @@ server {
     # -> the decision engine, which scores the click and routes human vs bot.
     location / {
         add_header X-Robots-Tag "noindex, nofollow" always;   # keep short links out of indexes
+        include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
         set \$dec http://decision:8080; proxy_pass \$dec; include /etc/nginx/proxy.inc;
     }
 }

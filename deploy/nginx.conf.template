@@ -31,6 +31,8 @@ server {
     # Empty unless ORIGIN_CLOUDFLARE_ONLY is set (deploy/originlock.sh).
     include /etc/nginx/originlock.inc;
 
+    include /etc/nginx/security-headers.inc;
+
     gzip on;
     gzip_types text/plain text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
@@ -52,7 +54,11 @@ server {
     # put the dashboard and email reputation behind the same blocklist entry,
     # which is the whole reason the short domain exists.
 
-    location /assets/ { root /usr/share/nginx/html; expires 1y; add_header Cache-Control "public, immutable"; }
+    location /assets/ {
+        root /usr/share/nginx/html; expires 1y;
+        add_header Cache-Control "public, immutable";
+        include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
+    }
     # Marketing routes resolve to their own pre-rendered index.html (via $uri/).
     # Everything else (dashboard/admin/auth — not pre-rendered) falls back to the
     # blank SPA shell, NOT the landing page, so a hard refresh doesn't flash the
