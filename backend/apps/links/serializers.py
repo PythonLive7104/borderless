@@ -74,4 +74,4 @@ class ShortDomainSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShortDomain
-        fields = ["id", "host", "base", "is_default"]
+        fields = ["id", "host", "base", "is_default", "is_shared", "private_until"]

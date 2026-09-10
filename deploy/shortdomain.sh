@@ -6,7 +6,10 @@ set -e
 # SHORT_DOMAIN is the primary; SHORT_DOMAINS may list more, comma-separated.
 # Each needs its own certificate — a domain without one is skipped rather than
 # taking nginx down with it.
-ALL="$(echo "$SHORT_DOMAIN,$SHORT_DOMAINS" | tr ',' ' ')"
+# Every domain nginx should answer for: the shared pool plus the private
+# ones. Being served and being in the shared pool are different things —
+# a private domain still needs a server block and a certificate.
+ALL="$(echo "$SHORT_DOMAIN,$SHORT_DOMAINS,$SHORT_DOMAINS_PRIVATE" | tr ',' ' ')"
 [ -z "$(echo $ALL)" ] && exit 0
 : > /etc/nginx/conf.d/shortdomain.conf
 

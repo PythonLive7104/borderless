@@ -23,9 +23,38 @@ class ShortDomain(models.Model):
     """
     host = models.CharField(max_length=190, unique=True,
                             help_text='Bare hostname, e.g. "trynb.cc" — no scheme, no trailing slash.')
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True,
+    organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True,
                                      related_name="short_domains",
-                                     help_text="Empty = available to every workspace (our own domain).")
+                                     help_text="Set = private to that workspace. Empty = shared, or unsold stock.")
+    # Three states, not two:
+    #   is_shared=True,  organization=None  -> the public pool, everyone uses it
+    #   is_shared=False, organization=None  -> bought but unsold, nobody sees it
+    #   is_shared=False, organization=<org> -> private, only that workspace
+    # Without this flag an unsold domain would silently appear in every
+    # customer's dropdown the moment we registered it.
+    is_shared = models.BooleanField(
+        default=True,
+        help_text="In the pool everyone can use. Uncheck for stock held back to sell privately.")
+    # A private domain is rented, not bought outright: each payment extends this.
+    # Past it the domain enters a grace period during which links keep working
+    # and the owner is reminded — reclaiming a domain that is carrying live
+    # traffic without warning would break campaigns already in the wild.
+    private_until = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Paid through this date. Only meaningful for a private domain.")
+
+    PRIVATE_GRACE_DAYS = 14
+
+    @property
+    def private_expired(self) -> bool:
+        from django.utils import timezone as tz
+        return bool(self.organization_id and self.private_until
+                    and tz.now() > self.private_until)
+
+    @property
+    def private_grace_ends(self):
+        from datetime import timedelta
+        return self.private_until + timedelta(days=self.PRIVATE_GRACE_DAYS) if self.private_until else None
     active = models.BooleanField(default=True,
                                  help_text="Uncheck to retire a domain; its links stop resolving.")
     is_default = models.BooleanField(default=False, help_text="Pre-selected when creating a redirect.")
@@ -50,10 +79,25 @@ class ShortDomain(models.Model):
 
     @classmethod
     def for_org(cls, organization_id):
-        """Domains this workspace may publish on: the shared pool plus its own."""
+        """Domains this workspace may publish on: the shared pool plus its own.
+
+        Unsold private stock belongs to neither and is deliberately excluded —
+        a domain someone paid for must not be usable by anyone else.
+        """
         from django.db.models import Q
         return cls.objects.filter(active=True, verified_at__isnull=False).filter(
-            Q(organization__isnull=True) | Q(organization_id=organization_id))
+            Q(is_shared=True, organization__isnull=True) | Q(organization_id=organization_id))
+
+    @classmethod
+    def private_stock(cls):
+        """Registered, verified domains held back for private sale."""
+        return cls.objects.filter(active=True, verified_at__isnull=False,
+                                  is_shared=False, organization__isnull=True)
+
+    @classmethod
+    def private_for(cls, organization_id):
+        return cls.objects.filter(active=True, is_shared=False,
+                                  organization_id=organization_id)
 
     @classmethod
     def default_for(cls, organization_id):
@@ -212,3 +256,38 @@ class AbuseReport(models.Model):
 
     def __str__(self):
         return f"{self.reason} report on /{self.slug or '?'} ({self.status})"
+
+
+class PrivateDomainPurchase(models.Model):
+    """Someone buying exclusive use of a short domain.
+
+    Held as its own record rather than a subscription change: it's a one-off,
+    it can be paid for before we have stock to hand over, and the fulfilment
+    (assigning a real domain) is a separate step from the payment.
+    """
+    class Status(models.TextChoices):
+        PENDING = "pending", "Awaiting payment"
+        PAID = "paid", "Paid — awaiting a domain"
+        FULFILLED = "fulfilled", "Domain assigned"
+        REFUNDED = "refunded", "Refunded"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE,
+                                     related_name="private_domain_purchases")
+    user = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="private_domain_purchases")
+    amount = models.IntegerField(help_text="USD charged.")
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING,
+                              db_index=True)
+    bachs_session_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    domain = models.ForeignKey(ShortDomain, on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name="purchases")
+    note = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    fulfilled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.organization.slug} · private domain · {self.status}"

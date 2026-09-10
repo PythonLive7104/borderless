@@ -378,6 +378,26 @@ class BachsWebhookView(views.APIView):
             log.info("bachs webhook: ignoring event type=%s", etype)
             return Response({"received": True})
 
+        # A private-domain purchase is a one-off, not a plan change. Without
+        # this branch it would fall through and be read as a subscription
+        # payment with no plan — activating nothing and losing the sale.
+        if (meta.get("kind") or "") == "private_domain":
+            from apps.links.models import PrivateDomainPurchase
+            from apps.links.purchases import mark_paid
+            purchase = None
+            if meta.get("purchase_id"):
+                purchase = PrivateDomainPurchase.objects.filter(pk=meta["purchase_id"]).first()
+            if not purchase and session_id:
+                purchase = PrivateDomainPurchase.objects.filter(bachs_session_id=session_id).first()
+            if purchase:
+                domain = mark_paid(purchase)
+                log.info("bachs webhook: private domain paid org=%s domain=%s",
+                         purchase.organization_id, domain.host if domain else "(none in stock)")
+            else:
+                log.warning("bachs webhook: private-domain payment with no matching purchase "
+                            "(purchase_id=%r session=%r)", meta.get("purchase_id"), session_id)
+            return Response({"received": True})
+
         # Find the subscription: prefer our metadata org id, else the checkout
         # session id we saved. Find the plan: metadata, else the pending plan.
         sub = _get_subscription(meta["organization_id"]) if meta.get("organization_id") else None

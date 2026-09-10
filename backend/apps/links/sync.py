@@ -34,7 +34,15 @@ def publish_link(link):
     """Publish under host+slug. A link with no domain, or on a retired one, is
     withdrawn instead — that is how a burned domain is switched off."""
     try:
-        if not (link.domain_id and link.domain.usable):
+        # A link may only be served on a domain its workspace is entitled to:
+        # the shared pool, or one it owns privately. Anything else — reclaimed
+        # stock, or a domain now rented by somebody else — must be withdrawn,
+        # or one customer's links would keep resolving on another's domain.
+        d = link.domain if link.domain_id else None
+        entitled = bool(d and (
+            (d.is_shared and d.organization_id is None)
+            or d.organization_id == link.organization_id))
+        if not (d and d.usable and entitled):
             unpublish_link(link.slug, link.host())
             return
         _r().set(f"shortlink:{link.host()}:{link.slug}", _payload(link))

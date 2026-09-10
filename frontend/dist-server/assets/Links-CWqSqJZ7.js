@@ -1,8 +1,8 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { A as useDialog, c as useWorkspace, B as Button, y as linkApi, x as websiteApi, d as billingApi } from "../entry-server.js";
+import { A as useDialog, c as useWorkspace, y as linkApi, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CEHlixCW.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
@@ -16,6 +16,7 @@ const randSlug = (len = 10) => {
   return s;
 };
 const MAX_SLUG = 200;
+const PRIVATE_DOMAIN_PRICE = 5;
 const clampLen = (n) => Math.min(MAX_SLUG, Math.max(6, n || 6));
 const BOT_OPTIONS = [
   { value: "decoy", label: "A decoy page", desc: "Looks like a real page and wastes their time." },
@@ -40,6 +41,72 @@ const CHALLENGE_STYLES = [
     desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages."
   }
 ];
+function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
+  var _a, _b;
+  const owned = priv.owned.length;
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const { confirm, notify } = useDialog();
+  async function buy() {
+    var _a2;
+    if (!await confirm({
+      title: `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
+      message: "A short domain used by you and nobody else, so another customer's traffic can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
+      confirmLabel: "Continue to payment",
+      cancelLabel: "Not now",
+      tone: "brand"
+    })) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await linkApi.buyPrivateDomain(orgId);
+      if (r.checkout_url) {
+        window.location.href = r.checkout_url;
+        return;
+      }
+      notify("Private domain added.");
+      onChanged();
+    } catch (e) {
+      setMsg(((_a2 = e == null ? void 0 : e.data) == null ? void 0 : _a2.detail) || "Could not start the purchase.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-5 flex flex-wrap items-center justify-between gap-3 p-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+      /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: owned > 0 ? `Your private ${owned === 1 ? "domain" : "domains"}` : "Private domain" }),
+      owned > 0 ? /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+        priv.owned.map((d) => d.host).join(", "),
+        " — yours alone. Nobody else can create links on ",
+        owned === 1 ? "it" : "them",
+        ", so another customer's traffic can never affect",
+        owned === 1 ? " its" : " their",
+        " reputation.",
+        ((_a = priv.owned[0]) == null ? void 0 : _a.private_until) && /* @__PURE__ */ jsxs(Fragment, { children: [
+          " Renews ",
+          /* @__PURE__ */ jsx("b", { children: new Date(priv.owned[0].private_until).toLocaleDateString() }),
+          "."
+        ] })
+      ] }) : /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+        "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else.",
+        " ",
+        priv.available > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx("b", { children: priv.available }),
+          " available right now."
+        ] }) : /* @__PURE__ */ jsx(Fragment, { children: "None in stock at the moment — ask and we'll source one." })
+      ] })
+    ] }),
+    owned > 0 && ((_b = priv.owned[0]) == null ? void 0 : _b.private_until) && new Date(priv.owned[0].private_until) < /* @__PURE__ */ new Date() && /* @__PURE__ */ jsxs("div", { className: "w-full rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm", children: [
+      "⚠️ This rental has lapsed. Your links still work for a short grace period, then the domain is released. ",
+      canManage && /* @__PURE__ */ jsx("button", { onClick: buy, className: "font-semibold text-brand hover:underline", children: "Renew now" })
+    ] }),
+    canManage && owned > 0 && /* @__PURE__ */ jsx(Button, { onClick: buy, variant: "outline", disabled: busy, children: busy ? "Starting…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo` }),
+    canManage && owned === 0 && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+      /* @__PURE__ */ jsx(Button, { onClick: buy, variant: "outline", disabled: busy, children: busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
+      msg && /* @__PURE__ */ jsx("span", { className: "max-w-xs text-right text-xs text-red-600", children: msg })
+    ] })
+  ] });
+}
 function LockedBanner({ planName, canManage }) {
   return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-brand/5 p-5", children: [
     /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
@@ -68,6 +135,7 @@ function Links() {
   const [editing, setEditing] = useState(null);
   const [linkBase, setLinkBase] = useState("");
   const [domains, setDomains] = useState([]);
+  const [priv, setPriv] = useState({ owned: [], available: 0 });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(null);
@@ -96,11 +164,31 @@ function Links() {
       setSub(s);
       setLinkBase(l.base || "");
       setDomains(l.domains || []);
+      if (l.private) setPriv(l.private);
     } finally {
       setLoading(false);
     }
   }
   useLivePoll(load, [current == null ? void 0 : current.id]);
+  useEffect(() => {
+    if (!current || !window.location.search.includes("purchase=success")) return;
+    let tries = 0;
+    const iv = setInterval(async () => {
+      tries++;
+      try {
+        const r = await linkApi.verifyPrivateDomain(current.id);
+        if (r.paid) {
+          clearInterval(iv);
+          window.history.replaceState({}, "", "/dashboard/links");
+          notify(r.awaiting_stock ? "Payment received. We're preparing your domain and will email you shortly." : `${r.host} is yours — pick it when you create a redirect.`);
+          load();
+        }
+      } catch {
+      }
+      if (tries >= 10) clearInterval(iv);
+    }, 2e3);
+    return () => clearInterval(iv);
+  }, [current == null ? void 0 : current.id]);
   async function explainLocked() {
     if (await confirm({
       title: "Redirects need a paid plan",
@@ -233,6 +321,15 @@ function Links() {
         ] })
       ] })
     ] }),
+    linkEnabled && current && /* @__PURE__ */ jsx(
+      PrivateDomainPanel,
+      {
+        priv,
+        canManage,
+        orgId: current.id,
+        onChanged: load
+      }
+    ),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !serviceUp ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl", children: "⏸️" }),
       /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirects are paused" }),

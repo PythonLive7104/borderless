@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, websiteApi, billingApi, type ChallengeStyle, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
+import { linkApi, websiteApi, billingApi, type ChallengeStyle, type PrivateDomains, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -18,6 +18,7 @@ const randSlug = (len = 10) => {
   return s;
 };
 const MAX_SLUG = 200;
+const PRIVATE_DOMAIN_PRICE = 5;
 const clampLen = (n: number) => Math.min(MAX_SLUG, Math.max(6, n || 6));
 
 const BOT_OPTIONS: { value: BotAction; label: string; desc: string }[] = [
@@ -34,6 +35,81 @@ const CHALLENGE_STYLES: { value: ChallengeStyle; label: string; desc: string }[]
   { value: "slide", label: "Slide to continue",
     desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages." },
 ];
+
+function PrivateDomainPanel({ priv, canManage, orgId, onChanged }: {
+  priv: PrivateDomains; canManage: boolean; orgId: number; onChanged: () => void;
+}) {
+  const owned = priv.owned.length;
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const { confirm, notify } = useDialog();
+
+  async function buy() {
+    if (!(await confirm({
+      title: `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
+      message: "A short domain used by you and nobody else, so another customer's traffic "
+             + "can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
+      confirmLabel: "Continue to payment",
+      cancelLabel: "Not now",
+      tone: "brand",
+    }))) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await linkApi.buyPrivateDomain(orgId);
+      if (r.checkout_url) { window.location.href = r.checkout_url; return; }
+      notify("Private domain added."); onChanged();
+    } catch (e: any) {
+      setMsg(e?.data?.detail || "Could not start the purchase.");
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="card shadow-soft mt-5 flex flex-wrap items-center justify-between gap-3 p-5">
+      <div className="min-w-0">
+        <div className="text-sm font-bold">
+          {owned > 0 ? `Your private ${owned === 1 ? "domain" : "domains"}` : "Private domain"}
+        </div>
+        {owned > 0 ? (
+          <p className="mt-1 text-sm text-fg-muted">
+            {priv.owned.map((d) => d.host).join(", ")} — yours alone. Nobody else can create links
+            on {owned === 1 ? "it" : "them"}, so another customer's traffic can never affect
+            {owned === 1 ? " its" : " their"} reputation.
+            {priv.owned[0]?.private_until && (
+              <> Renews <b>{new Date(priv.owned[0].private_until).toLocaleDateString()}</b>.</>
+            )}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-fg-muted">
+            Shared domains work well, but you're on them alongside other customers. A private domain
+            is used by you and nobody else.{" "}
+            {priv.available > 0
+              ? <><b>{priv.available}</b> available right now.</>
+              : <>None in stock at the moment — ask and we'll source one.</>}
+          </p>
+        )}
+      </div>
+      {owned > 0 && priv.owned[0]?.private_until &&
+        new Date(priv.owned[0].private_until) < new Date() && (
+        <div className="w-full rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
+          ⚠️ This rental has lapsed. Your links still work for a short grace period, then the
+          domain is released. {canManage && <button onClick={buy} className="font-semibold text-brand hover:underline">Renew now</button>}
+        </div>
+      )}
+      {canManage && owned > 0 && (
+        <Button onClick={buy} variant="outline" disabled={busy}>
+          {busy ? "Starting…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo`}
+        </Button>
+      )}
+      {canManage && owned === 0 && (
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={buy} variant="outline" disabled={busy}>
+            {busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
+          </Button>
+          {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function LockedBanner({ planName, canManage }: { planName?: string; canManage: boolean }) {
   return (
@@ -66,6 +142,7 @@ export default function Links() {
   // never show a trynobot.com link as a stand-in.
   const [linkBase, setLinkBase] = useState("");
   const [domains, setDomains] = useState<ShortDomain[]>([]);
+  const [priv, setPriv] = useState<PrivateDomains>({ owned: [], available: 0 });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
@@ -97,9 +174,34 @@ export default function Links() {
       const [l, w, s] = await Promise.all([linkApi.list(current.id), websiteApi.list(current.id), billingApi.subscription(current.id)]);
       setRows(l.results); setSites(w.results); setSub(s);
       setLinkBase(l.base || ""); setDomains(l.domains || []);
+      if (l.private) setPriv(l.private);
     } finally { setLoading(false); }
   }
   useLivePoll(load, [current?.id]);
+
+  // Returning from a private-domain checkout: ask Bachs directly rather than
+  // waiting on a webhook, same as plan purchases.
+  useEffect(() => {
+    if (!current || !window.location.search.includes("purchase=success")) return;
+    let tries = 0;
+    const iv = setInterval(async () => {
+      tries++;
+      try {
+        const r = await linkApi.verifyPrivateDomain(current.id);
+        if (r.paid) {
+          clearInterval(iv);
+          window.history.replaceState({}, "", "/dashboard/links");
+          notify(r.awaiting_stock
+            ? "Payment received. We're preparing your domain and will email you shortly."
+            : `${r.host} is yours — pick it when you create a redirect.`);
+          load();
+        }
+      } catch { /* keep trying */ }
+      if (tries >= 10) clearInterval(iv);
+    }, 2000);
+    return () => clearInterval(iv);
+    /* eslint-disable-next-line */
+  }, [current?.id]);
 
   // Clicking while unpaid explains why, rather than doing nothing. A disabled
   // button looks broken and tells them nothing.
@@ -216,6 +318,9 @@ export default function Links() {
           </div>
         )}
       </div>
+
+      {linkEnabled && current && <PrivateDomainPanel priv={priv} canManage={canManage}
+        orgId={current.id} onChanged={load} />}
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : !serviceUp ? (

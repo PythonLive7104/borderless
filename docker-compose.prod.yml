@@ -72,7 +72,9 @@ services:
         VITE_TAWK_SRC: ${VITE_TAWK_SRC:-}
     environment:
       DOMAIN: ${DOMAIN}
-      SHORT_DOMAIN: ${SHORT_DOMAIN:-}   # optional separate short-link domain
+      SHORT_DOMAIN: ${SHORT_DOMAIN:-}    # primary short-link domain
+      SHORT_DOMAINS: ${SHORT_DOMAINS:-}  # more shared-pool domains, comma-separated
+      SHORT_DOMAINS_PRIVATE: ${SHORT_DOMAINS_PRIVATE:-}  # served, but sold privately
       NGINX_ENVSUBST_FILTER: DOMAIN   # only substitute ${DOMAIN}; leave $host, $uri etc.
     ports:
       - "80:80"

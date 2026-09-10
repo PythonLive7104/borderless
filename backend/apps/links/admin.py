@@ -7,8 +7,24 @@ from .sync import publish_link
 
 @admin.register(ShortDomain)
 class ShortDomainAdmin(admin.ModelAdmin):
-    list_display = ("host", "active", "is_default", "verified_at", "organization", "sort")
-    list_filter = ("active", "is_default")
+    list_display = ("host", "active", "is_shared", "organization", "is_default", "verified_at")
+    list_filter = ("active", "is_shared", "is_default")
+    actions = ("hold_as_private_stock", "return_to_shared_pool")
+
+    @admin.action(description="Hold back as private stock (removes from the shared pool)")
+    def hold_as_private_stock(self, request, queryset):
+        n = queryset.filter(organization__isnull=True).update(is_shared=False, is_default=False)
+        self.message_user(request, f"{n} domain(s) held as private stock. "
+                                   "Assign one to a workspace to sell it.")
+
+    @admin.action(description="Return to the shared pool")
+    def return_to_shared_pool(self, request, queryset):
+        sold = queryset.filter(organization__isnull=False).count()
+        n = queryset.filter(organization__isnull=True).update(is_shared=True)
+        msg = f"{n} domain(s) returned to the shared pool."
+        if sold:
+            msg += f" {sold} skipped — they belong to a workspace; clear the owner first."
+        self.message_user(request, msg)
     search_fields = ("host",)
 
 

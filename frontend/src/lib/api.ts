@@ -157,7 +157,8 @@ export const websiteApi = {
 
 // ---- short links ----
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
-export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; }
+export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; is_shared: boolean; private_until: string | null; }
+export interface PrivateDomains { owned: ShortDomain[]; available: number; }
 export type ChallengeStyle = "hold" | "checkbox" | "slide";
 export interface ShortLink {
   domain: number | null;
@@ -174,11 +175,15 @@ export interface ShortLink {
   short_url: string; quality: number; created_at: string;
 }
 export const linkApi = {
-  list: (orgId: number) => http.get<{ results: ShortLink[]; base: string; domains: ShortDomain[] }>(`/links/?organization=${orgId}`),
+  list: (orgId: number) => http.get<{ results: ShortLink[]; base: string; domains: ShortDomain[]; private: PrivateDomains }>(`/links/?organization=${orgId}`),
   create: (p: { organization: number; destination_url: string; title?: string; slug?: string; domain?: number | null; bot_action?: BotAction; website?: number | null }) =>
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
   remove: (id: number) => http.del(`/links/${id}/`),
+  buyPrivateDomain: (orgId: number) =>
+    http.post<{ checkout_url?: string; activated?: boolean }>("/links/private-domain/checkout/", { organization: orgId }),
+  verifyPrivateDomain: (orgId: number) =>
+    http.post<{ paid: boolean; host: string; awaiting_stock: boolean }>("/links/private-domain/verify/", { organization: orgId }),
 };
 
 // ---- campaigns ----

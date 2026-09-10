@@ -54,5 +54,22 @@ class Command(BaseCommand):
             except Exception as exc:
                 self.stderr.write(f"  {sub.organization_id}: {exc}")
 
+        # Private-domain purchases go through the same "webhook may never
+        # arrive" risk, and one paid before we had stock still needs handing over.
+        from apps.links.models import PrivateDomainPurchase
+        from apps.links.purchases import fulfil_backlog, mark_paid
+        pending = PrivateDomainPurchase.objects.filter(
+            status=PrivateDomainPurchase.Status.PENDING).exclude(bachs_session_id="")
+        for p in pending:
+            data, err = bachs.get_checkout_session(p.bachs_session_id)
+            if not err and bachs.session_is_paid(data):
+                mark_paid(p)
+                self.stdout.write(self.style.SUCCESS(
+                    f"  private domain paid: {p.organization.slug}"))
+        handed = fulfil_backlog()
+        if handed:
+            self.stdout.write(self.style.SUCCESS(
+                f"  {handed} paid-but-unfulfilled private domain(s) assigned."))
+
         self.stdout.write(self.style.SUCCESS(
             f"Done. {checked} pending checkout(s) checked, {activated} activated."))

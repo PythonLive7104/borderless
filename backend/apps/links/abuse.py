@@ -25,7 +25,19 @@ SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,200}$")
 
 
 def _our_hosts() -> set:
+    """Every host a short link of ours can live on.
+
+    Read from the domain table rather than a setting: with more than one short
+    domain a single SHORTLINK_BASE can't describe them all, and a comma-joined
+    value would parse into a nonsense host — quietly breaking slug matching on
+    every domain, so no abuse report could be tied to a link.
+    """
     hosts = set()
+    try:
+        from .models import ShortDomain
+        hosts.update(h.lower() for h in ShortDomain.objects.values_list("host", flat=True))
+    except Exception:
+        pass
     for url in (getattr(settings, "SHORTLINK_BASE", ""), getattr(settings, "FRONTEND_URL", "")):
         h = urlparse(url if "//" in (url or "") else f"//{url}").hostname if url else None
         if h:
