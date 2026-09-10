@@ -1118,3 +1118,28 @@ class SimpleGatesTest(TestCase):
         p = self._payload(slug="sg3")
         self.assertEqual((p["device_mode"], p["os_mode"], p["max_risk"]), ("off", "off", 0))
         self.assertEqual((p["devices"], p["operating_systems"]), ([], []))
+
+
+class AllowedHostsTest(TestCase):
+    """The abuse form posts to /api/v1/abuse/ on the short domain. If Django
+    doesn't accept that Host, reporting fails with a bare 400 and nothing in the
+    dashboard shows reports going missing."""
+
+    def test_short_domains_are_accepted(self):
+        from config.settings import build_allowed_hosts
+        hosts = build_allowed_hosts("trynobot.com", "trynb.cc", "", "korv.cc, gonb.cc")
+        for h in ("trynobot.com", "trynb.cc", "korv.cc", "gonb.cc"):
+            self.assertIn(h, hosts)
+
+    def test_no_duplicates_when_a_domain_is_listed_twice(self):
+        from config.settings import build_allowed_hosts
+        hosts = build_allowed_hosts("trynobot.com,trynb.cc", "trynb.cc", "", "")
+        self.assertEqual(hosts.count("trynb.cc"), 1)
+
+    def test_a_wildcard_stays_a_wildcard(self):
+        from config.settings import build_allowed_hosts
+        self.assertEqual(build_allowed_hosts("*", "trynb.cc", "", ""), ["*"])
+
+    def test_casing_and_padding_are_tolerated(self):
+        from config.settings import build_allowed_hosts
+        self.assertIn("korv.cc", build_allowed_hosts("trynobot.com", " KORV.CC ", "", ""))

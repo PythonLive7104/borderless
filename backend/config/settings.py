@@ -10,7 +10,33 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "1").strip().lower() in ("1", "true", "yes", "on")
 TESTING = "test" in sys.argv  # Django forces DEBUG=False under tests; skip prod-only hardening
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+def build_allowed_hosts(raw: str, *short_domain_vars: str) -> list:
+    """Merge DJANGO_ALLOWED_HOSTS with the short-link domains.
+
+    The short domains serve the abuse-report form, which posts back to
+    /api/v1/abuse/ on their own host. Django rejects an unlisted Host before any
+    view runs, so leaving them out breaks reporting with a bare 400 — and
+    nothing in the dashboard shows reports going missing. They're already
+    configured for nginx, so they're read from there rather than asking for the
+    same list twice.
+    """
+    hosts = [h.strip() for h in (raw or "").split(",") if h.strip()]
+    if "*" in hosts:
+        return ["*"]
+    for group in short_domain_vars:
+        for host in (group or "").split(","):
+            host = host.strip().lower()
+            if host and host not in hosts:
+                hosts.append(host)
+    return hosts
+
+
+ALLOWED_HOSTS = build_allowed_hosts(
+    os.getenv("DJANGO_ALLOWED_HOSTS", "*"),
+    os.getenv("SHORT_DOMAIN", ""),
+    os.getenv("SHORT_DOMAINS", ""),
+    os.getenv("SHORT_DOMAINS_PRIVATE", ""),
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
