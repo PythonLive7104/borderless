@@ -28,6 +28,9 @@ server {
     ssl_session_cache   shared:SSL:10m;
     ssl_session_timeout 1h;
 
+    # Empty unless ORIGIN_CLOUDFLARE_ONLY is set (deploy/originlock.sh).
+    include /etc/nginx/originlock.inc;
+
     gzip on;
     gzip_types text/plain text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;

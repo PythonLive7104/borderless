@@ -75,6 +75,9 @@ services:
       SHORT_DOMAIN: ${SHORT_DOMAIN:-}    # primary short-link domain
       SHORT_DOMAINS: ${SHORT_DOMAINS:-}  # more shared-pool domains, comma-separated
       SHORT_DOMAINS_PRIVATE: ${SHORT_DOMAINS_PRIVATE:-}  # served, but sold privately
+      # 1 = refuse anything that didn't come through Cloudflare. Turn on only
+      # once EVERY domain above is proxied (orange cloud), or those sites go dark.
+      ORIGIN_CLOUDFLARE_ONLY: ${ORIGIN_CLOUDFLARE_ONLY:-0}
       NGINX_ENVSUBST_FILTER: DOMAIN   # only substitute ${DOMAIN}; leave $host, $uri etc.
     ports:
       - "80:80"

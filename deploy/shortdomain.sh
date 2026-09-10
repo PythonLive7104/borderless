@@ -34,6 +34,9 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${SHORT_DOMAIN}/privkey.pem;
     ssl_session_cache   shared:SSL:10m;
 
+    # Empty unless ORIGIN_CLOUDFLARE_ONLY is set (deploy/originlock.sh).
+    include /etc/nginx/originlock.inc;
+
     # Renewal must work over HTTPS too. Behind Cloudflare's "Always Use HTTPS"
     # the ACME challenge is redirected to 443, and without this it would fall
     # through to the slug handler below and 404 — the cert would then fail to

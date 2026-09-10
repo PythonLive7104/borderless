@@ -26,6 +26,11 @@ COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY deploy/proxy.inc /etc/nginx/proxy.inc
 # Optional: serve the Link Shortener on a separate short domain (SHORT_DOMAIN).
 COPY deploy/shortdomain.sh /docker-entrypoint.d/30-shortdomain.sh
-RUN chmod +x /docker-entrypoint.d/30-shortdomain.sh
+# Optional: refuse traffic that didn't come through Cloudflare (opt-in via
+# ORIGIN_CLOUDFLARE_ONLY). Runs before shortdomain so its server blocks can
+# include the result. The include must exist even when the lock is off.
+COPY deploy/originlock.sh /docker-entrypoint.d/20-originlock.sh
+RUN chmod +x /docker-entrypoint.d/30-shortdomain.sh /docker-entrypoint.d/20-originlock.sh \
+ && touch /etc/nginx/originlock.inc
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
