@@ -18,7 +18,8 @@ class WebsiteViewSet(viewsets.ModelViewSet):
         return OrganizationMember.objects.filter(user=self.request.user).values_list("organization_id", flat=True)
 
     def get_queryset(self):
-        qs = Website.objects.filter(organization_id__in=self._member_org_ids())
+        # The internal redirect holder isn't a site the user added.
+        qs = Website.objects.filter(organization_id__in=self._member_org_ids(), is_system=False)
         org = self.request.query_params.get("organization")
         if org:
             qs = qs.filter(organization_id=org)
@@ -35,7 +36,7 @@ class WebsiteViewSet(viewsets.ModelViewSet):
         from apps.billing.models import website_limit, is_on_trial
         from rest_framework.exceptions import ValidationError
         limit = website_limit(org.id)  # 0 = unlimited
-        if limit and Website.objects.filter(organization=org).count() >= limit:
+        if limit and Website.objects.filter(organization=org, is_system=False).count() >= limit:
             where = "free trial" if is_on_trial(org.id) else "current plan"
             raise ValidationError(
                 f"Your {where} can protect {limit} website{'s' if limit != 1 else ''}. "

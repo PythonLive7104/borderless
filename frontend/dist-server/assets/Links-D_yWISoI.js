@@ -384,7 +384,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "" }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -444,7 +444,7 @@ function Links() {
     setErr("");
     setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "" });
     setOpen(true);
   }
   function openEdit(l) {
@@ -461,7 +461,9 @@ function Links() {
       forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "",
       block_vpn: !!l.block_vpn,
-      domain: l.domain ? String(l.domain) : ""
+      domain: l.domain ? String(l.domain) : "",
+      country_mode: l.country_mode || "off",
+      countries: l.countries || ""
     });
     setOpen(true);
   }
@@ -478,6 +480,8 @@ function Links() {
       challenge: form.challenge,
       challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
+      country_mode: form.country_mode,
+      countries: form.country_mode === "off" ? "" : form.countries.trim(),
       domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
@@ -654,6 +658,14 @@ function Links() {
               " · ",
               /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
             ] }),
+            l.country_mode !== "off" && l.countries && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
+                l.country_mode === "allow" ? "Only" : "Not",
+                " ",
+                l.countries
+              ] })
+            ] }),
             l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
               " · ",
               /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
@@ -790,6 +802,37 @@ function Links() {
             /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: o.desc })
           ] })
         ] }, o.value)) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3.5", children: [
+        /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "Which countries can use this link?" }),
+        /* @__PURE__ */ jsxs(
+          "select",
+          {
+            value: form.country_mode,
+            onChange: (e) => setForm({ ...form, country_mode: e.target.value }),
+            className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20",
+            children: [
+              /* @__PURE__ */ jsx("option", { value: "off", children: "Everywhere — no country restriction" }),
+              /* @__PURE__ */ jsx("option", { value: "allow", children: "Only these countries" }),
+              /* @__PURE__ */ jsx("option", { value: "block", children: "Everywhere except these" })
+            ]
+          }
+        ),
+        form.country_mode !== "off" && /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              value: form.countries,
+              placeholder: "US, CA, GB",
+              onChange: (e) => setForm({ ...form, countries: e.target.value }),
+              className: "mt-2 w-full rounded-xl border border-line bg-white px-4 py-2.5 font-mono text-sm uppercase outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            }
+          ),
+          /* @__PURE__ */ jsxs("p", { className: "mt-1.5 text-xs text-fg-dim", children: [
+            "Two-letter country codes, comma separated. Anyone refused gets the bot handling above — they're never told why.",
+            form.country_mode === "allow" && " Visitors whose country we can't determine are refused too."
+          ] })
+        ] })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_vpn ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
         /* @__PURE__ */ jsx(

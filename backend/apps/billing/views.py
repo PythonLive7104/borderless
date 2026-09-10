@@ -85,7 +85,7 @@ class UsageView(views.APIView):
         from apps.links.models import ShortLink
         from .models import is_on_trial, website_limit, campaign_limit, redirect_limit
         on_trial = is_on_trial(org_id)
-        n_sites = Website.objects.filter(organization_id=org_id).count()
+        n_sites = Website.objects.filter(organization_id=org_id, is_system=False).count()
         n_campaigns = Campaign.objects.filter(website__organization_id=org_id).count()
         n_redirects = ShortLink.objects.filter(organization_id=org_id).count()
 

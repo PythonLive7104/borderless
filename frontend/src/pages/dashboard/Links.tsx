@@ -150,8 +150,8 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "" });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "" });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -221,7 +221,7 @@ export default function Links() {
   function openCreate() {
     setErr(""); setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "" });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -233,6 +233,7 @@ export default function Links() {
       forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn,
       domain: l.domain ? String(l.domain) : "",
+      country_mode: l.country_mode || "off", countries: l.countries || "",
     });
     setOpen(true);
   }
@@ -246,6 +247,8 @@ export default function Links() {
       challenge: form.challenge,
       challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
+      country_mode: form.country_mode,
+      countries: form.country_mode === "off" ? "" : form.countries.trim(),
       domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
@@ -387,6 +390,8 @@ export default function Links() {
                     {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
                     {domains.length > 1 && l.domain_host && <> · <b className="text-fg-muted">{l.domain_host}</b></>}
                     {l.block_vpn && <> · <b className="text-fg-muted">VPN/RDP blocked</b></>}
+                    {l.country_mode !== "off" && l.countries && <> · <b className="text-fg-muted">
+                      {l.country_mode === "allow" ? "Only" : "Not"} {l.countries}</b></>}
                     {l.challenge && <> · <b className="text-fg-muted">Human check: {CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))?.label}</b></>}
                     {l.forward_params && <> · <b className="text-fg-muted">
                       Forwards {l.forward_param_keys || "all params"}</b></>}
@@ -479,6 +484,29 @@ export default function Links() {
                 </label>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-line p-3.5">
+            <span className="mb-1.5 block text-sm font-semibold">Which countries can use this link?</span>
+            <select value={form.country_mode}
+              onChange={(e) => setForm({ ...form, country_mode: e.target.value as typeof form.country_mode })}
+              className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+              <option value="off">Everywhere — no country restriction</option>
+              <option value="allow">Only these countries</option>
+              <option value="block">Everywhere except these</option>
+            </select>
+            {form.country_mode !== "off" && (
+              <>
+                <input value={form.countries} placeholder="US, CA, GB"
+                  onChange={(e) => setForm({ ...form, countries: e.target.value })}
+                  className="mt-2 w-full rounded-xl border border-line bg-white px-4 py-2.5 font-mono text-sm uppercase outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                <p className="mt-1.5 text-xs text-fg-dim">
+                  Two-letter country codes, comma separated. Anyone refused gets the bot handling
+                  above — they're never told why.
+                  {form.country_mode === "allow" && " Visitors whose country we can't determine are refused too."}
+                </p>
+              </>
+            )}
           </div>
 
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_vpn ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>

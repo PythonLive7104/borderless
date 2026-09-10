@@ -18,6 +18,7 @@ def _payload(link) -> str:
         "destination": link.destination_url,
         "tid": tid,
         "slug": link.slug,
+        "org": str(link.organization_id),
         "bot_action": link.bot_action,          # off | decoy | notfound | blank
         "decoy_url": (_bot_base(link) + "/decoy.html") if link.domain_id else "",
         "challenge": bool(link.challenge),      # human check before redirecting
@@ -25,6 +26,8 @@ def _payload(link) -> str:
         "forward_params": bool(link.forward_params),
         "forward_keys": link.forward_keys(),
         "block_vpn": bool(link.block_vpn),
+        "country_mode": link.country_mode or "off",
+        "countries": link.country_list(),
         # Rules attached to this redirect specifically. The engine prefers
         # these over the attached website's rules.
         "rules": _link_rules(link),

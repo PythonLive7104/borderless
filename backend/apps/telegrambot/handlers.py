@@ -149,7 +149,7 @@ def list_redirects(link: TelegramLink) -> None:
 
 def list_websites(link: TelegramLink) -> None:
     from apps.websites.models import Website
-    sites = list(Website.objects.filter(organization_id=link.organization_id)[:10])
+    sites = list(Website.objects.filter(organization_id=link.organization_id, is_system=False)[:10])
     if not sites:
         api.send(link.chat_id,
                  "No websites yet.\n\n"
@@ -174,7 +174,7 @@ def show_plan(link: TelegramLink) -> None:
         return
     state = sub.access_state()
     used_links = ShortLink.objects.filter(organization_id=link.organization_id).count()
-    used_sites = Website.objects.filter(organization_id=link.organization_id).count()
+    used_sites = Website.objects.filter(organization_id=link.organization_id, is_system=False).count()
     cap_links = redirect_limit(link.organization_id)
     cap_sites = website_limit(link.organization_id)
 

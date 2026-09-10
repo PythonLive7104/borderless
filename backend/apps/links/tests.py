@@ -1011,3 +1011,77 @@ class DomainPoolSplitTest(TestCase):
         korv.refresh_from_db()
         self.assertEqual(korv.organization, self.org)     # still the renter's
         self.assertEqual(ShortDomain.private_stock().count(), 1)   # only gonb.cc left
+
+
+class RedirectTrafficIsRecordedTest(TestCase):
+    """A redirect with no website attached must still produce visitors and
+    click-log rows — its clicks were being dropped entirely."""
+
+    def setUp(self):
+        self.org = _workspace("owner@traffic.example")
+        self.link = ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                             slug="tr", destination_url="https://e.example")
+
+    def test_the_payload_carries_the_owning_workspace(self):
+        import json
+        from apps.links.sync import _payload
+        # Without this the consumer has no idea whose traffic a website-less
+        # redirect belongs to, and drops the event.
+        self.assertEqual(json.loads(_payload(self.link))["org"], str(self.org.id))
+
+    def test_the_consumer_parks_it_on_an_internal_holder(self):
+        from apps.traffic.management.commands.consume_traffic import _redirect_site
+        site = _redirect_site(str(self.org.id))
+        self.assertIsNotNone(site)
+        self.assertTrue(site.is_system)
+        self.assertEqual(site.organization, self.org)
+
+    def test_the_holder_is_reused_not_duplicated(self):
+        from apps.traffic.management.commands.consume_traffic import _redirect_site
+        a = _redirect_site(str(self.org.id))
+        b = _redirect_site(str(self.org.id))
+        self.assertEqual(a.pk, b.pk)
+
+    def test_an_unknown_workspace_is_still_dropped(self):
+        from apps.traffic.management.commands.consume_traffic import _redirect_site
+        self.assertIsNone(_redirect_site("999999"))
+        self.assertIsNone(_redirect_site(""))
+
+    def test_the_holder_is_hidden_from_the_websites_list_and_limits(self):
+        from apps.websites.models import Website
+        from apps.traffic.management.commands.consume_traffic import _redirect_site
+        _redirect_site(str(self.org.id))
+        visible = Website.objects.filter(organization=self.org, is_system=False).count()
+        self.assertEqual(visible, 0)          # not a site they added
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class CountryGateTest(TestCase):
+    def setUp(self):
+        self.org = _workspace("owner@geo.example")
+
+    def _link(self, mode, countries):
+        return ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                        slug=f"g{mode}{len(countries)}",
+                                        destination_url="https://e.example",
+                                        country_mode=mode, countries=countries)
+
+    def test_codes_are_normalised(self):
+        self.assertEqual(self._link("allow", " us , ca ,, gb ").country_list(),
+                         ["US", "CA", "GB"])
+
+    def test_the_gate_reaches_the_engine(self):
+        import json
+        p = json.loads(__import__("apps.links.sync", fromlist=["_payload"])._payload(
+            self._link("allow", "US,CA")))
+        self.assertEqual(p["country_mode"], "allow")
+        self.assertEqual(p["countries"], ["US", "CA"])
+
+    def test_off_by_default_sends_no_restriction(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=_domain(), slug="gd",
+                                        destination_url="https://e.example")
+        p = json.loads(_payload(link))
+        self.assertEqual(p["country_mode"], "off")
+        self.assertEqual(p["countries"], [])

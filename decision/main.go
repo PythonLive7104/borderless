@@ -473,6 +473,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	var link struct {
 		Destination string `json:"destination"`
 		TID         string `json:"tid"`
+		Org         string `json:"org"`
 		BotAction   string `json:"bot_action"` // off | decoy | notfound | blank
 		DecoyURL    string `json:"decoy_url"`
 		Active      bool   `json:"active"`
@@ -481,6 +482,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		ForwardQS   bool     `json:"forward_params"`
 		ForwardKeys []string `json:"forward_keys"`
 		BlockVPN    bool     `json:"block_vpn"`
+		CountryMode string   `json:"country_mode"` // off | allow | block
+		Countries   []string `json:"countries"`
 		Rules       string   `json:"rules"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
@@ -519,6 +522,31 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 			mode = link.BotAction
 		}
 	}
+	// Country gate. Runs before the VPN check and before any rules: if the
+	// visitor isn't allowed in from where they are, nothing else matters.
+	// An unknown country (no geo match) is treated as "not on the list" for an
+	// allow-list, which is the safe reading of "only these countries".
+	if link.CountryMode == "allow" || link.CountryMode == "block" {
+		listed := false
+		for _, c := range link.Countries {
+			if strings.EqualFold(c, fp.Country) && fp.Country != "" {
+				listed = true
+				break
+			}
+		}
+		refused := (link.CountryMode == "allow" && !listed) ||
+			(link.CountryMode == "block" && listed)
+		if refused {
+			isBot = true
+			switch link.BotAction {
+			case "decoy", "notfound", "blank":
+				mode = link.BotAction
+			default:
+				mode = "notfound"
+			}
+		}
+	}
+
 	// VPN / proxy / RDP-datacenter blocking. Treated as bot traffic rather than a
 	// hard 403 so the visitor sees the same decoy or 404 as any other bot and
 	// isn't told what gave them away. "Send them through too" is not a sensible
@@ -588,7 +616,9 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 
 	sigJSON, _ := json.Marshal(result.Signals)
 	go h.st.EmitTraffic(context.Background(), map[string]any{
-		"site_id": link.TID, "visitor_id": "click:" + fp.IP, "session_id": "",
+		// org travels alongside site_id: a redirect with no website still has an
+		// owner, and its clicks must land somewhere rather than being dropped.
+		"site_id": link.TID, "org": link.Org, "visitor_id": "click:" + fp.IP, "session_id": "",
 		"type": "click", "slug": slug, "url": link.Destination,
 		"ip": fp.IP, "country": fp.Country, "device": fp.Device, "browser": fp.Browser, "os": fp.OS,
 		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),

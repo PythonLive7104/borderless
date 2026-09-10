@@ -173,6 +173,23 @@ class ShortLink(models.Model):
         default=False,
         help_text="Give VPN, proxy and datacenter/RDP visitors the bot handling.")
 
+    # Country gate. Expressed as a plain list rather than making the user build
+    # a rule, because "only these countries" is the single most common thing an
+    # advertiser wants and shouldn't require learning the rule builder.
+    class CountryMode(models.TextChoices):
+        OFF = "off", "Everywhere"
+        ALLOW = "allow", "Only these countries"
+        BLOCK = "block", "Everywhere except these"
+
+    country_mode = models.CharField(max_length=6, choices=CountryMode.choices,
+                                    default=CountryMode.OFF)
+    countries = models.CharField(
+        max_length=400, blank=True, default="",
+        help_text='Comma-separated ISO-2 codes, e.g. "US,CA,GB".')
+
+    def country_list(self) -> list:
+        return [c.strip().upper() for c in self.countries.split(",") if c.strip()]
+
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)

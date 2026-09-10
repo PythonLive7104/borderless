@@ -15,6 +15,24 @@ from apps.traffic.models import Visitor, Session, TrafficEvent, Conversion
 from apps.integrations.dispatch import dispatch
 from apps.intelligence.service import enrich
 
+def _redirect_site(org_id):
+    """The per-workspace holder for redirect traffic, created on first use."""
+    if not org_id:
+        return None
+    try:
+        org_id = int(org_id)
+    except (TypeError, ValueError):
+        return None
+    site = Website.objects.filter(organization_id=org_id, is_system=True).first()
+    if site:
+        return site
+    from apps.organizations.models import Organization
+    if not Organization.objects.filter(pk=org_id).exists():
+        return None
+    return Website.objects.create(organization_id=org_id, name="Redirects",
+                                  domain="redirects.internal", is_system=True)
+
+
 STREAM = "events:traffic"
 GROUP = "traffic"
 CONSUMER = "worker-1"
@@ -70,7 +88,13 @@ class Command(BaseCommand):
 
         site = Website.objects.filter(tracking_id=f.get("site_id")).first()
         if not site:
-            return  # unknown site — drop
+            # A redirect with no website attached still has an owner. Park its
+            # traffic on that workspace's internal holder so the visitor and
+            # click log work for redirect-only customers, instead of silently
+            # dropping every event.
+            site = _redirect_site(f.get("org"))
+        if not site:
+            return  # genuinely unattributable — drop
 
         ts = datetime.fromtimestamp(int(f.get("ts", "0")), tz=timezone.utc)
 

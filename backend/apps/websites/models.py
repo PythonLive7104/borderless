@@ -34,6 +34,13 @@ class Website(models.Model):
         default=False,
         help_text="Hide the page until the bot check finishes (stops blocked visitors seeing content).")
 
+    # An internal holder for traffic that isn't tied to a real site — clicks on
+    # a redirect that has no website attached. Without somewhere to put them the
+    # consumer dropped those events, so redirect-only customers saw counters go
+    # up and an empty Visitors page. Hidden from the Websites list and from plan
+    # limits; it isn't a site they added.
+    is_system = models.BooleanField(default=False, editable=False)
+
     def __str__(self):
         return f"{self.name} ({self.tracking_id})"
 

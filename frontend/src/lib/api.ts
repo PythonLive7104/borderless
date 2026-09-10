@@ -168,6 +168,8 @@ export interface ShortLink {
   forward_params: boolean;
   forward_param_keys: string;
   block_vpn: boolean;
+  country_mode: "off" | "allow" | "block";
+  countries: string;
   id: number; organization: number; website: number | null; slug: string;
   destination_url: string; title: string; active: boolean; bot_action: BotAction;
   clicks: number; human_clicks: number; bot_clicks: number;
