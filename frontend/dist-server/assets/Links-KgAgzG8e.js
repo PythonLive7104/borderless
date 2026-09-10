@@ -1,262 +1,14 @@
-import { jsx, jsxs, Fragment } from "react/jsx-runtime";
+import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { A as useDialog, B as Button, R as RULE_FIELDS, F as ruleApi, c as useWorkspace, y as linkApi, x as websiteApi, d as billingApi } from "../entry-server.js";
+import { A as useDialog, c as useWorkspace, y as linkApi, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
-import { A as ACTION_META, a as actionTone, f as fieldLabel, o as opLabel, v as valueLabel, e as emptyCond, b as opsFor, C as CondValue, c as ACTIONS, R as REDIRECT_PRESETS, d as REDIRECT_ORIGIN } from "./ruleFields-BHbrkhqx.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
-const blank = () => ({
-  name: "",
-  priority: "100",
-  action: "block",
-  tag: "",
-  redirect_url: "",
-  conditions: [emptyCond()]
-});
-function RedirectRulesModal({ link, orgId, onClose, onSaved }) {
-  const [rules, setRules] = useState([]);
-  const [form, setForm] = useState(blank());
-  const [editingId, setEditingId] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const { confirm } = useDialog();
-  async function load() {
-    if (!link) return;
-    try {
-      setRules((await ruleApi.list(orgId, link.id)).results);
-    } catch {
-      setRules([]);
-    }
-  }
-  useEffect(() => {
-    load();
-    setAdding(false);
-    setEditingId(null);
-  }, [link == null ? void 0 : link.id]);
-  if (!link) return null;
-  const linkId = link.id;
-  const setCond = (i, patch) => setForm({ ...form, conditions: form.conditions.map((c, j) => j === i ? { ...c, ...patch } : c) });
-  function startAdd() {
-    setForm(blank());
-    setEditingId(null);
-    setAdding(true);
-    setErr("");
-  }
-  function startEdit(r) {
-    setForm({
-      name: r.name,
-      priority: String(r.priority),
-      action: r.action,
-      tag: r.tag || "",
-      redirect_url: r.redirect_url || "",
-      conditions: r.conditions.map((c) => ({ field: c.field, operator: c.operator, value: c.value }))
-    });
-    setEditingId(r.id);
-    setAdding(true);
-    setErr("");
-  }
-  async function submit(e) {
-    var _a, _b, _c;
-    e.preventDefault();
-    setBusy(true);
-    setErr("");
-    const payload = {
-      organization: orgId,
-      short_link: linkId,
-      website: null,
-      name: form.name || "Rule",
-      priority: Number(form.priority) || 100,
-      action: form.action,
-      tag: form.tag,
-      redirect_url: form.redirect_url,
-      conditions: form.conditions.filter((c) => c.value !== "")
-    };
-    try {
-      if (editingId) await ruleApi.update(editingId, payload);
-      else await ruleApi.create(payload);
-      setAdding(false);
-      setEditingId(null);
-      await load();
-      onSaved();
-    } catch (e2) {
-      setErr(((_a = e2 == null ? void 0 : e2.data) == null ? void 0 : _a.detail) || ((_c = (_b = e2 == null ? void 0 : e2.data) == null ? void 0 : _b.conditions) == null ? void 0 : _c[0]) || "Could not save that rule.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function remove(r) {
-    if (!await confirm({
-      title: "Delete this rule?",
-      message: "Traffic matching it will no longer be filtered on this redirect.",
-      confirmLabel: "Delete rule"
-    })) return;
-    await ruleApi.remove(r.id);
-    await load();
-    onSaved();
-  }
-  return /* @__PURE__ */ jsx(
-    Modal,
-    {
-      open: !!link,
-      onClose,
-      size: "wide",
-      title: `Rules for ${link.domain_host || ""}/${link.slug}`,
-      children: /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
-        /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-success/30 bg-success/5 px-4 py-3", children: [
-          /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-emerald-700", children: "Your link" }),
-          /* @__PURE__ */ jsx("div", { className: "mt-0.5 break-all font-mono text-sm font-semibold text-fg", children: link.short_url })
-        ] }),
-        /* @__PURE__ */ jsxs("p", { className: "rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted", children: [
-          "Rules run top to bottom and the ",
-          /* @__PURE__ */ jsx("b", { children: "first match wins" }),
-          ". They're checked on every click of this redirect, before anyone reaches your destination — so you can block by country, device, OS, browser, risk score, VPN and more. These apply to this link only."
-        ] }),
-        rules.length > 0 && /* @__PURE__ */ jsx("div", { className: "space-y-2", children: rules.map((r) => /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2", children: [
-            /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
-              /* @__PURE__ */ jsx("span", { className: "rounded-md bg-bg-mute px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-fg-dim", children: r.priority }),
-              /* @__PURE__ */ jsx("span", { className: "font-semibold", children: r.name }),
-              /* @__PURE__ */ jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-semibold ${actionTone[r.action]}`, children: ACTION_META[r.action].label })
-            ] }),
-            /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 text-xs", children: [
-              /* @__PURE__ */ jsx("button", { onClick: () => startEdit(r), className: "font-semibold text-brand hover:underline", children: "Edit" }),
-              /* @__PURE__ */ jsx("button", { onClick: () => remove(r), className: "font-semibold text-red-500 hover:underline", children: "Delete" })
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { className: "mt-2 flex flex-wrap items-center gap-1.5 text-xs", children: [
-            /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "IF" }),
-            r.conditions.map((c, i) => /* @__PURE__ */ jsxs("span", { className: "rounded-md bg-bg-soft px-2 py-0.5", children: [
-              /* @__PURE__ */ jsx("b", { children: fieldLabel(c.field) }),
-              " ",
-              opLabel(c.operator),
-              " ",
-              /* @__PURE__ */ jsx("b", { children: valueLabel(c.field, c.value) })
-            ] }, i))
-          ] })
-        ] }, r.id)) }),
-        !adding ? /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
-          rules.length === 0 && /* @__PURE__ */ jsxs("span", { className: "text-sm text-fg-muted", children: [
-            /* @__PURE__ */ jsx("b", { className: "text-fg", children: "Your link already works." }),
-            " Rules are optional — add one to allow or block visitors by country, device, OS, browser or risk."
-          ] }),
-          /* @__PURE__ */ jsx(Button, { onClick: startAdd, variant: "outline", className: "ml-auto shrink-0", children: "+ Add a rule" })
-        ] }) : /* @__PURE__ */ jsxs("form", { onSubmit: submit, className: "space-y-4 rounded-xl border border-line bg-bg-soft p-4", children: [
-          /* @__PURE__ */ jsxs("div", { className: "grid gap-3 sm:grid-cols-2", children: [
-            /* @__PURE__ */ jsx(Field, { label: "Rule name", value: form.name, onChange: (v) => setForm({ ...form, name: v }), placeholder: "Block mobile from Nigeria" }),
-            /* @__PURE__ */ jsx(Field, { label: "Priority", type: "number", value: form.priority, onChange: (v) => setForm({ ...form, priority: v }) })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line bg-white p-3", children: [
-            /* @__PURE__ */ jsxs("div", { className: "mb-2 flex items-center justify-between", children: [
-              /* @__PURE__ */ jsx("span", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "IF all conditions match" }),
-              /* @__PURE__ */ jsx(
-                "button",
-                {
-                  type: "button",
-                  onClick: () => setForm({ ...form, conditions: [...form.conditions, emptyCond()] }),
-                  className: "text-xs font-semibold text-brand hover:underline",
-                  children: "+ condition"
-                }
-              )
-            ] }),
-            /* @__PURE__ */ jsxs("p", { className: "mb-2.5 rounded-lg bg-brand/5 px-3 py-2 text-[11px] leading-relaxed text-fg-muted", children: [
-              "A visitor must match ",
-              /* @__PURE__ */ jsx("b", { children: "every" }),
-              " condition for this rule to act, so each one you add catches ",
-              /* @__PURE__ */ jsx("b", { children: "fewer" }),
-              " visitors, not more. Start with one."
-            ] }),
-            /* @__PURE__ */ jsx("div", { className: "space-y-2", children: form.conditions.map((c, i) => /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5", children: [
-              /* @__PURE__ */ jsx(
-                "select",
-                {
-                  value: c.field,
-                  onChange: (e) => setCond(i, { field: e.target.value }),
-                  className: "min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand",
-                  children: RULE_FIELDS.map(([v, l]) => /* @__PURE__ */ jsx("option", { value: v, children: l }, v))
-                }
-              ),
-              /* @__PURE__ */ jsx(
-                "select",
-                {
-                  value: c.operator,
-                  onChange: (e) => setCond(i, { operator: e.target.value }),
-                  className: "rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand",
-                  children: opsFor(c.field).map(([v, l]) => /* @__PURE__ */ jsx("option", { value: v, children: l }, v))
-                }
-              ),
-              /* @__PURE__ */ jsx(CondValue, { c, onChange: (v) => setCond(i, { value: v }) }),
-              form.conditions.length > 1 && /* @__PURE__ */ jsx(
-                "button",
-                {
-                  type: "button",
-                  onClick: () => setForm({ ...form, conditions: form.conditions.filter((_, j) => j !== i) }),
-                  className: "text-fg-dim hover:text-red-500",
-                  "aria-label": "Remove condition",
-                  children: /* @__PURE__ */ jsx("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx("path", { d: "M18 6L6 18M6 6l12 12" }) })
-                }
-              )
-            ] }, i)) })
-          ] }),
-          /* @__PURE__ */ jsxs("label", { className: "block", children: [
-            /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "THEN do this" }),
-            /* @__PURE__ */ jsx(
-              "select",
-              {
-                value: form.action,
-                onChange: (e) => setForm({ ...form, action: e.target.value }),
-                className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand",
-                children: ACTIONS.map((a) => /* @__PURE__ */ jsx("option", { value: a, children: ACTION_META[a].label }, a))
-              }
-            ),
-            /* @__PURE__ */ jsx("p", { className: "mt-1.5 rounded-lg bg-white px-3 py-2 text-xs text-fg-muted", children: ACTION_META[form.action].desc })
-          ] }),
-          form.action === "redirect" && /* @__PURE__ */ jsxs("label", { className: "block", children: [
-            /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "Send them to this page" }),
-            /* @__PURE__ */ jsxs("div", { className: "mb-2 flex flex-wrap items-center gap-1.5", children: [
-              /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "Ready-made:" }),
-              REDIRECT_PRESETS.map((pr) => {
-                const url = REDIRECT_ORIGIN + pr.path;
-                return /* @__PURE__ */ jsx(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => setForm({ ...form, redirect_url: url }),
-                    className: `rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${form.redirect_url === url ? "border-brand bg-brand/10 text-brand" : "border-line hover:border-brand hover:text-brand"}`,
-                    children: pr.label
-                  },
-                  pr.path
-                );
-              })
-            ] }),
-            /* @__PURE__ */ jsx(
-              "input",
-              {
-                type: "url",
-                value: form.redirect_url,
-                required: true,
-                onChange: (e) => setForm({ ...form, redirect_url: e.target.value }),
-                placeholder: "…or your own page URL",
-                className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand"
-              }
-            )
-          ] }),
-          form.action === "tag" && /* @__PURE__ */ jsx(Field, { label: "Label to attach", value: form.tag, onChange: (v) => setForm({ ...form, tag: v }), placeholder: "fb-traffic" }),
-          err && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600", children: err }),
-          /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
-            /* @__PURE__ */ jsx(Button, { type: "button", variant: "outline", className: "flex-1", onClick: () => setAdding(false), disabled: busy, children: "Cancel" }),
-            /* @__PURE__ */ jsx(Button, { type: "submit", className: "flex-1", disabled: busy, children: busy ? "Saving…" : editingId ? "Save changes" : "Add rule" })
-          ] })
-        ] })
-      ] })
-    }
-  );
-}
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const randSlug = (len = 10) => {
   let s = "";
@@ -265,6 +17,57 @@ const randSlug = (len = 10) => {
 };
 const MAX_SLUG = 200;
 const PRIVATE_DOMAIN_PRICE = 5;
+const DEVICE_CHOICES = [
+  ["mobile", "Phones"],
+  ["desktop", "Computers"],
+  ["tablet", "Tablets"]
+];
+const OS_CHOICES = [
+  ["windows", "Windows"],
+  ["macos", "Mac"],
+  ["ios", "iPhone / iPad"],
+  ["android", "Android"],
+  ["linux", "Linux"]
+];
+const STRICTNESS = [
+  { value: 0, label: "Normal", desc: "Filter the visitors we're confident are bots." },
+  { value: 60, label: "Strict", desc: "Also turn away visitors that look suspicious." },
+  { value: 40, label: "Very strict", desc: "Turn away anything questionable. May stop some real people." }
+];
+const MODE_LABELS = [
+  ["off", "Everyone"],
+  ["allow", "Only these"],
+  ["block", "Everyone except these"]
+];
+function ChoiceGate({ title, mode, values, choices, onMode, onValues }) {
+  const picked = values.split(",").map((v) => v.trim()).filter(Boolean);
+  const toggle = (v) => onValues((picked.includes(v) ? picked.filter((p) => p !== v) : [...picked, v]).join(","));
+  return /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3.5", children: [
+    /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: title }),
+    /* @__PURE__ */ jsx(
+      "select",
+      {
+        value: mode,
+        onChange: (e) => onMode(e.target.value),
+        className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20",
+        children: MODE_LABELS.map(([v, l]) => /* @__PURE__ */ jsx("option", { value: v, children: l }, v))
+      }
+    ),
+    mode !== "off" && /* @__PURE__ */ jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: choices.map(([v, l]) => /* @__PURE__ */ jsxs(
+      "button",
+      {
+        type: "button",
+        onClick: () => toggle(v),
+        className: `rounded-full border px-3 py-1.5 text-sm font-medium transition ${picked.includes(v) ? "border-brand bg-brand/10 text-brand" : "border-line hover:border-brand/50"}`,
+        children: [
+          picked.includes(v) ? "✓ " : "",
+          l
+        ]
+      },
+      v
+    )) })
+  ] });
+}
 const clampLen = (n) => Math.min(MAX_SLUG, Math.max(6, n || 6));
 const BOT_OPTIONS = [
   { value: "decoy", label: "A decoy page", desc: "Looks like a real page and wastes their time." },
@@ -381,7 +184,6 @@ function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [rulesFor, setRulesFor] = useState(null);
   const [linkBase, setLinkBase] = useState("");
   const [domains, setDomains] = useState([]);
   const [priv, setPriv] = useState({ owned: [], available: 0 });
@@ -391,7 +193,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "" }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -451,7 +253,7 @@ function Links() {
     setErr("");
     setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l) {
@@ -470,7 +272,12 @@ function Links() {
       block_vpn: !!l.block_vpn,
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off",
-      countries: l.countries || ""
+      countries: l.countries || "",
+      device_mode: l.device_mode || "off",
+      devices: l.devices || "",
+      os_mode: l.os_mode || "off",
+      operating_systems: l.operating_systems || "",
+      max_risk: l.max_risk || 0
     });
     setOpen(true);
   }
@@ -489,6 +296,11 @@ function Links() {
       block_vpn: form.block_vpn,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
+      device_mode: form.device_mode,
+      devices: form.device_mode === "off" ? "" : form.devices,
+      os_mode: form.os_mode,
+      operating_systems: form.os_mode === "off" ? "" : form.operating_systems,
+      max_risk: form.max_risk,
       domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
@@ -501,7 +313,6 @@ function Links() {
         notify("Saved, but the destination was flagged as unsafe — the redirect is disabled.", "danger");
       } else {
         notify(editing ? "Redirect updated." : "Redirect created.");
-        if (!editing) setRulesFor(saved);
       }
       load();
     } catch (e2) {
@@ -713,22 +524,12 @@ function Links() {
                 children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
               }
             ),
-            /* @__PURE__ */ jsx("button", { onClick: () => setRulesFor(l), className: "text-brand hover:underline", children: "Rules" }),
             /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
             /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
           ] })
         ] })
       ] }) }, l.id);
     }) }),
-    current && /* @__PURE__ */ jsx(
-      RedirectRulesModal,
-      {
-        link: rulesFor,
-        orgId: current.id,
-        onClose: () => setRulesFor(null),
-        onSaved: load
-      }
-    ),
     /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: editing ? "Edit redirect" : "Create a redirect", size: "xl", children: /* @__PURE__ */ jsxs("form", { onSubmit: save, className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 px-4 py-3", children: [
         /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "Your link" }),
@@ -842,6 +643,47 @@ function Links() {
           ] })
         ] })
       ] }),
+      /* @__PURE__ */ jsx(
+        ChoiceGate,
+        {
+          title: "Which devices can use this link?",
+          mode: form.device_mode,
+          values: form.devices,
+          choices: DEVICE_CHOICES,
+          onMode: (m) => setForm({ ...form, device_mode: m }),
+          onValues: (v) => setForm({ ...form, devices: v })
+        }
+      ),
+      /* @__PURE__ */ jsx(
+        ChoiceGate,
+        {
+          title: "Which systems can use this link?",
+          mode: form.os_mode,
+          values: form.operating_systems,
+          choices: OS_CHOICES,
+          onMode: (m) => setForm({ ...form, os_mode: m }),
+          onValues: (v) => setForm({ ...form, operating_systems: v })
+        }
+      ),
+      /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3.5", children: [
+        /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "How strict should we be?" }),
+        /* @__PURE__ */ jsx("div", { className: "grid gap-2", children: STRICTNESS.map((o) => /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${form.max_risk === o.value ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "radio",
+              name: "max_risk",
+              checked: form.max_risk === o.value,
+              className: "mt-0.5",
+              onChange: () => setForm({ ...form, max_risk: o.value })
+            }
+          ),
+          /* @__PURE__ */ jsxs("span", { children: [
+            /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: o.label }),
+            /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: o.desc })
+          ] })
+        ] }, o.value)) })
+      ] }),
       /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_vpn ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
         /* @__PURE__ */ jsx(
           "input",
@@ -946,13 +788,6 @@ function Links() {
           "Apply a website's Traffic Rules? ",
           /* @__PURE__ */ jsx("span", { className: "font-normal text-fg-dim", children: "(optional, advanced)" })
         ] }),
-        /* @__PURE__ */ jsxs("p", { className: "mb-2 rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted", children: [
-          "Want to block by ",
-          /* @__PURE__ */ jsx("b", { children: "country, device, OS, browser or risk score" }),
-          " on this link alone? You don't need a website — save the redirect, then tap ",
-          /* @__PURE__ */ jsx("b", { children: "Rules" }),
-          " on it in the list."
-        ] }),
         /* @__PURE__ */ jsxs(
           "select",
           {
@@ -969,7 +804,7 @@ function Links() {
             ]
           }
         ),
-        /* @__PURE__ */ jsx("p", { className: "mt-1 text-xs text-fg-dim", children: "For tighter control, run a website's Traffic Rules on each click (block by country, device, risk, IP allow/deny, etc.). Those rules win; the bot handling above is the fallback." })
+        /* @__PURE__ */ jsx("p", { className: "mt-1 text-xs text-fg-dim", children: "Most people leave this alone. It reuses the detailed rules from a website you've already set up (IP allow/deny, browser, referrer…) on top of the settings above." })
       ] }),
       err && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600", children: err }),
       /* @__PURE__ */ jsx(Button, { type: "submit", className: "w-full", disabled: busy, children: busy ? "Saving…" : editing ? "Save changes" : "Create redirect" })

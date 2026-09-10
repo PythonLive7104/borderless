@@ -170,6 +170,11 @@ export interface ShortLink {
   block_vpn: boolean;
   country_mode: "off" | "allow" | "block";
   countries: string;
+  device_mode: "off" | "allow" | "block";
+  devices: string;
+  os_mode: "off" | "allow" | "block";
+  operating_systems: string;
+  max_risk: number;
   id: number; organization: number; website: number | null; slug: string;
   destination_url: string; title: string; active: boolean; bot_action: BotAction;
   clicks: number; human_clicks: number; bot_clicks: number;

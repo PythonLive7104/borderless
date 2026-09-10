@@ -484,6 +484,11 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		BlockVPN    bool     `json:"block_vpn"`
 		CountryMode string   `json:"country_mode"` // off | allow | block
 		Countries   []string `json:"countries"`
+		DeviceMode  string   `json:"device_mode"`
+		Devices     []string `json:"devices"`
+		OSMode      string   `json:"os_mode"`
+		OSList      []string `json:"operating_systems"`
+		MaxRisk     int      `json:"max_risk"`
 		Rules       string   `json:"rules"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
@@ -522,29 +527,43 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 			mode = link.BotAction
 		}
 	}
+	// Simple gates, all the same shape: an allow-list refuses anyone not named,
+	// a block-list refuses anyone named. Kept as plain lists rather than rules
+	// because "only mobile" shouldn't need a condition builder.
+	listed := func(mode string, list []string, value string) bool {
+		if mode != "allow" && mode != "block" {
+			return false
+		}
+		found := false
+		for _, v := range list {
+			if value != "" && strings.EqualFold(v, value) {
+				found = true
+				break
+			}
+		}
+		return (mode == "allow" && !found) || (mode == "block" && found)
+	}
+	refuse := func() {
+		isBot = true
+		switch link.BotAction {
+		case "decoy", "notfound", "blank":
+			mode = link.BotAction
+		default:
+			mode = "notfound"
+		}
+	}
+	if listed(link.DeviceMode, link.Devices, fp.Device) ||
+		listed(link.OSMode, link.OSList, fp.OS) ||
+		(link.MaxRisk > 0 && result.Score >= link.MaxRisk) {
+		refuse()
+	}
+
 	// Country gate. Runs before the VPN check and before any rules: if the
 	// visitor isn't allowed in from where they are, nothing else matters.
 	// An unknown country (no geo match) is treated as "not on the list" for an
 	// allow-list, which is the safe reading of "only these countries".
-	if link.CountryMode == "allow" || link.CountryMode == "block" {
-		listed := false
-		for _, c := range link.Countries {
-			if strings.EqualFold(c, fp.Country) && fp.Country != "" {
-				listed = true
-				break
-			}
-		}
-		refused := (link.CountryMode == "allow" && !listed) ||
-			(link.CountryMode == "block" && listed)
-		if refused {
-			isBot = true
-			switch link.BotAction {
-			case "decoy", "notfound", "blank":
-				mode = link.BotAction
-			default:
-				mode = "notfound"
-			}
-		}
+	if listed(link.CountryMode, link.Countries, fp.Country) {
+		refuse()
 	}
 
 	// VPN / proxy / RDP-datacenter blocking. Treated as bot traffic rather than a

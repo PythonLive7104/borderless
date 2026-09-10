@@ -28,6 +28,11 @@ def _payload(link) -> str:
         "block_vpn": bool(link.block_vpn),
         "country_mode": link.country_mode or "off",
         "countries": link.country_list(),
+        "device_mode": link.device_mode or "off",
+        "devices": link.device_list(),
+        "os_mode": link.os_mode or "off",
+        "operating_systems": link.os_list(),
+        "max_risk": int(link.max_risk or 0),
         # Rules attached to this redirect specifically. The engine prefers
         # these over the attached website's rules.
         "rules": _link_rules(link),

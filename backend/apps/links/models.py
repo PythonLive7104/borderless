@@ -187,8 +187,29 @@ class ShortLink(models.Model):
         max_length=400, blank=True, default="",
         help_text='Comma-separated ISO-2 codes, e.g. "US,CA,GB".')
 
+    # Same shape for device and OS: a mode plus a short list. Deliberately not
+    # the rule builder — "block Android" shouldn't require learning conditions,
+    # operators and priorities.
+    device_mode = models.CharField(max_length=6, choices=CountryMode.choices,
+                                   default=CountryMode.OFF)
+    devices = models.CharField(max_length=100, blank=True, default="",
+                               help_text="Comma-separated: mobile, desktop, tablet")
+    os_mode = models.CharField(max_length=6, choices=CountryMode.choices,
+                               default=CountryMode.OFF)
+    operating_systems = models.CharField(max_length=200, blank=True, default="",
+                                         help_text="Comma-separated: windows, macos, ios, android, linux")
+    # Visitors scoring at or above this are treated as bots. 0 = no extra limit.
+    max_risk = models.IntegerField(
+        default=0, help_text="Refuse visitors at or above this risk score (0 = off).")
+
     def country_list(self) -> list:
         return [c.strip().upper() for c in self.countries.split(",") if c.strip()]
+
+    def device_list(self) -> list:
+        return [d.strip().lower() for d in self.devices.split(",") if d.strip()]
+
+    def os_list(self) -> list:
+        return [o.strip().lower() for o in self.operating_systems.split(",") if o.strip()]
 
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)

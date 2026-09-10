@@ -8,7 +8,6 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import NoData from "../../components/dashboard/NoData";
-import RedirectRulesModal from "../../components/dashboard/RedirectRulesModal";
 import { useDialog } from "../../context/DialogContext";
 
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://trynobot.com";
@@ -20,6 +19,55 @@ const randSlug = (len = 10) => {
 };
 const MAX_SLUG = 200;
 const PRIVATE_DOMAIN_PRICE = 5;
+
+// Written for people who don't think in "user agents" or "risk scores".
+const DEVICE_CHOICES: [string, string][] = [
+  ["mobile", "Phones"], ["desktop", "Computers"], ["tablet", "Tablets"],
+];
+const OS_CHOICES: [string, string][] = [
+  ["windows", "Windows"], ["macos", "Mac"], ["ios", "iPhone / iPad"],
+  ["android", "Android"], ["linux", "Linux"],
+];
+const STRICTNESS: { value: number; label: string; desc: string }[] = [
+  { value: 0, label: "Normal", desc: "Filter the visitors we're confident are bots." },
+  { value: 60, label: "Strict", desc: "Also turn away visitors that look suspicious." },
+  { value: 40, label: "Very strict", desc: "Turn away anything questionable. May stop some real people." },
+];
+const MODE_LABELS: [string, string][] = [
+  ["off", "Everyone"], ["allow", "Only these"], ["block", "Everyone except these"],
+];
+
+// A row of tick-boxes with a mode in front — same shape for devices and systems,
+// so learning one teaches the other.
+function ChoiceGate({ title, mode, values, choices, onMode, onValues }: {
+  title: string; mode: string; values: string;
+  choices: [string, string][];
+  onMode: (m: any) => void; onValues: (v: string) => void;
+}) {
+  const picked = values.split(",").map((v) => v.trim()).filter(Boolean);
+  const toggle = (v: string) =>
+    onValues((picked.includes(v) ? picked.filter((p) => p !== v) : [...picked, v]).join(","));
+  return (
+    <div className="rounded-xl border border-line p-3.5">
+      <span className="mb-1.5 block text-sm font-semibold">{title}</span>
+      <select value={mode} onChange={(e) => onMode(e.target.value)}
+        className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+        {MODE_LABELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+      {mode !== "off" && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {choices.map(([v, l]) => (
+            <button key={v} type="button" onClick={() => toggle(v)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                picked.includes(v) ? "border-brand bg-brand/10 text-brand" : "border-line hover:border-brand/50"}`}>
+              {picked.includes(v) ? "✓ " : ""}{l}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 const clampLen = (n: number) => Math.min(MAX_SLUG, Math.max(6, n || 6));
 
 const BOT_OPTIONS: { value: BotAction; label: string; desc: string }[] = [
@@ -139,7 +187,6 @@ export default function Links() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ShortLink | null>(null);
-  const [rulesFor, setRulesFor] = useState<ShortLink | null>(null);
   // "" means no short domain is configured — the service is off, and we must
   // never show a trynobot.com link as a stand-in.
   const [linkBase, setLinkBase] = useState("");
@@ -150,8 +197,10 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "" });
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string;
+    device_mode: "off" | "allow" | "block"; devices: string;
+    os_mode: "off" | "allow" | "block"; operating_systems: string; max_risk: number }>(
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -221,7 +270,7 @@ export default function Links() {
   function openCreate() {
     setErr(""); setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "" });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -234,6 +283,9 @@ export default function Links() {
       forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn,
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off", countries: l.countries || "",
+      device_mode: (l.device_mode || "off") as "off", devices: l.devices || "",
+      os_mode: (l.os_mode || "off") as "off", operating_systems: l.operating_systems || "",
+      max_risk: l.max_risk || 0,
     });
     setOpen(true);
   }
@@ -249,6 +301,9 @@ export default function Links() {
       block_vpn: form.block_vpn,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
+      device_mode: form.device_mode, devices: form.device_mode === "off" ? "" : form.devices,
+      os_mode: form.os_mode, operating_systems: form.os_mode === "off" ? "" : form.operating_systems,
+      max_risk: form.max_risk,
       domain: form.domain ? Number(form.domain) : null,
       forward_params: form.forward_params,
       forward_param_keys: form.forward_params ? form.forward_param_keys.trim() : "",
@@ -270,7 +325,6 @@ export default function Links() {
         // thinking about who should reach the link, and the Rules button on the
         // row was easy to miss otherwise. Skipped for a link we just disabled —
         // filtering rules are beside the point there.
-        if (!editing) setRulesFor(saved);
       }
       load();
     } catch (e: any) { setErr(e.data?.slug?.[0] || e.data?.destination_url?.[0] || e.data?.detail || e.message); }
@@ -412,7 +466,6 @@ export default function Links() {
                         className={`h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`}>
                         <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}`} />
                       </button>
-                      <button onClick={() => setRulesFor(l)} className="text-brand hover:underline">Rules</button>
                       <button onClick={() => openEdit(l)} className="text-brand hover:underline">Edit</button>
                       <button onClick={() => remove(l.id)} className="text-red-500 hover:underline">Delete</button>
                     </>
@@ -424,8 +477,6 @@ export default function Links() {
         </div>
       )}
 
-      {current && <RedirectRulesModal link={rulesFor} orgId={current.id}
-        onClose={() => setRulesFor(null)} onSaved={load} />}
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Edit redirect" : "Create a redirect"} size="xl">
         <form onSubmit={save} className="space-y-4">
@@ -514,6 +565,32 @@ export default function Links() {
             )}
           </div>
 
+          <ChoiceGate title="Which devices can use this link?"
+            mode={form.device_mode} values={form.devices} choices={DEVICE_CHOICES}
+            onMode={(m) => setForm({ ...form, device_mode: m })}
+            onValues={(v) => setForm({ ...form, devices: v })} />
+
+          <ChoiceGate title="Which systems can use this link?"
+            mode={form.os_mode} values={form.operating_systems} choices={OS_CHOICES}
+            onMode={(m) => setForm({ ...form, os_mode: m })}
+            onValues={(v) => setForm({ ...form, operating_systems: v })} />
+
+          <div className="rounded-xl border border-line p-3.5">
+            <span className="mb-1.5 block text-sm font-semibold">How strict should we be?</span>
+            <div className="grid gap-2">
+              {STRICTNESS.map((o) => (
+                <label key={o.value} className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${form.max_risk === o.value ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
+                  <input type="radio" name="max_risk" checked={form.max_risk === o.value} className="mt-0.5"
+                    onChange={() => setForm({ ...form, max_risk: o.value })} />
+                  <span>
+                    <span className="block text-sm font-semibold">{o.label}</span>
+                    <span className="block text-xs text-fg-muted">{o.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_vpn ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
             <input type="checkbox" checked={form.block_vpn} className="mt-0.5"
               onChange={(e) => setForm({ ...form, block_vpn: e.target.checked })} />
@@ -597,16 +674,12 @@ export default function Links() {
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Apply a website's Traffic Rules? <span className="font-normal text-fg-dim">(optional, advanced)</span></span>
-            <p className="mb-2 rounded-lg bg-brand/5 px-3 py-2 text-xs leading-relaxed text-fg-muted">
-              Want to block by <b>country, device, OS, browser or risk score</b> on this link alone?
-              You don't need a website — save the redirect, then tap <b>Rules</b> on it in the list.
-            </p>
             <select value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
               className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
               <option value="">No — just use the bot handling above</option>
               {sites.map((s) => <option key={s.id} value={s.id}>Use {s.name}'s Traffic Rules</option>)}
             </select>
-            <p className="mt-1 text-xs text-fg-dim">For tighter control, run a website's Traffic Rules on each click (block by country, device, risk, IP allow/deny, etc.). Those rules win; the bot handling above is the fallback.</p>
+            <p className="mt-1 text-xs text-fg-dim">Most people leave this alone. It reuses the detailed rules from a website you've already set up (IP allow/deny, browser, referrer…) on top of the settings above.</p>
           </label>
 
           {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}

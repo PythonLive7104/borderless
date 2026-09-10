@@ -1085,3 +1085,36 @@ class CountryGateTest(TestCase):
         p = json.loads(_payload(link))
         self.assertEqual(p["country_mode"], "off")
         self.assertEqual(p["countries"], [])
+
+
+@override_settings(SHORTLINK_BASE=SHORT)
+class SimpleGatesTest(TestCase):
+    """Device/OS/strictness replaced the per-redirect rule builder, so they have
+    to reach the engine on their own."""
+
+    def setUp(self):
+        self.org = _workspace("owner@gates.example")
+
+    def _payload(self, **kw):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                        slug=kw.pop("slug", "sg1"),
+                                        destination_url="https://e.example", **kw)
+        return json.loads(_payload(link))
+
+    def test_device_and_os_lists_are_normalised(self):
+        p = self._payload(device_mode="allow", devices=" Mobile , Tablet ",
+                          os_mode="block", operating_systems="Android,,iOS")
+        self.assertEqual(p["device_mode"], "allow")
+        self.assertEqual(p["devices"], ["mobile", "tablet"])
+        self.assertEqual(p["os_mode"], "block")
+        self.assertEqual(p["operating_systems"], ["android", "ios"])
+
+    def test_strictness_reaches_the_engine(self):
+        self.assertEqual(self._payload(slug="sg2", max_risk=60)["max_risk"], 60)
+
+    def test_defaults_impose_nothing(self):
+        p = self._payload(slug="sg3")
+        self.assertEqual((p["device_mode"], p["os_mode"], p["max_risk"]), ("off", "off", 0))
+        self.assertEqual((p["devices"], p["operating_systems"]), ([], []))
