@@ -2,6 +2,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
+import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
 import { A as useDialog, c as useWorkspace, y as linkApi, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
@@ -353,6 +354,13 @@ function Links() {
       /* @__PURE__ */ jsx("b", { children: "scanned for malware/phishing" }),
       " and unsafe links are auto-disabled."
     ] }),
+    /* @__PURE__ */ jsx(
+      HelpVideo,
+      {
+        id: "63562736a0f84abcb8a88c2a811d0b18",
+        title: "How to create and protect a redirect"
+      }
+    ),
     /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-3", children: [

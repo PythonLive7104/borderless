@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
+import HelpVideo from "../../components/dashboard/HelpVideo";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { linkApi, websiteApi, billingApi, type ChallengeStyle, type PrivateDomains, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
@@ -354,6 +355,10 @@ export default function Links() {
         <b> real people always go to your destination</b>, and you choose what <b>bots</b> get (a decoy page, a 404,
         or nothing). Destinations are <b>scanned for malware/phishing</b> and unsafe links are auto-disabled.
       </PageNote>
+
+      <HelpVideo id="63562736a0f84abcb8a88c2a811d0b18"
+        title="How to create and protect a redirect" />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-3">
