@@ -92,7 +92,7 @@ const KB = [
   {
     q: "How do I restrict by country, device or OS?",
     keywords: ["country", "device", "os", "operating", "mobile", "desktop", "restrict", "geo"],
-    a: "Create a Traffic Rule with a condition like Country is Russia, Device is Mobile, or OS is Android, then choose an action such as Block or Redirect. You can match several values with 'is any of'."
+    a: "On a redirect: open the link on the Redirection page and use the pickers — which countries, which devices (phones/computers/tablets), which systems (Windows, Mac, iPhone, Android, Linux) and how strict to be. No rules to build. On a website you protect with the tracker: create a Traffic Rule with a condition like Country is Russia, Device is Mobile or OS is Android, then choose an action such as Block or Redirect. You can match several values with 'is any of'."
   },
   {
     q: "What is JA3 / TLS fingerprinting?",
@@ -112,7 +112,7 @@ const KB = [
   {
     q: "What are the plans and limits?",
     keywords: ["plan", "pricing", "billing", "price", "cost", "limit", "events", "upgrade", "subscription"],
-    a: "Starter ($29, 50k events/mo, 30-day retention), Growth ($99, 500k, 90-day) and Business ($299, 2M, 365-day). Change plans on the Billing page. Payments run through Bachs (card, mobile money or crypto)."
+    a: "Three tiers, billed weekly or monthly — your choice on the Billing page. Basic $25/week or $50/month (100k events, 30-day retention, 5 domains, 2 redirects). Plus $40/week or $100/month (300k events, 90-day, 10 domains, 5 redirects). Pro $70/week or $150/month (1M events, 365-day, 20 domains, 10 redirects). Monthly costs less than four weeks and doubles the domain and redirect limits. Payments run through Bachs (card, mobile money or crypto)."
   },
   {
     q: "How do I check my usage?",
@@ -153,6 +153,21 @@ const KB = [
     q: "Where do I change my password or notifications?",
     keywords: ["password", "settings", "profile", "notification", "email", "account", "change"],
     a: "On the Settings page: Profile (name, language, timezone), Security (change password) and Notifications (which emails you receive). You can also replay the product tour from there."
+  },
+  {
+    q: "What is Redirection (short links)?",
+    keywords: ["redirect", "redirection", "short", "link", "shortener", "slug", "trynb", "campaign", "url"],
+    a: "Redirection gives you a short link (like trynb.cc/abc123) that screens every click. Real people go straight to your destination; bots get whatever you pick — a decoy page, a 404, or nothing at all. On each link you can also choose which countries, devices and systems may use it, block VPN/proxy traffic, add a human check, and control which tracking parameters are passed on. Create one on the Redirection page."
+  },
+  {
+    q: "What is a private domain?",
+    keywords: ["private", "domain", "exclusive", "own", "shared", "brand", "dedicated"],
+    a: "Shared short domains are used by all customers at once. A private domain is yours alone — nobody else's links sit on it, so another customer's behaviour can't affect your links. It's $5/month on top of your plan and needs an active subscription. Buy one from the Redirection page; when it lapses the domain returns to the pool."
+  },
+  {
+    q: "Someone sent me a bad link — how do I report it?",
+    keywords: ["report", "abuse", "phishing", "malware", "scam", "complaint", "bad", "malicious"],
+    a: "Every short domain has a report form at /report (for example trynb.cc/report). Paste the link, pick a reason, and it reaches us straight away. Reported destinations are re-scanned for malware and phishing automatically."
   }
 ];
 const __vite_import_meta_env__ = {};
