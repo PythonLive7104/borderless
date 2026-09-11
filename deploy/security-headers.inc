@@ -25,10 +25,15 @@ add_header X-Frame-Options "SAMEORIGIN" always;
 # links carry campaign slugs, which shouldn't leak into a third party's logs.
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-# CSP. frame-src carries Loom, which hosts the in-app walkthrough videos —
+# CSP. Tawk is listed as BOTH tawk.to and *.tawk.to: a wildcard does not
+# match the bare domain, and Tawk serves its chat iframe from tawk.to while
+# loading scripts from embed.tawk.to. It also needs style-src and font-src —
+# with those missing the widget connects (the visitor appears in the Tawk
+# dashboard) but never paints, which looks like the chat button vanishing.
+# frame-src carries Loom, which hosts the in-app walkthrough videos —
 # without it the player renders as an empty box with nothing to explain why.
 # 'unsafe-inline' is required for both script and style: the Tawk widget
 # injects inline script at runtime, and the challenge/decoy pages the engine
 # serves are self-contained with inline <style>. img-src allows any https so
 # customer favicons and OG images render.
-add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://embed.tawk.to https://*.tawk.to; connect-src 'self' https://*.tawk.to wss://*.tawk.to; frame-src 'self' https://*.tawk.to https://www.loom.com" always;
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https://tawk.to https://*.tawk.to; style-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to; script-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to; connect-src 'self' https://tawk.to https://*.tawk.to wss://tawk.to wss://*.tawk.to; frame-src 'self' https://tawk.to https://*.tawk.to https://www.loom.com; worker-src 'self' blob:; media-src 'self' https://tawk.to https://*.tawk.to" always;

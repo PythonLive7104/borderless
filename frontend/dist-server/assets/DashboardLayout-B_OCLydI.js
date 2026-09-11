@@ -157,6 +157,16 @@ const KB = [
 ];
 const __vite_import_meta_env__ = {};
 const TAWK_SRC = (__vite_import_meta_env__ == null ? void 0 : __vite_import_meta_env__.VITE_TAWK_SRC) || "";
+function tawkIsVisible() {
+  const nodes = document.querySelectorAll(
+    'iframe[src*="tawk.to"], [id^="tawkchat"], .tawk-min-container'
+  );
+  for (const el of Array.from(nodes)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 20 && r.height > 20 && el.offsetParent !== null) return true;
+  }
+  return false;
+}
 let tawkScriptAdded = false;
 function openTawk(onReady, onFail) {
   var _a;
@@ -253,11 +263,28 @@ function HelpChat() {
     if (connecting) return;
     setConnecting(true);
     setMsgs((m) => [...m, { from: "bot", text: "Connecting you to a person…" }]);
+    const giveUp = () => {
+      setConnecting(false);
+      setOpen(true);
+      setMsgs((m) => [...m, {
+        from: "bot",
+        text: "Live chat opened but didn't appear on screen. Email support@trynobot.com and we'll pick it up there."
+      }]);
+    };
     openTawk(
       () => {
-        setConnecting(false);
-        setTawkActive(true);
-        setOpen(false);
+        let waited = 0;
+        const t = setInterval(() => {
+          if (tawkIsVisible()) {
+            clearInterval(t);
+            setConnecting(false);
+            setTawkActive(true);
+            setOpen(false);
+          } else if ((waited += 250) >= 5e3) {
+            clearInterval(t);
+            giveUp();
+          }
+        }, 250);
       },
       () => {
         setConnecting(false);

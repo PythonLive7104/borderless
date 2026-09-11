@@ -14,6 +14,25 @@ const TAWK_SRC = ((import.meta as any).env?.VITE_TAWK_SRC as string | undefined)
  *  up-front leaves the corner empty for as long as the load takes, which reads
  *  as "the chat button vanished" rather than "chat is opening".
  */
+/** Is Tawk's own widget actually on screen?
+ *
+ *  Tawk_API.maximize() existing only proves the script booted — the visitor
+ *  already shows up in the Tawk dashboard at that point. If anything stops the
+ *  UI from painting (a CSP that misses one of its hosts, a blocker that lets
+ *  the script through but kills the iframe), hiding our widget on that signal
+ *  alone leaves an empty corner and no way back. So we check for a rendered,
+ *  non-zero-size element before standing down.
+ */
+function tawkIsVisible(): boolean {
+  const nodes = document.querySelectorAll<HTMLElement>(
+    'iframe[src*="tawk.to"], [id^="tawkchat"], .tawk-min-container');
+  for (const el of Array.from(nodes)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 20 && r.height > 20 && el.offsetParent !== null) return true;
+  }
+  return false;
+}
+
 let tawkScriptAdded = false;   // module-level: one injection per page, not per click
 
 function openTawk(onReady: () => void, onFail: () => void) {
@@ -90,8 +109,29 @@ export default function HelpChat() {
     if (connecting) return;                       // ignore repeat taps
     setConnecting(true);
     setMsgs((m) => [...m, { from: "bot", text: "Connecting you to a person…" }]);
+    const giveUp = () => {
+      setConnecting(false);
+      setOpen(true);
+      setMsgs((m) => [...m, {
+        from: "bot",
+        text: "Live chat opened but didn't appear on screen. Email support@trynobot.com "
+            + "and we'll pick it up there.",
+      }]);
+    };
     openTawk(
-      () => { setConnecting(false); setTawkActive(true); setOpen(false); },
+      () => {
+        // Wait for Tawk to paint before we stand down — see tawkIsVisible().
+        let waited = 0;
+        const t = setInterval(() => {
+          if (tawkIsVisible()) {
+            clearInterval(t);
+            setConnecting(false); setTawkActive(true); setOpen(false);
+          } else if ((waited += 250) >= 5000) {
+            clearInterval(t);
+            giveUp();
+          }
+        }, 250);
+      },
       () => {
         setConnecting(false);
         setOpen(true);

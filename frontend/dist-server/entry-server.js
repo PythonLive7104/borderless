@@ -1958,7 +1958,7 @@ const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"))
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
-const DashboardLayout = lazy(() => import("./assets/DashboardLayout-Dxj0UHif.js"));
+const DashboardLayout = lazy(() => import("./assets/DashboardLayout-B_OCLydI.js"));
 const Overview = lazy(() => import("./assets/Overview-DJa0Lvuz.js"));
 const Websites = lazy(() => import("./assets/Websites-C10nyYf5.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-DCadEYny.js"));
