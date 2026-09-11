@@ -194,7 +194,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -254,7 +254,7 @@ function Links() {
     setErr("");
     setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l) {
@@ -274,6 +274,7 @@ function Links() {
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off",
       countries: l.countries || "",
+      decoy_url: l.decoy_url || "",
       device_mode: l.device_mode || "off",
       devices: l.devices || "",
       os_mode: l.os_mode || "off",
@@ -297,6 +298,7 @@ function Links() {
       block_vpn: form.block_vpn,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
+      decoy_url: form.bot_action === "decoy" ? form.decoy_url.trim() : "",
       device_mode: form.device_mode,
       devices: form.device_mode === "off" ? "" : form.devices,
       os_mode: form.os_mode,
@@ -619,6 +621,22 @@ function Links() {
             /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: o.desc })
           ] })
         ] }, o.value)) })
+      ] }),
+      form.bot_action === "decoy" && /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3.5", children: [
+        /* @__PURE__ */ jsxs("span", { className: "mb-1.5 block text-sm font-semibold", children: [
+          "Which decoy page? ",
+          /* @__PURE__ */ jsx("span", { className: "font-normal text-fg-dim", children: "(optional)" })
+        ] }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            value: form.decoy_url,
+            placeholder: "Leave blank to use ours",
+            onChange: (e) => setForm({ ...form, decoy_url: e.target.value }),
+            className: "w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+          }
+        ),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-xs text-fg-dim", children: "Blank uses our built-in decoy, served from your own short domain. Or paste any page of your own — an old offer, a landing page, anywhere you'd rather send bots. It's scanned for malware like your destination is." })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3.5", children: [
         /* @__PURE__ */ jsx("span", { className: "mb-1.5 block text-sm font-semibold", children: "Which countries can use this link?" }),

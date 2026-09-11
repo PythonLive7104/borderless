@@ -198,10 +198,10 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string;
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string; decoy_url: string;
     device_mode: "off" | "allow" | "block"; devices: string;
     os_mode: "off" | "allow" | "block"; operating_systems: string; max_risk: number }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -271,7 +271,7 @@ export default function Links() {
   function openCreate() {
     setErr(""); setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -284,6 +284,7 @@ export default function Links() {
       forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn,
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off", countries: l.countries || "",
+      decoy_url: l.decoy_url || "",
       device_mode: (l.device_mode || "off") as "off", devices: l.devices || "",
       os_mode: (l.os_mode || "off") as "off", operating_systems: l.operating_systems || "",
       max_risk: l.max_risk || 0,
@@ -302,6 +303,7 @@ export default function Links() {
       block_vpn: form.block_vpn,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
+      decoy_url: form.bot_action === "decoy" ? form.decoy_url.trim() : "",
       device_mode: form.device_mode, devices: form.device_mode === "off" ? "" : form.devices,
       os_mode: form.os_mode, operating_systems: form.os_mode === "off" ? "" : form.operating_systems,
       max_risk: form.max_risk,
@@ -546,6 +548,22 @@ export default function Links() {
               ))}
             </div>
           </div>
+
+          {form.bot_action === "decoy" && (
+            <div className="rounded-xl border border-line p-3.5">
+              <span className="mb-1.5 block text-sm font-semibold">
+                Which decoy page? <span className="font-normal text-fg-dim">(optional)</span>
+              </span>
+              <input value={form.decoy_url} placeholder="Leave blank to use ours"
+                onChange={(e) => setForm({ ...form, decoy_url: e.target.value })}
+                className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+              <p className="mt-1.5 text-xs text-fg-dim">
+                Blank uses our built-in decoy, served from your own short domain. Or paste any
+                page of your own — an old offer, a landing page, anywhere you'd rather send
+                bots. It's scanned for malware like your destination is.
+              </p>
+            </div>
+          )}
 
           <div className="rounded-xl border border-line p-3.5">
             <span className="mb-1.5 block text-sm font-semibold">Which countries can use this link?</span>

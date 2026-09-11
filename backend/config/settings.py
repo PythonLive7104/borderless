@@ -243,6 +243,12 @@ TRACKER_URL = os.getenv("TRACKER_URL", "https://cdn.borderless.local/bl.js")
 # link traffic off the main domain; falls back to FRONTEND_URL when unset.
 SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")
 
+# How many VirusTotal engines must flag a URL before we treat it as unsafe and
+# auto-disable the link. VT aggregates ~90 engines with a noisy long tail, so 1
+# detection is usually a false positive. Google Safe Browsing is unaffected —
+# it disables on its own, being far more precise.
+THREATSCAN_VT_MIN_DETECTIONS = int(os.getenv("THREATSCAN_VT_MIN_DETECTIONS", "3"))
+
 # Abuse handling for the short domain. ABUSE_EMAIL is published on the report
 # page and belongs in the domain's WHOIS record; being reachable and fast is
 # what stops a complainant escalating to the registrar (which suspends the whole

@@ -215,6 +215,13 @@ class ShortLink(models.Model):
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)
 
+    # Where bots go when bot_action is "decoy". Blank means our built-in decoy
+    # page, served from this link's OWN short domain — never the brand domain,
+    # which would hand a bot another domain of ours to report.
+    decoy_url = models.URLField(
+        blank=True, default="",
+        help_text="Send bots to your own page instead of the built-in decoy. Blank = built-in.")
+
     # Threat scan of the destination (Safe Browsing / VirusTotal). A link that
     # resolves to malware/phishing is auto-disabled so it can't be abused.
     url_safe = models.BooleanField(null=True, blank=True)

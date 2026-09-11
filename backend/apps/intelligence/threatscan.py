@@ -55,6 +55,15 @@ def _safe_browsing(url):
     return [m.get("threatType", "THREAT") for m in matches]
 
 
+def _vt_min() -> int:
+    """How many VirusTotal engines must agree before we call a URL unsafe."""
+    from django.conf import settings
+    try:
+        return max(1, int(getattr(settings, "THREATSCAN_VT_MIN_DETECTIONS", 3)))
+    except (TypeError, ValueError):
+        return 3
+
+
 def scan_url(url: str) -> dict:
     """Scan a URL. Returns {safe, flagged_by, threats, checked}. Never raises."""
     if not url or not is_enabled():
@@ -72,7 +81,13 @@ def scan_url(url: str) -> dict:
     if _vt_key():
         try:
             hits = _vt_scan(url)
-            if hits > 0:
+            # VirusTotal aggregates ~90 engines and its long tail is noisy: a
+            # single detection is very often a false positive (shared hosts,
+            # URL shorteners, big CDN domains). Auto-disabling a customer's
+            # live link on one low-quality engine costs them real traffic, so
+            # we require corroboration. Google Safe Browsing above is
+            # high-precision and still disables on its own.
+            if hits >= _vt_min():
                 flagged_by.append("virustotal")
                 threats.append(f"virustotal:{hits}_engines")
         except Exception:

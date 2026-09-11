@@ -174,6 +174,7 @@ export interface ShortLink {
   block_vpn: boolean;
   country_mode: "off" | "allow" | "block";
   countries: string;
+  decoy_url: string;
   device_mode: "off" | "allow" | "block";
   devices: string;
   os_mode: "off" | "allow" | "block";

@@ -20,7 +20,9 @@ def _payload(link) -> str:
         "slug": link.slug,
         "org": str(link.organization_id),
         "bot_action": link.bot_action,          # off | decoy | notfound | blank
-        "decoy_url": (_bot_base(link) + "/decoy.html") if link.domain_id else "",
+        # A page of their own if they set one, otherwise ours on their domain.
+        "decoy_url": link.decoy_url or (
+            (_bot_base(link) + "/decoy.html") if link.domain_id else ""),
         "challenge": bool(link.challenge),      # human check before redirecting
         "challenge_style": link.challenge_style or "hold",
         "forward_params": bool(link.forward_params),
@@ -95,8 +97,20 @@ def scan_and_flag(link):
         result = scan_url(link.destination_url)
     except Exception:
         return
-    link.url_safe = result.get("safe")
-    link.url_threats = result.get("threats", []) or []
+    threats = list(result.get("threats", []) or [])
+    safe = result.get("safe")
+    # A custom decoy is a second destination the link can serve, so it gets the
+    # same scrutiny — otherwise it's an unscanned way to deliver a payload.
+    if link.decoy_url:
+        try:
+            decoy = scan_url(link.decoy_url)
+            if decoy.get("safe") is False:
+                safe = False
+                threats.extend(f"decoy:{t}" for t in (decoy.get("threats") or []))
+        except Exception:
+            pass
+    link.url_safe = safe
+    link.url_threats = threats
     link.url_scanned_at = timezone.now()
     if link.url_safe is False:
         link.active = False  # kill malicious links automatically
