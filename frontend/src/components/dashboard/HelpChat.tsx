@@ -4,28 +4,44 @@ import { KB } from "../../data/knowledge";
 // Tawk.to live-chat embed URL, e.g. https://embed.tawk.to/<propertyId>/<widgetId>
 const TAWK_SRC = ((import.meta as any).env?.VITE_TAWK_SRC as string | undefined) || "";
 
-/** Loads Tawk and maximizes it. Calls onFail() when it can't be used — the
- *  common case is an ad blocker (Brave Shields, uBlock) dropping tawk.to, which
- *  is very likely for this audience. Without this the caller hides our own
- *  widget and the visitor is left with nothing at all. */
-function openTawk(onFail: () => void) {
+/** Loads Tawk and maximizes it.
+ *
+ *  Calls onReady() only once Tawk's own widget is actually up, and onFail()
+ *  when it can't be used — the common case is an ad blocker (Brave Shields,
+ *  uBlock) dropping tawk.to, which is very likely for this audience.
+ *
+ *  The caller must not hide our own widget until onReady fires. Hiding it
+ *  up-front leaves the corner empty for as long as the load takes, which reads
+ *  as "the chat button vanished" rather than "chat is opening".
+ */
+let tawkScriptAdded = false;   // module-level: one injection per page, not per click
+
+function openTawk(onReady: () => void, onFail: () => void) {
   const w = window as any;
-  if (!TAWK_SRC || TAWK_SRC.includes("<")) { onFail(); return; }   // unset or placeholder
-  if (w.Tawk_API?.maximize) { w.Tawk_API.maximize(); return; }
+  if (!TAWK_SRC || TAWK_SRC.includes("<")) { onFail(); return; }
+  if (w.Tawk_API?.maximize) { w.Tawk_API.maximize(); onReady(); return; }
+
+  let settled = false;
+  const succeed = () => { if (!settled) { settled = true; w.Tawk_API.maximize(); onReady(); } };
+  const fail = () => { if (!settled) { settled = true; onFail(); } };
+
+  // Poll for the real API. Tawk replaces our placeholder object once it boots,
+  // so the presence of `maximize` — not of `Tawk_API` — is the signal.
+  const startPolling = () => {
+    const t = setInterval(() => { if (w.Tawk_API?.maximize) { clearInterval(t); succeed(); } }, 200);
+    setTimeout(() => { clearInterval(t); fail(); }, 8000);
+  };
+
+  // A previous click already injected it; don't add a second copy.
+  if (tawkScriptAdded) { startPolling(); return; }
+
   w.Tawk_API = w.Tawk_API || {};
   w.Tawk_LoadStart = new Date();
   const s = document.createElement("script");
   s.async = true; s.src = TAWK_SRC; s.charset = "UTF-8"; s.setAttribute("crossorigin", "*");
-  let settled = false;
-  const fail = () => { if (!settled) { settled = true; onFail(); } };
   s.onerror = fail;                       // blocked, offline, or bad property id
-  s.onload = () => {
-    const t = setInterval(() => {
-      if (w.Tawk_API?.maximize) { settled = true; w.Tawk_API.maximize(); clearInterval(t); }
-    }, 300);
-    // Loaded but never initialised (a blocker can serve an empty stub).
-    setTimeout(() => { clearInterval(t); fail(); }, 8000);
-  };
+  s.onload = startPolling;                // loaded, but may still be an empty stub
+  tawkScriptAdded = true;
   document.body.appendChild(s);
 }
 
@@ -59,6 +75,7 @@ const SUGGESTIONS = [
 export default function HelpChat() {
   const [open, setOpen] = useState(false);
   const [tawkActive, setTawkActive] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([
     { from: "bot", text: "Hi! I'm the TryNoBot assistant. Ask me anything about using the app — or tap a suggestion below." },
@@ -66,24 +83,28 @@ export default function HelpChat() {
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => { scroller.current?.scrollTo(0, scroller.current.scrollHeight); }, [msgs, open]);
 
-  // Escalate to Tawk: hide our bubble so the two chats don't stack in the same
-  // corner. If Tawk never comes up we take the widget back and offer email,
-  // rather than leaving the visitor staring at an empty corner.
+  // Escalate to Tawk. Our widget stays put until Tawk's is actually on screen —
+  // hiding it first emptied the corner for up to 8s, which reads as the chat
+  // button disappearing. While we wait, the panel says what's happening.
   function talkToHuman() {
-    setOpen(false);
-    setTawkActive(true);
-    openTawk(() => {
-      setTawkActive(false);
-      setOpen(true);
-      setMsgs((m) => [...m, {
-        from: "bot",
-        text: "I couldn't open live chat — an ad blocker or privacy shield is usually the reason. "
-            + "Email support@trynobot.com and we'll pick it up there.",
-      }]);
-    });
+    if (connecting) return;                       // ignore repeat taps
+    setConnecting(true);
+    setMsgs((m) => [...m, { from: "bot", text: "Connecting you to a person…" }]);
+    openTawk(
+      () => { setConnecting(false); setTawkActive(true); setOpen(false); },
+      () => {
+        setConnecting(false);
+        setOpen(true);
+        setMsgs((m) => [...m, {
+          from: "bot",
+          text: "I couldn't open live chat — an ad blocker or privacy shield is usually the reason. "
+              + "Email support@trynobot.com and we'll pick it up there.",
+        }]);
+      },
+    );
   }
 
-  // If Tawk is the active chat, get out of its way entirely.
+  // Tawk is up and owns the corner now; get out of its way entirely.
   if (tawkActive) return null;
 
   function ask(text: string) {
@@ -117,9 +138,10 @@ export default function HelpChat() {
           <div className="flex items-center gap-2 border-b border-line bg-bg-soft px-4 py-3">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-brand/10 text-brand">?</span>
             <div className="flex-1"><div className="text-sm font-bold">Help & answers</div><div className="text-[11px] text-fg-dim">Ask about anything in TryNoBot</div></div>
-            <button onClick={talkToHuman} title="Chat with a support agent"
-              className="flex items-center gap-1 rounded-full border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/5">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" /> Talk to a human
+            <button onClick={talkToHuman} disabled={connecting} title="Chat with a support agent"
+              className="flex items-center gap-1 rounded-full border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">
+              <span className={`inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 ${connecting ? "animate-pulse" : ""}`} />
+              {connecting ? "Connecting…" : "Talk to a human"}
             </button>
           </div>
 
@@ -129,8 +151,9 @@ export default function HelpChat() {
                 <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-brand text-white" : "bg-bg-mute text-fg"}`}>
                   {m.text}
                   {m.human && (
-                    <button onClick={talkToHuman} className="mt-2 block w-full rounded-lg bg-brand px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-brand-600">
-                      Chat with a human
+                    <button onClick={talkToHuman} disabled={connecting}
+                      className="mt-2 block w-full rounded-lg bg-brand px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
+                      {connecting ? "Connecting…" : "Chat with a human"}
                     </button>
                   )}
                 </div>

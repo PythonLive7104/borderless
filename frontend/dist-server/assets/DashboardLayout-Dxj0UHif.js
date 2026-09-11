@@ -157,7 +157,8 @@ const KB = [
 ];
 const __vite_import_meta_env__ = {};
 const TAWK_SRC = (__vite_import_meta_env__ == null ? void 0 : __vite_import_meta_env__.VITE_TAWK_SRC) || "";
-function openTawk(onFail) {
+let tawkScriptAdded = false;
+function openTawk(onReady, onFail) {
   var _a;
   const w = window;
   if (!TAWK_SRC || TAWK_SRC.includes("<")) {
@@ -166,6 +167,38 @@ function openTawk(onFail) {
   }
   if ((_a = w.Tawk_API) == null ? void 0 : _a.maximize) {
     w.Tawk_API.maximize();
+    onReady();
+    return;
+  }
+  let settled = false;
+  const succeed = () => {
+    if (!settled) {
+      settled = true;
+      w.Tawk_API.maximize();
+      onReady();
+    }
+  };
+  const fail = () => {
+    if (!settled) {
+      settled = true;
+      onFail();
+    }
+  };
+  const startPolling = () => {
+    const t = setInterval(() => {
+      var _a2;
+      if ((_a2 = w.Tawk_API) == null ? void 0 : _a2.maximize) {
+        clearInterval(t);
+        succeed();
+      }
+    }, 200);
+    setTimeout(() => {
+      clearInterval(t);
+      fail();
+    }, 8e3);
+  };
+  if (tawkScriptAdded) {
+    startPolling();
     return;
   }
   w.Tawk_API = w.Tawk_API || {};
@@ -175,28 +208,9 @@ function openTawk(onFail) {
   s.src = TAWK_SRC;
   s.charset = "UTF-8";
   s.setAttribute("crossorigin", "*");
-  let settled = false;
-  const fail = () => {
-    if (!settled) {
-      settled = true;
-      onFail();
-    }
-  };
   s.onerror = fail;
-  s.onload = () => {
-    const t = setInterval(() => {
-      var _a2;
-      if ((_a2 = w.Tawk_API) == null ? void 0 : _a2.maximize) {
-        settled = true;
-        w.Tawk_API.maximize();
-        clearInterval(t);
-      }
-    }, 300);
-    setTimeout(() => {
-      clearInterval(t);
-      fail();
-    }, 8e3);
-  };
+  s.onload = startPolling;
+  tawkScriptAdded = true;
   document.body.appendChild(s);
 }
 const STOP = /* @__PURE__ */ new Set(["the", "a", "an", "is", "are", "do", "does", "how", "what", "i", "to", "my", "of", "on", "in", "and", "can", "for", "me", "you", "it"]);
@@ -225,6 +239,7 @@ const SUGGESTIONS = [
 function HelpChat() {
   const [open, setOpen] = useState(false);
   const [tawkActive, setTawkActive] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState([
     { from: "bot", text: "Hi! I'm the TryNoBot assistant. Ask me anything about using the app — or tap a suggestion below." }
@@ -235,16 +250,24 @@ function HelpChat() {
     (_a = scroller.current) == null ? void 0 : _a.scrollTo(0, scroller.current.scrollHeight);
   }, [msgs, open]);
   function talkToHuman() {
-    setOpen(false);
-    setTawkActive(true);
-    openTawk(() => {
-      setTawkActive(false);
-      setOpen(true);
-      setMsgs((m) => [...m, {
-        from: "bot",
-        text: "I couldn't open live chat — an ad blocker or privacy shield is usually the reason. Email support@trynobot.com and we'll pick it up there."
-      }]);
-    });
+    if (connecting) return;
+    setConnecting(true);
+    setMsgs((m) => [...m, { from: "bot", text: "Connecting you to a person…" }]);
+    openTawk(
+      () => {
+        setConnecting(false);
+        setTawkActive(true);
+        setOpen(false);
+      },
+      () => {
+        setConnecting(false);
+        setOpen(true);
+        setMsgs((m) => [...m, {
+          from: "bot",
+          text: "I couldn't open live chat — an ad blocker or privacy shield is usually the reason. Email support@trynobot.com and we'll pick it up there."
+        }]);
+      }
+    );
   }
   if (tawkActive) return null;
   function ask(text) {
@@ -279,11 +302,12 @@ function HelpChat() {
           "button",
           {
             onClick: talkToHuman,
+            disabled: connecting,
             title: "Chat with a support agent",
-            className: "flex items-center gap-1 rounded-full border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/5",
+            className: "flex items-center gap-1 rounded-full border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60",
             children: [
-              /* @__PURE__ */ jsx("span", { className: "inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" }),
-              " Talk to a human"
+              /* @__PURE__ */ jsx("span", { className: `inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 ${connecting ? "animate-pulse" : ""}` }),
+              connecting ? "Connecting…" : "Talk to a human"
             ]
           }
         )
@@ -291,7 +315,15 @@ function HelpChat() {
       /* @__PURE__ */ jsxs("div", { ref: scroller, className: "flex-1 space-y-3 overflow-y-auto px-4 py-4", children: [
         msgs.map((m, i) => /* @__PURE__ */ jsx("div", { className: `flex ${m.from === "user" ? "justify-end" : "justify-start"}`, children: /* @__PURE__ */ jsxs("div", { className: `max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-brand text-white" : "bg-bg-mute text-fg"}`, children: [
           m.text,
-          m.human && /* @__PURE__ */ jsx("button", { onClick: talkToHuman, className: "mt-2 block w-full rounded-lg bg-brand px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-brand-600", children: "Chat with a human" })
+          m.human && /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: talkToHuman,
+              disabled: connecting,
+              className: "mt-2 block w-full rounded-lg bg-brand px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60",
+              children: connecting ? "Connecting…" : "Chat with a human"
+            }
+          )
         ] }) }, i)),
         msgs.length <= 1 && /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1.5 pt-1", children: SUGGESTIONS.map((s) => /* @__PURE__ */ jsx("button", { onClick: () => ask(s), className: "rounded-full border border-line bg-white px-2.5 py-1 text-xs text-fg-muted hover:border-brand/40 hover:text-brand", children: s }, s)) })
       ] }),
