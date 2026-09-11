@@ -2,6 +2,7 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
+import { H as HelpVideo } from "./HelpVideo-DxHys9e3.js";
 import { A as useDialog, B as Button, J as ruleApi, c as useWorkspace, x as websiteApi } from "../entry-server.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
@@ -422,6 +423,13 @@ function Shield() {
       /* @__PURE__ */ jsx("b", { children: "no key and nothing to edit" }),
       "."
     ] }),
+    /* @__PURE__ */ jsx(
+      HelpVideo,
+      {
+        id: "9fc48277f5d3408a9595600d77f9bfa0",
+        title: "How to set up the server-side Shield"
+      }
+    ),
     /* @__PURE__ */ jsx("div", { className: "flex flex-wrap items-end justify-between gap-3", children: /* @__PURE__ */ jsxs("div", { children: [
       /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
         /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Server-side shield" }),

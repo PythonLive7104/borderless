@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
+import HelpVideo from "../../components/dashboard/HelpVideo";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { websiteApi, type Website } from "../../lib/api";
 import FolderGuard from "../../components/dashboard/FolderGuard";
@@ -327,6 +328,9 @@ export default function Shield() {
         website — so it's usually a job for whoever builds or manages your site. Good news: the snippet is
         <b>ready to paste</b> — your site ID is already in it, so there's <b>no key and nothing to edit</b>.
       </PageNote>
+
+      <HelpVideo id="9fc48277f5d3408a9595600d77f9bfa0"
+        title="How to set up the server-side Shield" />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
