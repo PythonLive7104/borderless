@@ -297,6 +297,8 @@ function HelpChat() {
     );
   }
   if (tawkActive) return null;
+  const askedAlready = new Set(msgs.filter((m) => m.from === "user").map((m) => m.text));
+  const unasked = SUGGESTIONS.filter((sug) => !askedAlready.has(sug));
   function ask(text) {
     const q = text.trim();
     if (!q) return;
@@ -352,7 +354,10 @@ function HelpChat() {
             }
           )
         ] }) }, i)),
-        msgs.length <= 1 && /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1.5 pt-1", children: SUGGESTIONS.map((s) => /* @__PURE__ */ jsx("button", { onClick: () => ask(s), className: "rounded-full border border-line bg-white px-2.5 py-1 text-xs text-fg-muted hover:border-brand/40 hover:text-brand", children: s }, s)) })
+        unasked.length > 0 && /* @__PURE__ */ jsxs("div", { className: "pt-1", children: [
+          msgs.length > 1 && /* @__PURE__ */ jsx("div", { className: "mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-dim", children: "Ask something else" }),
+          /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1.5", children: unasked.map((s) => /* @__PURE__ */ jsx("button", { onClick: () => ask(s), className: "rounded-full border border-line bg-white px-2.5 py-1 text-xs text-fg-muted hover:border-brand/40 hover:text-brand", children: s }, s)) })
+        ] })
       ] }),
       /* @__PURE__ */ jsxs("form", { onSubmit: (e) => {
         e.preventDefault();

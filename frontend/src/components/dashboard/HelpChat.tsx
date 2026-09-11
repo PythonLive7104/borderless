@@ -147,6 +147,9 @@ export default function HelpChat() {
   // Tawk is up and owns the corner now; get out of its way entirely.
   if (tawkActive) return null;
 
+  const askedAlready = new Set(msgs.filter((m) => m.from === "user").map((m) => m.text));
+  const unasked = SUGGESTIONS.filter((sug) => !askedAlready.has(sug));
+
   function ask(text: string) {
     const q = text.trim();
     if (!q) return;
@@ -199,11 +202,22 @@ export default function HelpChat() {
                 </div>
               </div>
             ))}
-            {msgs.length <= 1 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {SUGGESTIONS.map((s) => (
-                  <button key={s} onClick={() => ask(s)} className="rounded-full border border-line bg-white px-2.5 py-1 text-xs text-fg-muted hover:border-brand/40 hover:text-brand">{s}</button>
-                ))}
+            {/* Suggestions stay put after the first tap — they used to vanish
+                on any answer, which stranded anyone who had a second question
+                and didn't know what else to type. Ones already asked drop off
+                so the list only ever shrinks. */}
+            {unasked.length > 0 && (
+              <div className="pt-1">
+                {msgs.length > 1 && (
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-dim">
+                    Ask something else
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {unasked.map((s) => (
+                    <button key={s} onClick={() => ask(s)} className="rounded-full border border-line bg-white px-2.5 py-1 text-xs text-fg-muted hover:border-brand/40 hover:text-brand">{s}</button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
