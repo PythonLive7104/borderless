@@ -1964,7 +1964,7 @@ const Websites = lazy(() => import("./assets/Websites-C10nyYf5.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-DCadEYny.js"));
 const Campaigns = lazy(() => import("./assets/Campaigns-CWguQI14.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-e8019AW8.js"));
-const TrafficRules = lazy(() => import("./assets/TrafficRules-nj95ICPE.js"));
+const TrafficRules = lazy(() => import("./assets/TrafficRules-Crbsy5sj.js"));
 const Shield = lazy(() => import("./assets/Shield-BKuv5LuX.js"));
 const Links = lazy(() => import("./assets/Links-KgAgzG8e.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-DbWVaBH9.js"));
