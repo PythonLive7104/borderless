@@ -2,7 +2,7 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { H as HelpVideo } from "./HelpVideo-DxHys9e3.js";
+import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
 import { A as useDialog, B as Button, J as ruleApi, c as useWorkspace, x as websiteApi } from "../entry-server.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";

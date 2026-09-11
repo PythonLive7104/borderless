@@ -1,7 +1,7 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { H as HelpVideo } from "./HelpVideo-DxHys9e3.js";
+import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
 import { A as useDialog, B as Button, E as ipFilterApi, R as RULE_FIELDS, F as RULE_OPS, G as FIELD_VALUE_OPTIONS, H as COUNTRIES, c as useWorkspace, J as ruleApi, x as websiteApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
