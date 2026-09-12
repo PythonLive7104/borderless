@@ -117,6 +117,23 @@ function Websites() {
         ] }),
         /* @__PURE__ */ jsx(StatusBadge, { status: s.live_state })
       ] }),
+      s.safe_browsing_flagged && /* @__PURE__ */ jsxs("div", { className: "mt-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-red-600", children: [
+        /* @__PURE__ */ jsx("b", { children: "Flagged by Google Safe Browsing." }),
+        " Browsers show a red warning before your page loads. Open",
+        " ",
+        /* @__PURE__ */ jsx(
+          "a",
+          {
+            href: "https://search.google.com/search-console",
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "underline",
+            children: "Search Console"
+          }
+        ),
+        " ",
+        "→ Security Issues, fix the cause, then Request Review."
+      ] }),
       /* @__PURE__ */ jsx("p", { className: "mt-2 text-xs text-fg-muted", children: stateHint(s) }),
       /* @__PURE__ */ jsxs("div", { className: "mt-4 flex items-center justify-between", children: [
         /* @__PURE__ */ jsx("code", { className: "rounded bg-bg-mute px-2 py-1 text-xs text-fg-muted", children: s.tracking_id }),

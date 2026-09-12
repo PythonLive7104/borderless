@@ -12,6 +12,7 @@ class WebsiteSerializer(serializers.ModelSerializer):
         model = Website
         fields = ["id", "organization", "name", "domain", "url", "tracking_id",
                   "status", "live_state", "last_event_at", "created_at", "strict_mode",
+                  "safe_browsing_flagged", "safe_browsing_threats", "safe_browsing_checked_at",
                   "snippet"]
         read_only_fields = ["tracking_id", "status", "last_event_at", "created_at"]
 

@@ -145,6 +145,8 @@ export interface Website {
   id: number; organization: number; name: string; domain: string; url: string;
   tracking_id: string; status: WebsiteStatus; live_state: WebsiteState;
   last_event_at: string | null;
+  safe_browsing_flagged: boolean; safe_browsing_threats: string[];
+  safe_browsing_checked_at: string | null;
   created_at: string; snippet: string;
 }
 

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"borderless/decision/internal/crawler"
 	"borderless/decision/internal/fingerprint"
 	"borderless/decision/internal/geo"
 	"borderless/decision/internal/ipfilter"
@@ -83,7 +84,7 @@ func main() {
 
 	go geo.Init(env("GEOIP_DB", ""))  // real-time IP->country (free DB-IP lite)
 
-	h := &handler{st: st}
+	h := &handler{st: st, allowCrawlers: env("ALLOW_VERIFIED_CRAWLERS", "1") != "0"}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("/bl.js", serveTracker)
@@ -104,7 +105,14 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-type handler struct{ st *store.Store }
+type handler struct {
+	st *store.Store
+	// Let forward-confirmed search/safety crawlers see what real visitors see,
+	// instead of a decoy/block/redirect — serving Googlebot different content is
+	// cloaking and gets sites flagged by Safe Browsing. On unless explicitly
+	// disabled (ALLOW_VERIFIED_CRAWLERS=0).
+	allowCrawlers bool
+}
 
 func serveTracker(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
@@ -207,6 +215,11 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	// Verified crawler -> real content (anti-cloaking); see score() for why.
+	if h.allowCrawlers && crawler.Verify(rctx, fp.IP, fp.UserAgent) {
+		action, tag, redirect = "allow", "", ""
+		result.Signals = append(result.Signals, "verified_crawler")
+	}
 	// --- IP allow/deny lists: whitelist always passes, blacklist blocks;
 	// both take precedence over the scored rules above. ---
 	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(rctx, p.SiteID)), fp.IP) {
@@ -326,6 +339,13 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 			"path":           urlPath(path),
 		},
 	})
+	// A forward-confirmed crawler (Googlebot, Safe Browsing, Bing…) sees exactly
+	// what a human sees. Overrides a rule-driven block/redirect so the site
+	// isn't deceptive to Google; a manual IP denylist below can still stop it.
+	if h.allowCrawlers && crawler.Verify(ctx, fp.IP, fp.UserAgent) {
+		action, tag, redirect = "allow", "", ""
+		result.Signals = append(result.Signals, "verified_crawler")
+	}
 	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, siteID)), fp.IP) {
 	case ipfilter.Allow:
 		action, redirect = "allow", ""

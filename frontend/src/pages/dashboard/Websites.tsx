@@ -117,6 +117,15 @@ export default function Websites() {
                 </div>
                 <StatusBadge status={s.live_state} />
               </div>
+              {s.safe_browsing_flagged && (
+                <div className="mt-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-red-600">
+                  <b>Flagged by Google Safe Browsing.</b> Browsers show a red warning before your
+                  page loads. Open{" "}
+                  <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer"
+                    className="underline">Search Console</a>{" "}
+                  → Security Issues, fix the cause, then Request Review.
+                </div>
+              )}
               <p className="mt-2 text-xs text-fg-muted">{stateHint(s)}</p>
               <div className="mt-4 flex items-center justify-between">
                 <code className="rounded bg-bg-mute px-2 py-1 text-xs text-fg-muted">{s.tracking_id}</code>

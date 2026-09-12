@@ -41,6 +41,16 @@ class Website(models.Model):
     # limits; it isn't a site they added.
     is_system = models.BooleanField(default=False, editable=False)
 
+    # Google Safe Browsing monitoring. Chrome (and Firefox/Safari) paint their
+    # red "deceptive site" page straight from this list, before the site loads —
+    # so once a domain lands on it there's nothing to do in the page itself. The
+    # value of watching it is knowing the moment it happens and getting it
+    # cleared through Search Console, instead of finding out when traffic dies.
+    safe_browsing_flagged = models.BooleanField(default=False)
+    safe_browsing_threats = models.JSONField(default=list, blank=True)
+    safe_browsing_checked_at = models.DateTimeField(null=True, blank=True)
+    safe_browsing_notified_at = models.DateTimeField(null=True, blank=True)
+
     def __str__(self):
         return f"{self.name} ({self.tracking_id})"
 

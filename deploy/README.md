@@ -108,6 +108,7 @@ Celery was removed to save RAM, so these run from host cron:
 30 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_access
 */10 * * * * docker compose -f docker-compose.prod.yml exec -T backend python manage.py reconcile_payments
 45 4 * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_private_domains
+0 */6 * * * docker compose -f docker-compose.prod.yml exec -T backend python manage.py check_safebrowsing
 ```
 
 `reconcile_payments` is the safety net under the payment webhook. It asks Bachs
