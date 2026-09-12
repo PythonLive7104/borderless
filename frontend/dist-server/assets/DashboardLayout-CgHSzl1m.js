@@ -1,7 +1,7 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useLocation, Link, useNavigate, Outlet, NavLink } from "react-router-dom";
-import { c as useWorkspace, d as billingApi, u as useAuth, B as Button, a as authApi, L as Logo, I as IHome, e as IGlobe, f as IFilter, g as IShieldGold, h as IRadar, i as ILink, j as IUsers, k as IList, l as ITarget, m as ISources, n as IFunnel, p as IChart, q as IPlug, r as IKey, s as IBolt, t as ICard, v as IGauge, w as IGear } from "../entry-server.js";
+import { useLocation, useNavigate, Link, Outlet, NavLink } from "react-router-dom";
+import { c as useWorkspace, d as useDialog, e as billingApi, u as useAuth, B as Button, a as authApi, L as Logo, I as IHome, f as IGlobe, g as IFilter, h as IShieldGold, i as IRadar, j as ILink, k as IUsers, l as IList, m as ITarget, n as ISources, p as IFunnel, q as IChart, r as IPlug, s as IKey, t as IBolt, v as ICard, w as IGauge, x as IGear } from "../entry-server.js";
 import { T as TourProvider } from "./TourContext-CngGBo1N.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
@@ -396,8 +396,11 @@ const BILLING_PATH = "/dashboard/billing";
 function AccessGate({ children }) {
   const { current } = useWorkspace();
   const loc = useLocation();
+  const navigate = useNavigate();
+  const { confirm } = useDialog();
   const [access, setAccess] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const promptOpen = useRef(false);
   useEffect(() => {
     let alive = true;
     setLoaded(false);
@@ -414,25 +417,48 @@ function AccessGate({ children }) {
       alive = false;
     };
   }, [current == null ? void 0 : current.id, loc.pathname]);
+  useEffect(() => {
+    const onBlocked = async () => {
+      if (promptOpen.current) return;
+      promptOpen.current = true;
+      const go = await confirm({
+        title: "Renew to make changes",
+        message: "Your access period has ended. You can still look around, but creating or changing things needs an active plan. Your data is safe and everything resumes the moment you renew.",
+        confirmLabel: "Go to Billing",
+        cancelLabel: "Not now",
+        tone: "brand"
+      });
+      promptOpen.current = false;
+      if (go) navigate(BILLING_PATH);
+    };
+    window.addEventListener("tnb:access-blocked", onBlocked);
+    return () => window.removeEventListener("tnb:access-blocked", onBlocked);
+  }, [confirm, navigate]);
   if (!loaded || !access) return /* @__PURE__ */ jsx(Fragment, { children });
   const onBilling = loc.pathname.startsWith(BILLING_PATH);
   if (access.locked && !onBilling) {
     const canceled = access.reason === "canceled";
     const lapsed = access.reason === "period_ended";
-    return /* @__PURE__ */ jsx("div", { className: "grid min-h-[60vh] place-items-center px-4", children: /* @__PURE__ */ jsxs("div", { className: "card shadow-soft max-w-md p-8 text-center", children: [
-      /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand/10 text-2xl", children: "🔒" }),
-      /* @__PURE__ */ jsx("h2", { className: "mt-4 text-xl font-extrabold tracking-tight", children: canceled ? "Subscription canceled" : lapsed ? "Your access period has ended" : "Your free trial has ended" }),
-      /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-fg-muted", children: canceled ? "Reactivate a plan to regain access to your workspace, traffic data and rules." : lapsed ? "Your weekly access period has run out. Renew to start filtering traffic again — your rules, sites and data are all still here." : "Thanks for trying TryNoBot! Choose a plan to keep filtering traffic and unlock your dashboard again." }),
-      /* @__PURE__ */ jsx(
-        Link,
-        {
-          to: BILLING_PATH,
-          className: "mt-6 inline-flex items-center justify-center rounded-full bg-brand px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600",
-          children: canceled ? "Reactivate a plan" : lapsed ? "Renew now" : "Choose a plan"
-        }
-      ),
-      /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-fg-dim", children: "Your data is safe and returns the moment you subscribe." })
-    ] }) });
+    return /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { className: "mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-3", children: [
+          /* @__PURE__ */ jsx("span", { className: "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-lg", children: "🔒" }),
+          /* @__PURE__ */ jsxs("div", { className: "text-sm", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-bold text-amber-900", children: canceled ? "Subscription canceled" : lapsed ? "Your access period has ended" : "Your free trial has ended" }),
+            /* @__PURE__ */ jsx("div", { className: "text-amber-800", children: "You can still look around. Renewing turns your protection back on and lets you make changes again — your data is all still here." })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx(
+          Link,
+          {
+            to: BILLING_PATH,
+            className: "shrink-0 inline-flex items-center justify-center rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-600",
+            children: canceled ? "Reactivate a plan" : lapsed ? "Renew now" : "Choose a plan"
+          }
+        )
+      ] }),
+      children
+    ] });
   }
   const banner = access.reason === "trialing" && /* @__PURE__ */ jsxs("div", { className: "mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2.5 text-sm", children: [
     /* @__PURE__ */ jsxs("span", { className: "text-amber-800", children: [

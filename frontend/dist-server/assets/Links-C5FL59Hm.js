@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
-import { A as useDialog, c as useWorkspace, y as linkApi, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
+import { d as useDialog, c as useWorkspace, z as linkApi, B as Button, y as websiteApi, e as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";

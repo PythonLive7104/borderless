@@ -1,6 +1,6 @@
 import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { d as billingApi, T as adminApi } from "../entry-server.js";
+import { e as billingApi, T as adminApi } from "../entry-server.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";

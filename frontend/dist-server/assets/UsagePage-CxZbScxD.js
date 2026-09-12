@@ -1,6 +1,6 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { c as useWorkspace, d as billingApi } from "../entry-server.js";
+import { c as useWorkspace, e as billingApi } from "../entry-server.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";

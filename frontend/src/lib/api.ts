@@ -85,9 +85,23 @@ async function request<T = any>(path: string, opts: RequestInit & { auth?: boole
   }
   const text = await res.text();
   const data = text ? (() => { try { return JSON.parse(text); } catch { return text; } })() : null;
-  if (!res.ok) throw new ApiError(res.status, data);
+  if (!res.ok) {
+    // A locked workspace can still browse (reads are open server-side); only a
+    // write is refused, with this message from billing/permissions.py. Rather
+    // than each button showing a raw error, broadcast it so one place can offer
+    // to renew. We still throw, so callers' own error handling runs too.
+    if (res.status === 403 && ACCESS_EXPIRED_RE.test(errText(data, "")) &&
+        typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tnb:access-blocked"));
+    }
+    throw new ApiError(res.status, data);
+  }
   return data as T;
 }
+
+// Matches HasWorkspaceAccess.MESSAGE in backend/apps/billing/permissions.py.
+// Keep in sync if that wording changes.
+const ACCESS_EXPIRED_RE = /access period has ended/i;
 
 export const http = {
   get: <T = any>(p: string) => request<T>(p),

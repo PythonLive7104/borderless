@@ -1,7 +1,7 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { c as useWorkspace, d as billingApi, B as Button, P as IntervalToggle, i as ILink, e as IGlobe } from "../entry-server.js";
+import { c as useWorkspace, e as billingApi, B as Button, P as IntervalToggle, j as ILink, f as IGlobe } from "../entry-server.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import "react-dom/server";

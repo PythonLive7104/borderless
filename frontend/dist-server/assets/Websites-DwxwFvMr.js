@@ -2,7 +2,7 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { A as useDialog, c as useWorkspace, B as Button, x as websiteApi, d as billingApi } from "../entry-server.js";
+import { d as useDialog, c as useWorkspace, B as Button, y as websiteApi, e as billingApi } from "../entry-server.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { S as StatusBadge } from "./StatusBadge-BjkD924O.js";

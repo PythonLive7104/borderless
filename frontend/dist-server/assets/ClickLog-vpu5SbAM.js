@@ -1,11 +1,11 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { c as useWorkspace, z as analyticsApi } from "../entry-server.js";
+import { c as useWorkspace, A as analyticsApi } from "../entry-server.js";
 import { C as ClassBadge } from "./ClassBadge-B1OvS151.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import { P as Pager } from "./Pager-Dnb3DgGO.js";
-import { W as WebsitePicker } from "./WebsitePicker-Bej3wDvm.js";
+import { W as WebsitePicker } from "./WebsitePicker-BhUQYD8k.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-router-dom";

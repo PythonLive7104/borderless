@@ -1,6 +1,6 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { A as useDialog, B as Button, Q as telegramApi, u as useAuth, c as useWorkspace, a as authApi } from "../entry-server.js";
+import { d as useDialog, B as Button, Q as telegramApi, u as useAuth, c as useWorkspace, a as authApi } from "../entry-server.js";
 import { u as useTour } from "./TourContext-CngGBo1N.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
