@@ -128,6 +128,7 @@ const websiteApi = {
   update: (id, payload) => http.patch(`/websites/${id}/`, payload),
   remove: (id) => http.del(`/websites/${id}/`),
   verify: (id) => http.post(`/websites/${id}/verify/`),
+  checkSafeBrowsing: (id) => http.post(`/websites/${id}/check-safebrowsing/`),
   verifyShield: (id) => http.post(`/websites/${id}/verify-shield/`)
 };
 const linkApi = {
@@ -1961,7 +1962,7 @@ const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
 const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CKDrS9qx.js"));
 const Overview = lazy(() => import("./assets/Overview-DJa0Lvuz.js"));
 const Websites = lazy(() => import("./assets/Websites-Bq_kSaCo.js"));
-const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-6Q9eqx97.js"));
+const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-D0oaWPV_.js"));
 const Campaigns = lazy(() => import("./assets/Campaigns-CWguQI14.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-e8019AW8.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-DgH69D8X.js"));

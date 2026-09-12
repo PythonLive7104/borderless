@@ -7,10 +7,31 @@ import StatusBadge from "../../components/ui/StatusBadge";
 
 // Turn the absence of a warning into an actual answer: clean / flagged / not
 // yet checked, rather than leaving silence to be read as "fine".
-function SafeBrowsing({ site }: { site: Website }) {
+function SafeBrowsing({ site, onChecked }: { site: Website; onChecked: () => void }) {
+  const [checking, setChecking] = useState(false);
+  const [note, setNote] = useState("");
+
+  async function check() {
+    setChecking(true); setNote("");
+    try {
+      const r = await websiteApi.checkSafeBrowsing(site.id);
+      setNote(r.message);
+      onChecked();
+    } catch {
+      setNote("Couldn't run the check just now — try again shortly.");
+    } finally { setChecking(false); }
+  }
+
   const when = site.safe_browsing_checked_at
     ? new Date(site.safe_browsing_checked_at).toLocaleString()
     : null;
+
+  const checkBtn = (
+    <button type="button" onClick={check} disabled={checking}
+      className="mt-1 block text-xs font-semibold text-brand hover:underline disabled:opacity-60">
+      {checking ? "Checking…" : "Check now"}
+    </button>
+  );
 
   if (site.safe_browsing_flagged) {
     const threats = (site.safe_browsing_threats || [])
@@ -21,16 +42,26 @@ function SafeBrowsing({ site }: { site: Website }) {
         {threats && <span className="block text-xs text-fg-muted">{threats}</span>}
         <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer"
           className="mt-0.5 block text-xs text-brand underline">Request a review →</a>
+        {checkBtn}
+        {note && <span className="block text-xs text-fg-muted">{note}</span>}
       </span>
     );
   }
   if (!when) {
-    return <span className="text-fg-muted">Not checked yet</span>;
+    return (
+      <span className="inline-block">
+        <span className="text-fg-muted">Not checked yet</span>
+        {checkBtn}
+        {note && <span className="block text-xs text-fg-muted">{note}</span>}
+      </span>
+    );
   }
   return (
-    <span>
+    <span className="inline-block">
       <span className="font-semibold text-emerald-700">✓ Clean</span>
       <span className="block text-xs text-fg-muted">checked {when}</span>
+      {checkBtn}
+      {note && <span className="block text-xs text-fg-muted">{note}</span>}
     </span>
   );
 }
@@ -106,7 +137,7 @@ export default function WebsiteDetail() {
             <div className="flex justify-between"><dt className="text-fg-muted">Created</dt><dd>{new Date(site.created_at).toLocaleDateString()}</dd></div>
             <div className="flex items-start justify-between gap-3">
               <dt className="text-fg-muted">Google Safe Browsing</dt>
-              <dd className="text-right"><SafeBrowsing site={site} /></dd>
+              <dd className="text-right"><SafeBrowsing site={site} onChecked={load} /></dd>
             </div>
           </dl>
         </div>

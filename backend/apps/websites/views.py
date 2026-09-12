@@ -73,6 +73,36 @@ class WebsiteViewSet(viewsets.ModelViewSet):
                        else "No events received yet. Make sure the snippet is on your site.",
         })
 
+    @action(detail=True, methods=["post"], url_path="check-safebrowsing")
+    def check_safebrowsing(self, request, pk=None):
+        """Run a Safe Browsing check for this site now, instead of waiting for
+        the scheduled job. A short cooldown stops the button burning API quota."""
+        from django.utils import timezone
+        from datetime import timedelta
+        from apps.websites import safebrowsing
+
+        w = self.get_object()
+        if not safebrowsing.is_enabled():
+            return Response(
+                {"enabled": False,
+                 "message": "Safe Browsing checks aren't configured on this server yet."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        # Manual checks hit Google's API, so rate-limit to once a minute per site.
+        if w.safe_browsing_checked_at and \
+                timezone.now() - w.safe_browsing_checked_at < timedelta(seconds=60):
+            return Response({
+                "enabled": True, "flagged": w.safe_browsing_flagged,
+                "threats": w.safe_browsing_threats,
+                "checked_at": w.safe_browsing_checked_at,
+                "message": "Checked moments ago — showing the latest result.",
+            })
+
+        r = safebrowsing.check_site(w)
+        r["message"] = ("Flagged by Google Safe Browsing." if r["flagged"]
+                        else "Clear — Google Safe Browsing found no problems.")
+        return Response(r)
+
     @action(detail=True, methods=["post"], url_path="verify-shield")
     def verify_shield(self, request, pk=None):
         """Report server-side Shield status. Active once the site's server/edge has

@@ -158,6 +158,7 @@ export const websiteApi = {
   update: (id: number, payload: Partial<Website>) => http.patch<Website>(`/websites/${id}/`, payload),
   remove: (id: number) => http.del(`/websites/${id}/`),
   verify: (id: number) => http.post<{ status: WebsiteStatus; live_state: WebsiteState; installed: boolean; message: string; last_event_at: string | null }>(`/websites/${id}/verify/`),
+  checkSafeBrowsing: (id: number) => http.post<{ enabled: boolean; flagged?: boolean; threats?: string[]; checked_at?: string | null; message: string }>(`/websites/${id}/check-safebrowsing/`),
   verifyShield: (id: number) => http.post<{ active: boolean; last_check_at: string | null; message: string }>(`/websites/${id}/verify-shield/`),
 };
 

@@ -6,8 +6,33 @@ import { B as Button, x as websiteApi } from "../entry-server.js";
 import { S as StatusBadge } from "./StatusBadge-BjkD924O.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
-function SafeBrowsing({ site }) {
+function SafeBrowsing({ site, onChecked }) {
+  const [checking, setChecking] = useState(false);
+  const [note, setNote] = useState("");
+  async function check() {
+    setChecking(true);
+    setNote("");
+    try {
+      const r = await websiteApi.checkSafeBrowsing(site.id);
+      setNote(r.message);
+      onChecked();
+    } catch {
+      setNote("Couldn't run the check just now — try again shortly.");
+    } finally {
+      setChecking(false);
+    }
+  }
   const when = site.safe_browsing_checked_at ? new Date(site.safe_browsing_checked_at).toLocaleString() : null;
+  const checkBtn = /* @__PURE__ */ jsx(
+    "button",
+    {
+      type: "button",
+      onClick: check,
+      disabled: checking,
+      className: "mt-1 block text-xs font-semibold text-brand hover:underline disabled:opacity-60",
+      children: checking ? "Checking…" : "Check now"
+    }
+  );
   if (site.safe_browsing_flagged) {
     const threats = (site.safe_browsing_threats || []).map((t) => t.replace(/_/g, " ").toLowerCase()).join(", ");
     return /* @__PURE__ */ jsxs("span", { className: "inline-block max-w-[16rem]", children: [
@@ -22,18 +47,26 @@ function SafeBrowsing({ site }) {
           className: "mt-0.5 block text-xs text-brand underline",
           children: "Request a review →"
         }
-      )
+      ),
+      checkBtn,
+      note && /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: note })
     ] });
   }
   if (!when) {
-    return /* @__PURE__ */ jsx("span", { className: "text-fg-muted", children: "Not checked yet" });
+    return /* @__PURE__ */ jsxs("span", { className: "inline-block", children: [
+      /* @__PURE__ */ jsx("span", { className: "text-fg-muted", children: "Not checked yet" }),
+      checkBtn,
+      note && /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: note })
+    ] });
   }
-  return /* @__PURE__ */ jsxs("span", { children: [
+  return /* @__PURE__ */ jsxs("span", { className: "inline-block", children: [
     /* @__PURE__ */ jsx("span", { className: "font-semibold text-emerald-700", children: "✓ Clean" }),
     /* @__PURE__ */ jsxs("span", { className: "block text-xs text-fg-muted", children: [
       "checked ",
       when
-    ] })
+    ] }),
+    checkBtn,
+    note && /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: note })
   ] });
 }
 function WebsiteDetail() {
@@ -124,7 +157,7 @@ function WebsiteDetail() {
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3", children: [
             /* @__PURE__ */ jsx("dt", { className: "text-fg-muted", children: "Google Safe Browsing" }),
-            /* @__PURE__ */ jsx("dd", { className: "text-right", children: /* @__PURE__ */ jsx(SafeBrowsing, { site }) })
+            /* @__PURE__ */ jsx("dd", { className: "text-right", children: /* @__PURE__ */ jsx(SafeBrowsing, { site, onChecked: load }) })
           ] })
         ] })
       ] })
