@@ -5,6 +5,36 @@ import { websiteApi, type Website } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import StatusBadge from "../../components/ui/StatusBadge";
 
+// Turn the absence of a warning into an actual answer: clean / flagged / not
+// yet checked, rather than leaving silence to be read as "fine".
+function SafeBrowsing({ site }: { site: Website }) {
+  const when = site.safe_browsing_checked_at
+    ? new Date(site.safe_browsing_checked_at).toLocaleString()
+    : null;
+
+  if (site.safe_browsing_flagged) {
+    const threats = (site.safe_browsing_threats || [])
+      .map((t) => t.replace(/_/g, " ").toLowerCase()).join(", ");
+    return (
+      <span className="inline-block max-w-[16rem]">
+        <span className="font-semibold text-red-600">⚠ Flagged by Google</span>
+        {threats && <span className="block text-xs text-fg-muted">{threats}</span>}
+        <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer"
+          className="mt-0.5 block text-xs text-brand underline">Request a review →</a>
+      </span>
+    );
+  }
+  if (!when) {
+    return <span className="text-fg-muted">Not checked yet</span>;
+  }
+  return (
+    <span>
+      <span className="font-semibold text-emerald-700">✓ Clean</span>
+      <span className="block text-xs text-fg-muted">checked {when}</span>
+    </span>
+  );
+}
+
 export default function WebsiteDetail() {
   const { id } = useParams();
   const [site, setSite] = useState<Website | null>(null);
@@ -74,6 +104,10 @@ export default function WebsiteDetail() {
             <div className="flex justify-between"><dt className="text-fg-muted">Status</dt><dd><StatusBadge status={site.live_state} /></dd></div>
             <div className="flex justify-between"><dt className="text-fg-muted">Last event</dt><dd>{site.last_event_at ? new Date(site.last_event_at).toLocaleString() : "—"}</dd></div>
             <div className="flex justify-between"><dt className="text-fg-muted">Created</dt><dd>{new Date(site.created_at).toLocaleDateString()}</dd></div>
+            <div className="flex items-start justify-between gap-3">
+              <dt className="text-fg-muted">Google Safe Browsing</dt>
+              <dd className="text-right"><SafeBrowsing site={site} /></dd>
+            </div>
           </dl>
         </div>
       </div>

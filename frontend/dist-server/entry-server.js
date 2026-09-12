@@ -1961,7 +1961,7 @@ const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
 const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CKDrS9qx.js"));
 const Overview = lazy(() => import("./assets/Overview-DJa0Lvuz.js"));
 const Websites = lazy(() => import("./assets/Websites-Bq_kSaCo.js"));
-const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-DCadEYny.js"));
+const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-6Q9eqx97.js"));
 const Campaigns = lazy(() => import("./assets/Campaigns-CWguQI14.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-e8019AW8.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-DgH69D8X.js"));

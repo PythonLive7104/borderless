@@ -6,6 +6,36 @@ import { B as Button, x as websiteApi } from "../entry-server.js";
 import { S as StatusBadge } from "./StatusBadge-BjkD924O.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
+function SafeBrowsing({ site }) {
+  const when = site.safe_browsing_checked_at ? new Date(site.safe_browsing_checked_at).toLocaleString() : null;
+  if (site.safe_browsing_flagged) {
+    const threats = (site.safe_browsing_threats || []).map((t) => t.replace(/_/g, " ").toLowerCase()).join(", ");
+    return /* @__PURE__ */ jsxs("span", { className: "inline-block max-w-[16rem]", children: [
+      /* @__PURE__ */ jsx("span", { className: "font-semibold text-red-600", children: "⚠ Flagged by Google" }),
+      threats && /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: threats }),
+      /* @__PURE__ */ jsx(
+        "a",
+        {
+          href: "https://search.google.com/search-console",
+          target: "_blank",
+          rel: "noopener noreferrer",
+          className: "mt-0.5 block text-xs text-brand underline",
+          children: "Request a review →"
+        }
+      )
+    ] });
+  }
+  if (!when) {
+    return /* @__PURE__ */ jsx("span", { className: "text-fg-muted", children: "Not checked yet" });
+  }
+  return /* @__PURE__ */ jsxs("span", { children: [
+    /* @__PURE__ */ jsx("span", { className: "font-semibold text-emerald-700", children: "✓ Clean" }),
+    /* @__PURE__ */ jsxs("span", { className: "block text-xs text-fg-muted", children: [
+      "checked ",
+      when
+    ] })
+  ] });
+}
 function WebsiteDetail() {
   const { id } = useParams();
   const [site, setSite] = useState(null);
@@ -91,6 +121,10 @@ function WebsiteDetail() {
           /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
             /* @__PURE__ */ jsx("dt", { className: "text-fg-muted", children: "Created" }),
             /* @__PURE__ */ jsx("dd", { children: new Date(site.created_at).toLocaleDateString() })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3", children: [
+            /* @__PURE__ */ jsx("dt", { className: "text-fg-muted", children: "Google Safe Browsing" }),
+            /* @__PURE__ */ jsx("dd", { className: "text-right", children: /* @__PURE__ */ jsx(SafeBrowsing, { site }) })
           ] })
         ] })
       ] })
