@@ -56,7 +56,7 @@ const PLANS: Plan[] = [
 ];
 
 const FAQ = [
-  ["How do I pay?", "We accept major cryptocurrencies (BTC, ETH, USDT, USDC, TON) as well as cards. Crypto keeps billing private and borderless."],
+  ["How do I pay?", "We accept major cryptocurrencies — BTC, ETH, USDT, USDC and TON. Crypto keeps billing private and borderless."],
   ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
@@ -90,7 +90,7 @@ function PlusDivider() {
 }
 
 export default function Pricing() {
-  useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay by card, mobile money or crypto.");
+  useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay with cryptocurrency.");
   const [interval, setInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
   return (
@@ -101,7 +101,7 @@ export default function Pricing() {
           <Badge tone="light">Simple, weekly pricing</Badge>
           <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Tariffs & payment</h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-300">
-            7 days of access on every plan — renew when it runs out, and unused days roll over. Pay with crypto or card.
+            Weekly or monthly access — renew when it runs out, and unused days roll over. Pay with cryptocurrency.
           </p>
         </div>
       </section>
@@ -175,7 +175,7 @@ export default function Pricing() {
           ))}
         </div>
         <p className="mt-8 text-center text-sm text-fg-dim">
-          All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD, payable in crypto or card.
+          All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD, payable in cryptocurrency.
         </p>
       </Section>
 

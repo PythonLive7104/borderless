@@ -153,11 +153,13 @@ function Billing() {
   const daysLeft = ((_b = sub.access) == null ? void 0 : _b.days_left) ?? null;
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsxs(PageNote, { id: "billing", children: [
-      "Every plan is ",
+      "Choose ",
       /* @__PURE__ */ jsx("b", { children: "weekly" }),
-      " — 7 days of access, renew when it runs out. Payments run through ",
-      /* @__PURE__ */ jsx("b", { children: "Bachs" }),
-      " (card, mobile money or crypto); until a live payment key is set, plan changes activate instantly."
+      " or ",
+      /* @__PURE__ */ jsx("b", { children: "monthly" }),
+      " access — renew when it runs out, and any unused days roll over. Payment is in ",
+      /* @__PURE__ */ jsx("b", { children: "cryptocurrency" }),
+      " through our secure checkout (Bachs)."
     ] }),
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-extrabold tracking-tight", children: "Billing" }),
     /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Days you have left are added to whatever you buy next — you never lose time by renewing early or changing tier." }),
@@ -262,7 +264,7 @@ function Billing() {
         " domains)."
       ] }),
       /* @__PURE__ */ jsxs("p", { className: "rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted", children: [
-        "You'll be taken to our secure checkout (Bachs) — card, mobile money or crypto. Access starts as soon as payment succeeds, for ",
+        "You'll be taken to our secure checkout (Bachs) — pay in cryptocurrency. Access starts as soon as payment succeeds, for ",
         monthly ? 30 : 7,
         " days. Any days you have left are added on top, so you never lose time."
       ] }),

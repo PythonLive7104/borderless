@@ -28,7 +28,7 @@ export const KB: KBEntry[] = [
   { q: "How do conversions work?", keywords: ["conversion", "convert", "revenue", "sale", "postback", "track"],
     a: "Call the conversion function from your tracking snippet (or the public conversions API) when a visitor completes a goal. Conversions show under Conversions with revenue and attribution." },
   { q: "What are the plans and limits?", keywords: ["plan", "pricing", "billing", "price", "cost", "limit", "events", "upgrade", "subscription"],
-    a: "Three tiers, billed weekly or monthly — your choice on the Billing page. Basic $25/week or $50/month (100k events, 30-day retention, 5 domains, 2 redirects). Plus $40/week or $100/month (300k events, 90-day, 10 domains, 5 redirects). Pro $70/week or $150/month (1M events, 365-day, 20 domains, 10 redirects). Monthly costs less than four weeks and doubles the domain and redirect limits. Payments run through Bachs (card, mobile money or crypto)." },
+    a: "Three tiers, billed weekly or monthly — your choice on the Billing page. Basic $25/week or $50/month (100k events, 30-day retention, 5 domains, 2 redirects). Plus $40/week or $100/month (300k events, 90-day, 10 domains, 5 redirects). Pro $70/week or $150/month (1M events, 365-day, 20 domains, 10 redirects). Monthly costs less than four weeks and doubles the domain and redirect limits. Payment is in cryptocurrency, through our secure checkout (Bachs)." },
   { q: "How do I check my usage?", keywords: ["usage", "quota", "remaining", "events", "limit", "used"],
     a: "The Usage page shows events used this period against your plan limit, with alerts at 70%, 85% and 100%. Upgrade on Billing if you're close." },
   { q: "How do API keys work?", keywords: ["api", "key", "token", "developer", "authentication"],

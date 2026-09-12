@@ -112,7 +112,7 @@ const KB = [
   {
     q: "What are the plans and limits?",
     keywords: ["plan", "pricing", "billing", "price", "cost", "limit", "events", "upgrade", "subscription"],
-    a: "Three tiers, billed weekly or monthly — your choice on the Billing page. Basic $25/week or $50/month (100k events, 30-day retention, 5 domains, 2 redirects). Plus $40/week or $100/month (300k events, 90-day, 10 domains, 5 redirects). Pro $70/week or $150/month (1M events, 365-day, 20 domains, 10 redirects). Monthly costs less than four weeks and doubles the domain and redirect limits. Payments run through Bachs (card, mobile money or crypto)."
+    a: "Three tiers, billed weekly or monthly — your choice on the Billing page. Basic $25/week or $50/month (100k events, 30-day retention, 5 domains, 2 redirects). Plus $40/week or $100/month (300k events, 90-day, 10 domains, 5 redirects). Pro $70/week or $150/month (1M events, 365-day, 20 domains, 10 redirects). Monthly costs less than four weeks and doubles the domain and redirect limits. Payment is in cryptocurrency, through our secure checkout (Bachs)."
   },
   {
     q: "How do I check my usage?",
