@@ -331,6 +331,16 @@ function Links() {
     });
     setOpen(true);
   }
+  async function toggleScanOptout(l) {
+    var _a2;
+    try {
+      await linkApi.update(l.id, { scan_optout: !l.scan_optout });
+      notify(l.scan_optout ? "Safety scan back on for this link." : "This link will stay live even if flagged.");
+      load();
+    } catch (e) {
+      notify(((_a2 = e == null ? void 0 : e.data) == null ? void 0 : _a2.detail) || "Could not change that.", "danger");
+    }
+  }
   async function save(e) {
     var _a2, _b2, _c2, _d, _e;
     e.preventDefault();
@@ -503,7 +513,8 @@ function Links() {
         /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
           /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
             /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
-            l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Unsafe — disabled" }),
+            l.url_safe === false && !l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Unsafe — disabled" }),
+            l.url_safe === false && l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "Flagged — kept live" }),
             !l.active && l.url_safe !== false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
           ] }),
           /* @__PURE__ */ jsxs(
@@ -521,10 +532,20 @@ function Links() {
             "→ ",
             l.destination_url
           ] }),
-          l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-red-600", children: [
+          l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: `mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`, children: [
             "Flagged by ",
             threatSource(l.url_threats),
-            ". If you're sure the page is safe, you can re-scan by editing and saving the link."
+            ".",
+            " ",
+            l.active ? "Kept live because you chose to keep flagged links running." : "Switch on “Keep live” if you’re sure the page is safe.",
+            canManage && /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => toggleScanOptout(l),
+                className: "ml-2 inline-flex items-center gap-1 font-semibold underline hover:no-underline",
+                children: l.scan_optout ? "Turn off keep-live" : "Keep live"
+              }
+            )
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-fg-dim", children: [
             "Bots get: ",

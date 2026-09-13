@@ -1274,3 +1274,38 @@ class ReevaluateOnOptoutTest(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         link.refresh_from_db()
         self.assertTrue(link.active)
+
+
+class PerLinkScanOptoutTest(TestCase):
+    """A single link can be kept live despite a flag, without changing the
+    workspace setting — subject to the same shared-domain Safe Browsing floor."""
+
+    def setUp(self):
+        self.org = _workspace("perlink@example.com")
+
+    def _domain(self, *, shared):
+        from django.utils import timezone
+        return ShortDomain.objects.create(
+            host=f"{'sh' if shared else 'pv'}{ShortDomain.objects.count()}.cc",
+            is_shared=shared, organization=None if shared else self.org,
+            active=True, verified_at=timezone.now())
+
+    def _link(self, domain, **kw):
+        return ShortLink.objects.create(organization=self.org, domain=domain,
+                                        slug=f"s{ShortLink.objects.count()}",
+                                        destination_url="https://d.example", **kw)
+
+    def test_per_link_optout_keeps_a_vt_flag_live(self):
+        from apps.links.sync import _should_disable
+        link = self._link(self._domain(shared=True), scan_optout=True)
+        self.assertFalse(_should_disable(link, ["virustotal"]))
+
+    def test_per_link_optout_cannot_lift_safe_browsing_on_shared(self):
+        from apps.links.sync import _should_disable
+        link = self._link(self._domain(shared=True), scan_optout=True)
+        self.assertTrue(_should_disable(link, ["google_safe_browsing"]))
+
+    def test_without_optout_still_strict(self):
+        from apps.links.sync import _should_disable
+        link = self._link(self._domain(shared=False), scan_optout=False)
+        self.assertTrue(_should_disable(link, ["virustotal"]))

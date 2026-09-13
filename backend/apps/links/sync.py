@@ -166,4 +166,6 @@ def _should_disable(link, flagged_by) -> bool:
     sb_flagged = "google_safe_browsing" in flagged_by
     if sb_flagged and not own_private:
         return True  # protect the shared domain for everyone — non-negotiable
-    return not bool(getattr(link.organization, "link_scan_optout", False))
+    optout = bool(getattr(link, "scan_optout", False)) or \
+        bool(getattr(link.organization, "link_scan_optout", False))
+    return not optout

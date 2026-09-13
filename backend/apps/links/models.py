@@ -224,6 +224,10 @@ class ShortLink(models.Model):
 
     # Threat scan of the destination (Safe Browsing / VirusTotal). A link that
     # resolves to malware/phishing is auto-disabled so it can't be abused.
+    # Per-link safety override: keep this link live even if the scan flags it.
+    # Subject to the same shared-domain Safe Browsing floor as the workspace
+    # setting (see sync._should_disable).
+    scan_optout = models.BooleanField(default=False)
     url_safe = models.BooleanField(null=True, blank=True)
     url_threats = models.JSONField(default=list, blank=True)
     url_scanned_at = models.DateTimeField(null=True, blank=True)

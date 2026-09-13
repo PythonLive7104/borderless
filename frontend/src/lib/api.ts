@@ -197,7 +197,7 @@ export interface ShortLink {
   devices: string;
   os_mode: "off" | "allow" | "block";
   operating_systems: string;
-  max_risk: number;
+  max_risk: number; scan_optout: boolean;
   id: number; organization: number; website: number | null; slug: string;
   destination_url: string; title: string; active: boolean; bot_action: BotAction;
   clicks: number; human_clicks: number; bot_clicks: number;

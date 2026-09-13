@@ -338,6 +338,14 @@ export default function Links() {
     });
     setOpen(true);
   }
+  async function toggleScanOptout(l: ShortLink) {
+    try {
+      await linkApi.update(l.id, { scan_optout: !l.scan_optout } as any);
+      notify(l.scan_optout ? "Safety scan back on for this link." : "This link will stay live even if flagged.");
+      load();
+    } catch (e: any) { notify(e?.data?.detail || "Could not change that.", "danger"); }
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
     const payload = {
@@ -493,7 +501,8 @@ export default function Links() {
                 <div className="min-w-0 flex-1 basis-64">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="min-w-0 break-all font-bold">{l.title || l.slug}</span>
-                    {l.url_safe === false && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Unsafe — disabled</span>}
+                    {l.url_safe === false && !l.active && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Unsafe — disabled</span>}
+                    {l.url_safe === false && l.active && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700">Flagged — kept live</span>}
                     {!l.active && l.url_safe !== false && <span className="rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim">Paused</span>}
                   </div>
                   <button onClick={() => copy(l)}
@@ -503,9 +512,17 @@ export default function Links() {
                   </button>
                   <div className="mt-1 min-w-0 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
                   {l.url_safe === false && (
-                    <div className="mt-1 text-xs text-red-600">
-                      Flagged by {threatSource(l.url_threats)}. If you're sure the page is safe,
-                      you can re-scan by editing and saving the link.
+                    <div className={`mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`}>
+                      Flagged by {threatSource(l.url_threats)}.{" "}
+                      {l.active
+                        ? "Kept live because you chose to keep flagged links running."
+                        : "Switch on “Keep live” if you’re sure the page is safe."}
+                      {canManage && (
+                        <button onClick={() => toggleScanOptout(l)}
+                          className="ml-2 inline-flex items-center gap-1 font-semibold underline hover:no-underline">
+                          {l.scan_optout ? "Turn off keep-live" : "Keep live"}
+                        </button>
+                      )}
                     </div>
                   )}
                   <div className="mt-1 text-xs text-fg-dim">
