@@ -11,6 +11,11 @@ FIELD_CHOICES = [
     # datacenter", which is what the single flag forced.
     ("is_proxy", "Proxy / VPN / Datacenter (any)"),
     ("is_vpn", "VPN or Tor"), ("is_datacenter", "Datacenter / RDP"),
+    # Deeper targeting signals (from IP intelligence + the request).
+    ("connection_type", "Connection type"), ("isp", "ISP"), ("asn", "ASN"),
+    ("is_mobile", "Mobile connection"),
+    ("browser_version", "Browser version"), ("os_version", "OS version"),
+    ("language", "Browser language"),
     ("utm_source", "UTM source"), ("utm_medium", "UTM medium"), ("utm_campaign", "UTM campaign"),
     ("referrer", "Referrer"), ("ja3", "TLS/JA3 hash"), ("path", "URL path"),
 ]

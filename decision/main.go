@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -82,7 +83,7 @@ func main() {
 		log.Printf("warning: redis ping failed: %v", err)
 	}
 
-	go geo.Init(env("GEOIP_DB", ""))  // real-time IP->country (free DB-IP lite)
+	go geo.Init(env("GEOIP_DB", "")) // real-time IP->country (free DB-IP lite)
 
 	h := &handler{st: st, allowCrawlers: env("ALLOW_VERIFIED_CRAWLERS", "1") != "0"}
 	mux := http.NewServeMux()
@@ -92,8 +93,8 @@ func main() {
 	mux.HandleFunc("/v1/decide", h.decide)
 	mux.HandleFunc("/v1/guard", h.guard)
 	mux.HandleFunc("/v1/challenge", h.challenge)
-	mux.HandleFunc("/l/", h.shortlink)         // legacy /l/<slug>
-	mux.HandleFunc("/", h.shortlink)           // bare /<slug> (short domain)
+	mux.HandleFunc("/l/", h.shortlink) // legacy /l/<slug>
+	mux.HandleFunc("/", h.shortlink)   // bare /<slug> (short domain)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -155,7 +156,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 
 	fp := fingerprint.Extract(r)
 	if fp.Country == "" {
-		fp.Country = geo.Country(fp.IP)  // engine-side GeoIP when no edge header
+		fp.Country = geo.Country(fp.IP) // engine-side GeoIP when no edge header
 	}
 
 	// TLS/JA3 fingerprint is supplied by a TLS-terminating upstream (Cloudflare,
@@ -193,25 +194,33 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
 	intel := h.knownIntel(rctx, fp.IP)
+	h.warmIntel(fp.IP) // fill ISP/ASN/conn for next time, off the hot path
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
 		Fields: map[string]string{
-			"classification": result.Classification,
-			"country":        fp.Country,
-			"device":         fp.Device,
-			"browser":        fp.Browser,
-			"os":             fp.OS,
-			"is_bot":         boolStr(fp.IsBot),
-			"is_proxy":       boolStr(intel.flagged()),
-			"is_vpn":         boolStr(intel.VPN),
-			"is_datacenter":  boolStr(intel.Datacenter),
-			"utm_source":     p.UTMSource,
-			"utm_medium":     p.UTMMedium,
-			"utm_campaign":   p.UTMCampaign,
-			"referrer":       p.Referrer,
-			"ja3":            ja3,
-			"path":           urlPath(p.URL),
+			"classification":  result.Classification,
+			"country":         fp.Country,
+			"device":          fp.Device,
+			"browser":         fp.Browser,
+			"os":              fp.OS,
+			"is_bot":          boolStr(fp.IsBot),
+			"is_proxy":        boolStr(intel.flagged()),
+			"is_vpn":          boolStr(intel.VPN),
+			"is_datacenter":   boolStr(intel.Datacenter),
+			"isp":             intel.ISP,
+			"asn":             intel.ASN,
+			"connection_type": intel.ConnType,
+			"is_mobile":       boolStr(intel.Mobile || fp.Device == "mobile"),
+			"browser_version": fp.BrowserVersion,
+			"os_version":      fp.OSVersion,
+			"language":        fp.Language,
+			"utm_source":      p.UTMSource,
+			"utm_medium":      p.UTMMedium,
+			"utm_campaign":    p.UTMCampaign,
+			"referrer":        p.Referrer,
+			"ja3":             ja3,
+			"path":            urlPath(p.URL),
 		},
 	})
 
@@ -233,35 +242,35 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	signalsJSON, _ := json.Marshal(result.Signals)
 
 	fields := map[string]any{
-		"site_id":      p.SiteID,
-		"visitor_id":   p.VisitorID,
-		"session_id":   p.SessionID,
-		"type":         p.Type,
-		"url":          p.URL,
-		"referrer":     p.Referrer,
-		"utm_source":   p.UTMSource,
-		"utm_medium":   p.UTMMedium,
-		"utm_campaign": p.UTMCampaign,
-		"event_name":   p.EventName,
-		"revenue":      p.Revenue,
-		"currency":     p.Currency,
-		"ip":           fp.IP,
-		"country":      fp.Country,
-		"device":       fp.Device,
-		"browser":      fp.Browser,
-		"os":           fp.OS,
-		"ua":           fp.UserAgent,
-		"is_headless":  boolStr(fp.IsHeadless),
-		"risk_score":   result.Score,
+		"site_id":        p.SiteID,
+		"visitor_id":     p.VisitorID,
+		"session_id":     p.SessionID,
+		"type":           p.Type,
+		"url":            p.URL,
+		"referrer":       p.Referrer,
+		"utm_source":     p.UTMSource,
+		"utm_medium":     p.UTMMedium,
+		"utm_campaign":   p.UTMCampaign,
+		"event_name":     p.EventName,
+		"revenue":        p.Revenue,
+		"currency":       p.Currency,
+		"ip":             fp.IP,
+		"country":        fp.Country,
+		"device":         fp.Device,
+		"browser":        fp.Browser,
+		"os":             fp.OS,
+		"ua":             fp.UserAgent,
+		"is_headless":    boolStr(fp.IsHeadless),
+		"risk_score":     result.Score,
 		"classification": result.Classification,
-		"confidence":   fmt.Sprintf("%.2f", result.Confidence),
-		"signals":      string(signalsJSON),
-		"fingerprint":  fpHash,
-		"fp_flags":     fpFlags,
-		"ja3":          ja3,
-		"action":       action,
-		"tag":          tag,
-		"redirect_url": redirect,
+		"confidence":     fmt.Sprintf("%.2f", result.Confidence),
+		"signals":        string(signalsJSON),
+		"fingerprint":    fpHash,
+		"fp_flags":       fpFlags,
+		"ja3":            ja3,
+		"action":         action,
+		"tag":            tag,
+		"redirect_url":   redirect,
 	}
 	// fire-and-forget; never block the caller
 	go h.st.EmitTraffic(context.Background(), fields)
@@ -321,22 +330,30 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 	})
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	intel := h.knownIntel(ctx, fp.IP)
+	h.warmIntel(fp.IP)
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
 		Fields: map[string]string{
-			"classification": result.Classification,
-			"country":        fp.Country,
-			"device":         fp.Device,
-			"browser":        fp.Browser,
-			"os":             fp.OS,
-			"is_bot":         boolStr(fp.IsBot),
-			"is_proxy":       boolStr(intel.flagged()),
-			"is_vpn":         boolStr(intel.VPN),
-			"is_datacenter":  boolStr(intel.Datacenter),
-			"referrer":       referrer,
-			"ja3":            ja3,
-			"path":           urlPath(path),
+			"classification":  result.Classification,
+			"country":         fp.Country,
+			"device":          fp.Device,
+			"browser":         fp.Browser,
+			"os":              fp.OS,
+			"is_bot":          boolStr(fp.IsBot),
+			"is_proxy":        boolStr(intel.flagged()),
+			"is_vpn":          boolStr(intel.VPN),
+			"is_datacenter":   boolStr(intel.Datacenter),
+			"isp":             intel.ISP,
+			"asn":             intel.ASN,
+			"connection_type": intel.ConnType,
+			"is_mobile":       boolStr(intel.Mobile || fp.Device == "mobile"),
+			"browser_version": fp.BrowserVersion,
+			"os_version":      fp.OSVersion,
+			"language":        fp.Language,
+			"referrer":        referrer,
+			"ja3":             ja3,
+			"path":            urlPath(path),
 		},
 	})
 	// A forward-confirmed crawler (Googlebot, Safe Browsing, Bing…) sees exactly
@@ -491,25 +508,25 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var link struct {
-		Destination string `json:"destination"`
-		TID         string `json:"tid"`
-		Org         string `json:"org"`
-		BotAction   string `json:"bot_action"` // off | decoy | notfound | blank
-		DecoyURL    string `json:"decoy_url"`
-		Active      bool   `json:"active"`
-		Challenge      bool   `json:"challenge"`
-		ChallengeStyle string `json:"challenge_style"` // hold | checkbox | slide
-		ForwardQS   bool     `json:"forward_params"`
-		ForwardKeys []string `json:"forward_keys"`
-		BlockVPN    bool     `json:"block_vpn"`
-		CountryMode string   `json:"country_mode"` // off | allow | block
-		Countries   []string `json:"countries"`
-		DeviceMode  string   `json:"device_mode"`
-		Devices     []string `json:"devices"`
-		OSMode      string   `json:"os_mode"`
-		OSList      []string `json:"operating_systems"`
-		MaxRisk     int      `json:"max_risk"`
-		Rules       string   `json:"rules"`
+		Destination    string   `json:"destination"`
+		TID            string   `json:"tid"`
+		Org            string   `json:"org"`
+		BotAction      string   `json:"bot_action"` // off | decoy | notfound | blank
+		DecoyURL       string   `json:"decoy_url"`
+		Active         bool     `json:"active"`
+		Challenge      bool     `json:"challenge"`
+		ChallengeStyle string   `json:"challenge_style"` // hold | checkbox | slide
+		ForwardQS      bool     `json:"forward_params"`
+		ForwardKeys    []string `json:"forward_keys"`
+		BlockVPN       bool     `json:"block_vpn"`
+		CountryMode    string   `json:"country_mode"` // off | allow | block
+		Countries      []string `json:"countries"`
+		DeviceMode     string   `json:"device_mode"`
+		Devices        []string `json:"devices"`
+		OSMode         string   `json:"os_mode"`
+		OSList         []string `json:"operating_systems"`
+		MaxRisk        int      `json:"max_risk"`
+		Rules          string   `json:"rules"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
 		http.NotFound(w, r)
@@ -621,11 +638,18 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 			Fields: map[string]string{
 				"classification": result.Classification, "country": fp.Country,
 				"device": fp.Device, "browser": fp.Browser, "os": fp.OS,
-				"is_bot": boolStr(fp.IsBot),
-				"is_proxy":      boolStr(intel.flagged()),
-				"is_vpn":        boolStr(intel.VPN),
-				"is_datacenter": boolStr(intel.Datacenter),
-				"ja3": ja3,
+				"is_bot":          boolStr(fp.IsBot),
+				"is_proxy":        boolStr(intel.flagged()),
+				"is_vpn":          boolStr(intel.VPN),
+				"is_datacenter":   boolStr(intel.Datacenter),
+				"isp":             intel.ISP,
+				"asn":             intel.ASN,
+				"connection_type": intel.ConnType,
+				"is_mobile":       boolStr(intel.Mobile || fp.Device == "mobile"),
+				"browser_version": fp.BrowserVersion,
+				"os_version":      fp.OSVersion,
+				"language":        fp.Language,
+				"ja3":             ja3,
 			},
 		})
 		if link.TID != "" {
@@ -742,28 +766,58 @@ func urlPath(raw string) string {
 // the spot — cache first (shared with Django), then a short live lookup.
 
 type ipIntel struct {
-	Proxy      bool `json:"proxy"`
-	VPN        bool `json:"vpn"`
-	Datacenter bool `json:"datacenter"`
+	Proxy      bool   `json:"proxy"`
+	VPN        bool   `json:"vpn"`
+	Datacenter bool   `json:"datacenter"`
+	ISP        string `json:"isp,omitempty"`
+	ASN        string `json:"asn,omitempty"`
+	ConnType   string `json:"conn_type,omitempty"` // Residential | Corporate | Mobile | Data Center | ...
+	Mobile     bool   `json:"mobile,omitempty"`
 }
 
 func (i ipIntel) flagged() bool { return i.Proxy || i.VPN || i.Datacenter }
 
 var intelClient = &http.Client{Timeout: 700 * time.Millisecond}
 
+// warmIntel enriches an IP's record (ISP/ASN/connection type) in the background
+// when it isn't cached yet, so the hot path never blocks on the provider. The
+// lookup is cache-first and 24h-cached, so a busy IP is fetched at most once a
+// day. Fire-and-forget: a failure just means we try again next time.
+func (h *handler) warmIntel(ip string) {
+	if ip == "" {
+		return
+	}
+	if env("IPQUALITYSCORE_KEY", "") == "" ||
+		!strings.EqualFold(env("IP_INTEL_PROVIDER", ""), "ipqualityscore") {
+		return
+	}
+	if h.st.GetStr(context.Background(), "ipintel:cache:"+ip) != "" {
+		return // already known
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		h.lookupIP(ctx, ip)
+	}()
+}
+
 func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	var out ipIntel
 	if ip == "" {
 		return out
 	}
-	// The sets are still authoritative when they already know this IP.
-	if h.st.InSet(ctx, "ipintel:proxy", ip) || h.st.InSet(ctx, "ipintel:datacenter", ip) {
-		out.Proxy = true
-		return out
-	}
 	key := "ipintel:cache:" + ip
+	// Cache first: it holds the full record (ISP/ASN/connection type), which the
+	// proxy/datacenter sets don't — so checking the sets first would throw that
+	// detail away for any IP we've already flagged.
 	if raw := h.st.GetStr(ctx, key); raw != "" {
-		json.Unmarshal([]byte(raw), &out) // "{}" = looked up, nothing found
+		json.Unmarshal([]byte(raw), &out)
+		if h.st.InSet(ctx, "ipintel:datacenter", ip) {
+			out.Datacenter = true
+		}
+		if h.st.InSet(ctx, "ipintel:proxy", ip) {
+			out.Proxy = true
+		}
 		return out
 	}
 	apiKey := env("IPQUALITYSCORE_KEY", "")
@@ -781,12 +835,21 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		Proxy          bool   `json:"proxy"`
 		VPN            bool   `json:"vpn"`
 		Tor            bool   `json:"tor"`
+		Mobile         bool   `json:"mobile"`
 		ConnectionType string `json:"connection_type"`
+		ISP            string `json:"ISP"`
+		ASN            int    `json:"ASN"`
 	}
 	if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&d) != nil || !d.Success {
 		return out
 	}
-	out = ipIntel{Proxy: d.Proxy, VPN: d.VPN || d.Tor, Datacenter: d.ConnectionType == "Data Center"}
+	out = ipIntel{
+		Proxy: d.Proxy, VPN: d.VPN || d.Tor, Datacenter: d.ConnectionType == "Data Center",
+		ISP: d.ISP, ConnType: d.ConnectionType, Mobile: d.Mobile,
+	}
+	if d.ASN > 0 {
+		out.ASN = strconv.Itoa(d.ASN)
+	}
 	// Share the answer with Django's cache and sets, same keys and shape.
 	if b, err := json.Marshal(out); err == nil {
 		h.st.SetEx(ctx, key, string(b), 24*time.Hour)
@@ -901,6 +964,7 @@ func normStyle(s string) string {
 	}
 	return "hold"
 }
+
 const challengePageTTL = 10 * time.Minute
 
 func challengeSecret() string {

@@ -173,6 +173,13 @@ const RULE_FIELDS = [
   ["is_proxy", "Proxy / VPN / Datacenter (any)"],
   ["is_vpn", "VPN or Tor"],
   ["is_datacenter", "Datacenter / RDP"],
+  ["connection_type", "Connection type"],
+  ["isp", "ISP"],
+  ["asn", "ASN"],
+  ["is_mobile", "Mobile connection"],
+  ["browser_version", "Browser version"],
+  ["os_version", "OS version"],
+  ["language", "Browser language"],
   ["utm_source", "UTM source"],
   ["utm_medium", "UTM medium"],
   ["utm_campaign", "UTM campaign"],
@@ -198,7 +205,16 @@ const FIELD_VALUE_OPTIONS = {
   is_bot: [["1", "Yes"], ["0", "No"]],
   is_proxy: [["1", "Yes"], ["0", "No"]],
   is_vpn: [["1", "Yes"], ["0", "No"]],
-  is_datacenter: [["1", "Yes"], ["0", "No"]]
+  is_datacenter: [["1", "Yes"], ["0", "No"]],
+  is_mobile: [["1", "Yes"], ["0", "No"]],
+  // IPQualityScore's connection_type values, verbatim, so an equals match works.
+  connection_type: [
+    ["Residential", "Residential"],
+    ["Corporate", "Corporate"],
+    ["Mobile", "Mobile"],
+    ["Data Center", "Data Center"],
+    ["Education", "Education"]
+  ]
 };
 const COUNTRIES = [
   ["US", "United States"],

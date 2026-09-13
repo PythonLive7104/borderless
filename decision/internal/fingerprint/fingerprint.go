@@ -3,19 +3,23 @@ package fingerprint
 import (
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
 // Fingerprint holds server-side signals extracted from the request.
 type Fingerprint struct {
-	IP         string
-	Country    string
-	UserAgent  string
-	Device     string // mobile | desktop | tablet
-	Browser    string
-	OS         string
-	IsHeadless bool
-	IsBot      bool
+	IP             string
+	Country        string
+	UserAgent      string
+	Device         string // mobile | desktop | tablet
+	Browser        string
+	BrowserVersion string // major version, e.g. "120"
+	OS             string
+	OSVersion      string // best-effort, e.g. "10" / "13" / "16"
+	Language       string // first Accept-Language tag, e.g. "en-us"
+	IsHeadless     bool
+	IsBot          bool
 }
 
 var headlessMarkers = []string{
@@ -34,12 +38,14 @@ var botMarkers = []string{
 func FromValues(ip, ua, country string) Fingerprint {
 	lua := strings.ToLower(ua)
 	fp := Fingerprint{
-		IP:        ip,
-		Country:   strings.ToUpper(country),
-		UserAgent: ua,
-		Device:    deviceClass(lua),
-		Browser:   browser(lua),
-		OS:        os(lua),
+		IP:             ip,
+		Country:        strings.ToUpper(country),
+		UserAgent:      ua,
+		Device:         deviceClass(lua),
+		Browser:        browser(lua),
+		BrowserVersion: browserVersion(lua),
+		OS:             os(lua),
+		OSVersion:      osVersion(lua),
 	}
 	for _, m := range headlessMarkers {
 		if strings.Contains(lua, m) {
@@ -63,12 +69,15 @@ func Extract(r *http.Request) Fingerprint {
 	ua := r.UserAgent()
 	lua := strings.ToLower(ua)
 	fp := Fingerprint{
-		IP:        clientIP(r),
-		Country:   strings.ToUpper(headerAny(r, "CF-IPCountry", "X-Country")),
-		UserAgent: ua,
-		Device:    deviceClass(lua),
-		Browser:   browser(lua),
-		OS:        os(lua),
+		IP:             clientIP(r),
+		Country:        strings.ToUpper(headerAny(r, "CF-IPCountry", "X-Country")),
+		UserAgent:      ua,
+		Device:         deviceClass(lua),
+		Browser:        browser(lua),
+		BrowserVersion: browserVersion(lua),
+		OS:             os(lua),
+		OSVersion:      osVersion(lua),
+		Language:       acceptLanguage(r.Header.Get("Accept-Language")),
 	}
 	for _, m := range headlessMarkers {
 		if strings.Contains(lua, m) {
@@ -86,6 +95,57 @@ func Extract(r *http.Request) Fingerprint {
 		fp.IsHeadless = true
 	}
 	return fp
+}
+
+// browserVersion returns the major version for the detected browser, e.g. "120".
+// Order matters: Edge/Opera UAs also contain "chrome", so check them first.
+func browserVersion(lua string) string {
+	for _, tok := range []string{"edg/", "opr/", "firefox/", "fxios/", "crios/", "chrome/", "version/"} {
+		if v := verAfter(lua, tok); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// osVersion is best-effort: OS UA formats vary, so this captures the common
+// shapes and returns the major version as a string ("10", "13", "16").
+func osVersion(lua string) string {
+	for _, tok := range []string{"android ", "windows nt ", "cpu iphone os ", "cpu os ", "mac os x "} {
+		if i := strings.Index(lua, tok); i >= 0 {
+			// iOS/macOS use underscores (16_5); normalise to a dot first.
+			rest := strings.ReplaceAll(lua[i+len(tok):], "_", ".")
+			return verLead(rest)
+		}
+	}
+	return ""
+}
+
+var verNum = regexp.MustCompile(`^[0-9]+`)
+
+// verAfter returns the leading major-version digits following a token.
+func verAfter(lua, tok string) string {
+	i := strings.Index(lua, tok)
+	if i < 0 {
+		return ""
+	}
+	return verLead(lua[i+len(tok):])
+}
+
+// verLead reads the leading integer of a version string ("120.0.6099" -> "120").
+func verLead(s string) string {
+	return verNum.FindString(strings.TrimSpace(s))
+}
+
+// acceptLanguage returns the first language tag, lowercased ("en-US,en;q=0.9"
+// -> "en-us"). Empty when the header is absent.
+func acceptLanguage(header string) string {
+	if header == "" {
+		return ""
+	}
+	first := strings.TrimSpace(strings.Split(header, ",")[0])
+	first = strings.TrimSpace(strings.Split(first, ";")[0]) // drop any q-value
+	return strings.ToLower(first)
 }
 
 func deviceClass(lua string) string {

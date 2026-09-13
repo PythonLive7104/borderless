@@ -103,3 +103,49 @@ class RedirectRulesTest(TestCase):
                                    "conditions": [{"field": "country", "operator": "eq", "value": "NG"}]},
                    format="json")
         self.assertEqual(r.status_code, 400)
+
+
+class DeeperSignalFieldsTest(TestCase):
+    """The new targeting fields (ISP, ASN, connection type, versions, language)
+    must validate as rule conditions and reach the engine payload."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.org = _auth(self.c, "deep@example.com")
+
+    def test_connection_type_rule_is_accepted(self):
+        r = self.c.post("/api/rules/", {
+            "organization": self.org, "name": "Only residential", "priority": 5, "action": "block",
+            "conditions": [{"field": "connection_type", "operator": "eq", "value": "Data Center"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def test_all_new_fields_validate(self):
+        for field, op, val in [
+            ("isp", "contains", "amazon"), ("asn", "eq", "16509"),
+            ("is_mobile", "eq", "1"), ("browser_version", "eq", "120"),
+            ("os_version", "eq", "10"), ("language", "contains", "ru"),
+        ]:
+            r = self.c.post("/api/rules/", {
+                "organization": self.org, "name": f"r-{field}", "priority": 10, "action": "review",
+                "conditions": [{"field": field, "operator": op, "value": val}],
+            }, format="json")
+            self.assertEqual(r.status_code, 201, f"{field}: {r.content}")
+
+    def test_field_reaches_the_engine_payload(self):
+        import json
+        from apps.rules.sync import build_payload
+        self.c.post("/api/rules/", {
+            "organization": self.org, "name": "Block DC", "priority": 1, "action": "block",
+            "conditions": [{"field": "connection_type", "operator": "eq", "value": "Data Center"}],
+        }, format="json")
+        payload = json.loads(build_payload(self.org))
+        fields = [c["field"] for rule in payload for c in rule["conditions"]]
+        self.assertIn("connection_type", fields)
+
+    def test_an_unknown_field_is_still_rejected(self):
+        r = self.c.post("/api/rules/", {
+            "organization": self.org, "name": "bad", "priority": 1, "action": "block",
+            "conditions": [{"field": "not_a_field", "operator": "eq", "value": "x"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
