@@ -175,11 +175,6 @@ function LockedBanner({ planName, canManage }) {
     canManage ? /* @__PURE__ */ jsx(Button, { to: "/dashboard/billing", children: "Choose a plan →" }) : /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "Ask an owner or admin to upgrade." })
   ] });
 }
-function threatSource(threats) {
-  const t = (threats || []).join(" ").toLowerCase();
-  if (t.includes("social_engineering") || t.includes("malware") || t.includes("unwanted") || t.includes("harmful")) return "Google";
-  return "Our safety check";
-}
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 function Links() {
   var _a, _b, _c;
@@ -474,8 +469,7 @@ function Links() {
           l.active ? /* @__PURE__ */ jsxs("span", { className: "inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700", children: [
             /* @__PURE__ */ jsx("span", { className: "h-1.5 w-1.5 rounded-full bg-success" }),
             " Live"
-          ] }) : l.url_safe === false ? /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Off · flagged unsafe" }) : /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" }),
-          l.active && l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "⚠ safety warning" })
+          ] }) : l.url_safe === false ? /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Off · flagged unsafe" }) : /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
         ] }),
         /* @__PURE__ */ jsxs(
           "button",
@@ -492,17 +486,14 @@ function Links() {
           "→ ",
           l.destination_url
         ] }),
-        l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: `mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`, children: [
-          threatSource(l.url_threats),
-          " thinks this page may not be safe.",
-          " ",
-          l.active ? "You're keeping this link on." : "This link is off for now.",
+        l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: `mt-1 text-xs ${l.active ? "text-fg-muted" : "text-red-600"}`, children: [
+          l.active ? `We flagged this destination as possibly unsafe — it's live because you allowed it.` : `We flagged this destination as possibly unsafe, so it's switched off.`,
           canManage && /* @__PURE__ */ jsx(
             "button",
             {
               onClick: () => toggleScanOptout(l),
-              className: "ml-2 font-semibold underline hover:no-underline",
-              children: l.scan_optout ? "Turn it off" : "Keep it on anyway"
+              className: "ml-2 font-semibold text-brand underline hover:no-underline",
+              children: l.active ? "Turn it off" : "Make it live anyway"
             }
           )
         ] }),

@@ -467,7 +467,6 @@ export default function Links() {
                       : l.url_safe === false
                         ? <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Off · flagged unsafe</span>
                         : <span className="rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim">Paused</span>}
-                    {l.active && l.url_safe === false && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700">⚠ safety warning</span>}
                   </div>
                   <button onClick={() => copy(l)}
                     className="mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline">
@@ -476,15 +475,14 @@ export default function Links() {
                   </button>
                   <div className="mt-1 min-w-0 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
                   {l.url_safe === false && (
-                    <div className={`mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`}>
-                      {threatSource(l.url_threats)} thinks this page may not be safe.{" "}
+                    <div className={`mt-1 text-xs ${l.active ? "text-fg-muted" : "text-red-600"}`}>
                       {l.active
-                        ? "You're keeping this link on."
-                        : "This link is off for now."}
+                        ? `We flagged this destination as possibly unsafe — it's live because you allowed it.`
+                        : `We flagged this destination as possibly unsafe, so it's switched off.`}
                       {canManage && (
                         <button onClick={() => toggleScanOptout(l)}
-                          className="ml-2 font-semibold underline hover:no-underline">
-                          {l.scan_optout ? "Turn it off" : "Keep it on anyway"}
+                          className="ml-2 font-semibold text-brand underline hover:no-underline">
+                          {l.active ? "Turn it off" : "Make it live anyway"}
                         </button>
                       )}
                     </div>
