@@ -5,6 +5,7 @@ import { ResponsiveContainer, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, A
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { Link } from "react-router-dom";
 import { y as websiteApi, z as linkApi, f as IGlobe, j as ILink, c as useWorkspace, A as analyticsApi } from "../entry-server.js";
+import { F as FunnelReport } from "./FunnelReport-DvYiCJpM.js";
 import { W as WebsitePicker } from "./WebsitePicker-BhUQYD8k.js";
 import { R as RangeTabs } from "./RangeTabs-BPSt5JoP.js";
 import { S as StatCard } from "./StatCard-ChLtMs89.js";
@@ -180,6 +181,7 @@ function Overview() {
         /* @__PURE__ */ jsx(StatCard, { label: "Suspicious + Fraud", value: (t.suspicious + t.bot + t.fraud).toLocaleString(), sub: `${t.flagged} flagged`, tone: "red" }),
         /* @__PURE__ */ jsx(StatCard, { label: "Conversions", value: t.conversions.toLocaleString(), sub: `${(t.conversion_rate * 100).toFixed(1)}% rate`, tone: "amber" })
       ] }),
+      current && /* @__PURE__ */ jsx("div", { className: "mt-6", children: /* @__PURE__ */ jsx(FunnelReport, { orgId: current.id, range, website, compact: true }) }),
       !hasData ? /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-6", children: /* @__PURE__ */ jsx(NoData, { msg: "No traffic in this range yet. Install your tracking snippet to start receiving data." }) }) : /* @__PURE__ */ jsxs("div", { className: "mt-6 grid gap-5 lg:grid-cols-2", children: [
         /* @__PURE__ */ jsx(Panel, { title: "Visitors over time", children: /* @__PURE__ */ jsx(ResponsiveContainer, { width: "100%", height: 220, children: /* @__PURE__ */ jsxs(AreaChart, { data: data.timeseries.visitors, children: [
           /* @__PURE__ */ jsx("defs", { children: /* @__PURE__ */ jsxs("linearGradient", { id: "gv", x1: "0", y1: "0", x2: "0", y2: "1", children: [

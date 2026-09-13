@@ -187,21 +187,27 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	// proxy sets used to be checked twice per decision).
 	intel := h.knownIntel(rctx, fp.IP)
 	h.warmIntel(fp.IP, intel.ISP != "") // fill ISP/ASN/conn for next time, off the hot path
+	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
+	repeat := h.isRepeatOffender(rctx, fp.IP)
 	result := risk.Evaluate(risk.Input{
-		KnownBot:      fp.IsBot,
-		Webdriver:     webdriver,
-		HeadlessFP:    headlessFP,
-		Automation:    fp.IsHeadless,
-		Datacenter:    intel.Datacenter,
-		Proxy:         intel.Proxy || intel.VPN,
-		NoFingerprint: noFP,
-		AbnormalRate:  rate > 20, // >20 events/min from one visitor
-		BadJA3:        ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
-		BadJA4:        ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
-		IPBot:         intel.BotStatus,
-		RecentAbuse:   intel.RecentAbuse,
-		IPFraudScore:  intel.FraudScore,
+		KnownBot:       fp.IsBot,
+		Webdriver:      webdriver,
+		HeadlessFP:     headlessFP,
+		Automation:     fp.IsHeadless,
+		Datacenter:     intel.Datacenter,
+		Proxy:          intel.Proxy || intel.VPN,
+		NoFingerprint:  noFP,
+		AbnormalRate:   rate > 20 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:         ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
+		BadJA4:         ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
+		IPBot:          intel.BotStatus,
+		RecentAbuse:    intel.RecentAbuse,
+		IPFraudScore:   intel.FraudScore,
+		RepeatOffender: repeat,
 	})
+	if result.Classification == "bot" || result.Classification == "fraud" {
+		h.rememberBot(fp.IP)
+	}
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
@@ -334,19 +340,25 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 	// datacenter/proxy sets used to be checked twice per decision.
 	intel := h.knownIntel(ctx, fp.IP)
 	h.warmIntel(fp.IP, intel.ISP != "")
+	iprate := h.st.RateIncr(ctx, "iprate:"+fp.IP, time.Minute)
+	repeat := h.isRepeatOffender(ctx, fp.IP)
 	result := risk.Evaluate(risk.Input{
-		KnownBot:      fp.IsBot,
-		Automation:    fp.IsHeadless,
-		Datacenter:    intel.Datacenter,
-		Proxy:         intel.Proxy || intel.VPN,
-		NoFingerprint: false,
-		AbnormalRate:  rate > 40,
-		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
-		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
-		IPBot:         intel.BotStatus,
-		RecentAbuse:   intel.RecentAbuse,
-		IPFraudScore:  intel.FraudScore,
+		KnownBot:       fp.IsBot,
+		Automation:     fp.IsHeadless,
+		Datacenter:     intel.Datacenter,
+		Proxy:          intel.Proxy || intel.VPN,
+		NoFingerprint:  false,
+		AbnormalRate:   rate > 40 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:         ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+		BadJA4:         ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
+		IPBot:          intel.BotStatus,
+		RecentAbuse:    intel.RecentAbuse,
+		IPFraudScore:   intel.FraudScore,
+		RepeatOffender: repeat,
 	})
+	if result.Classification == "bot" || result.Classification == "fraud" {
+		h.rememberBot(fp.IP)
+	}
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
@@ -567,23 +579,30 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// look the IP up live (cache-first, 24h) rather than only reading the cache,
 	// so the provider's fraud score / abuse history is present on the first hit.
 	linkIntel := h.lookupIP(ctx, fp.IP)
+	iprate := h.st.RateIncr(ctx, "iprate:"+fp.IP, time.Minute) // global per-IP (#5)
+	repeat := h.isRepeatOffender(ctx, fp.IP)                   // cross-surface memory (#4)
 	result := risk.Evaluate(risk.Input{
-		KnownBot:      fp.IsBot,
-		Automation:    fp.IsHeadless,
-		Datacenter:    linkIntel.Datacenter,
-		Proxy:         linkIntel.Proxy || linkIntel.VPN,
-		NoFingerprint: false,
-		AbnormalRate:  rate > 40,
-		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
-		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
-		IPBot:         linkIntel.BotStatus,
-		RecentAbuse:   linkIntel.RecentAbuse,
-		IPFraudScore:  linkIntel.FraudScore,
+		KnownBot:       fp.IsBot,
+		Automation:     fp.IsHeadless,
+		Datacenter:     linkIntel.Datacenter,
+		Proxy:          linkIntel.Proxy || linkIntel.VPN,
+		NoFingerprint:  false,
+		AbnormalRate:   rate > 40 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:         ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+		BadJA4:         ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
+		IPBot:          linkIntel.BotStatus,
+		RecentAbuse:    linkIntel.RecentAbuse,
+		IPFraudScore:   linkIntel.FraudScore,
+		RepeatOffender: repeat,
 	})
 
 	// A link filters more eagerly than a page: known-bot UAs, automation tools,
 	// and anything suspicious+ (risk >= 40).
 	isBot := fp.IsBot || fp.IsHeadless || result.Score >= 40
+	// Remember clear bots so every other link/site sees this IP as suspicious.
+	if result.Classification == "bot" || result.Classification == "fraud" {
+		h.rememberBot(fp.IP)
+	}
 
 	// Decide the outcome. Default: humans -> destination; bots -> the link's
 	// bot handling (decoy / 404 / blank / through).
@@ -817,6 +836,45 @@ type ipIntel struct {
 func (i ipIntel) flagged() bool { return i.Proxy || i.VPN || i.Datacenter }
 
 var intelClient = &http.Client{Timeout: 700 * time.Millisecond}
+
+// --- Cross-surface bot memory (#4) + per-IP global rate (#5) ------------------
+
+func botmemTTL() time.Duration {
+	days := 7
+	if v := env("BOTMEM_TTL_DAYS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = n
+		}
+	}
+	return time.Duration(days) * 24 * time.Hour
+}
+
+// rememberBot records an IP that was just classified as a clear bot, so any
+// other link or protected site treats it as suspicious next time. Fire-and-
+// forget; the memory expires on its own.
+func (h *handler) rememberBot(ip string) {
+	if ip == "" {
+		return
+	}
+	go h.st.SetEx(context.Background(), "botmem:"+ip, "1", botmemTTL())
+}
+
+// isRepeatOffender reports whether this IP was caught as a bot recently.
+func (h *handler) isRepeatOffender(ctx context.Context, ip string) bool {
+	return ip != "" && h.st.GetStr(ctx, "botmem:"+ip) != ""
+}
+
+// ipRateLimit is the per-minute cap on one IP's requests ACROSS every link and
+// site — catches an IP that stays under each link's own limit by spreading
+// itself thin. 0 disables it.
+func ipRateLimit() int64 {
+	if v := env("IP_RATE_PER_MIN", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return int64(n)
+		}
+	}
+	return 120
+}
 
 // warmIntel enriches an IP's record (ISP/ASN/connection type) in the background
 // when it isn't cached yet, so the hot path never blocks on the provider. The

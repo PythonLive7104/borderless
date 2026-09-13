@@ -45,3 +45,16 @@ func TestIPReputationSignals(t *testing.T) {
 		t.Fatalf("empty input should be human; got %q", c)
 	}
 }
+
+func TestRepeatOffenderSignal(t *testing.T) {
+	base := Evaluate(Input{}).Score
+	r := Evaluate(Input{RepeatOffender: true})
+	if r.Score <= base || !hasSig(r.Signals, "repeat_offender") {
+		t.Fatalf("repeat offender should raise score + add signal; got %d %v", r.Score, r.Signals)
+	}
+	// Combined with a datacenter IP it should reach bot territory.
+	c := Evaluate(Input{RepeatOffender: true, Datacenter: true})
+	if c.Classification == "human" {
+		t.Fatalf("repeat offender + datacenter should not be human; got %s (%d)", c.Classification, c.Score)
+	}
+}

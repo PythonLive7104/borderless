@@ -27,6 +27,7 @@ const (
 	wRecentAbuse     = 25 // IP recently seen in abuse/fraud
 	wHighFraudIP     = 40 // provider fraud score very high (>=85): actionable alone
 	wElevatedFraudIP = 20 // provider fraud score elevated (>=75): a nudge
+	wRepeatOffender  = 30 // this IP was caught as a bot recently (any link/site)
 )
 
 type Input struct {
@@ -43,6 +44,7 @@ type Input struct {
 	IPBot         bool // IP-intelligence provider flags the IP as a bot
 	RecentAbuse   bool // IP-intelligence provider: recent abuse/fraud from this IP
 	IPFraudScore  int  // IP-intelligence fraud score, 0..100 (0 = unknown)
+	RepeatOffender bool // caught as a bot recently, anywhere in the platform
 }
 
 func Evaluate(in Input) Result {
@@ -95,6 +97,9 @@ func Evaluate(in Input) Result {
 		add(wHighFraudIP, "high_fraud_ip")
 	case in.IPFraudScore >= 75:
 		add(wElevatedFraudIP, "elevated_fraud_ip")
+	}
+	if in.RepeatOffender {
+		add(wRepeatOffender, "repeat_offender")
 	}
 	if score > 100 {
 		score = 100

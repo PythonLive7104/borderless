@@ -1,16 +1,16 @@
-import { jsx, jsxs } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { A as analyticsApi } from "../entry-server.js";
-function FunnelReport({ orgId, range, website }) {
+function FunnelReport({ orgId, range, website, compact }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     setLoading(true);
     analyticsApi.funnel(orgId, range, website).then(setData).finally(() => setLoading(false));
   }, [orgId, range, website]);
-  return /* @__PURE__ */ jsx(FunnelChart, { data, loading });
+  return /* @__PURE__ */ jsx(FunnelChart, { data, loading, compact });
 }
-function FunnelChart({ data, loading, title = "Filtering funnel", subtitle }) {
+function FunnelChart({ data, loading, title = "Filtering funnel", subtitle, compact }) {
   var _a, _b;
   if (loading) {
     return /* @__PURE__ */ jsx("div", { className: "card shadow-soft h-48 animate-pulse rounded-2xl bg-bg-mute/40" });
@@ -85,7 +85,8 @@ function FunnelChart({ data, loading, title = "Filtering funnel", subtitle }) {
         /* @__PURE__ */ jsx("b", { className: "text-fg", children: s.count.toLocaleString() })
       ] }, s.key)) })
     ] }),
-    /* @__PURE__ */ jsxs("div", { className: "mt-6 grid gap-6 md:grid-cols-2", children: [
+    compact && /* @__PURE__ */ jsx("a", { href: "/dashboard/reports", className: "mt-4 inline-block text-sm font-semibold text-brand hover:underline", children: "See why & full breakdown →" }),
+    !compact && /* @__PURE__ */ jsx(Fragment, { children: /* @__PURE__ */ jsxs("div", { className: "mt-6 grid gap-6 md:grid-cols-2", children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx("h3", { className: "text-sm font-semibold", children: "Why traffic was turned away" }),
         data.reasons.length === 0 ? /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-fg-muted", children: "Nothing was filtered in this period." }) : /* @__PURE__ */ jsx("ul", { className: "mt-3 space-y-2", children: data.reasons.map((r) => /* @__PURE__ */ jsxs("li", { className: "text-sm", children: [
@@ -112,7 +113,7 @@ function FunnelChart({ data, loading, title = "Filtering funnel", subtitle }) {
           /* @__PURE__ */ jsx("span", { className: "tabular-nums text-fg-muted", children: c.count.toLocaleString() })
         ] }, c.key)) })
       ] })
-    ] })
+    ] }) })
   ] });
 }
 const CLASS_DOT = {
@@ -131,6 +132,6 @@ function Tile({ label, value, sub, tone }) {
   ] });
 }
 export {
-  FunnelChart as F,
-  FunnelReport as a
+  FunnelReport as F,
+  FunnelChart as a
 };

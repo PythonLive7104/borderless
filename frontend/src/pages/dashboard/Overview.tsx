@@ -7,6 +7,7 @@ import {
 import PageNote from "../../components/dashboard/PageNote";
 import GetStarted from "../../components/dashboard/GetStarted";
 import WhatsNew from "../../components/dashboard/WhatsNew";
+import FunnelReport from "../../components/dashboard/FunnelReport";
 import WebsitePicker from "../../components/dashboard/WebsitePicker";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type Overview as OverviewT } from "../../lib/api";
@@ -70,6 +71,12 @@ export default function Overview() {
             <StatCard label="Suspicious + Fraud" value={(t!.suspicious + t!.bot + t!.fraud).toLocaleString()} sub={`${t!.flagged} flagged`} tone="red" />
             <StatCard label="Conversions" value={t!.conversions.toLocaleString()} sub={`${(t!.conversion_rate * 100).toFixed(1)}% rate`} tone="amber" />
           </div>
+
+          {current && (
+            <div className="mt-6">
+              <FunnelReport orgId={current.id} range={range} website={website} compact />
+            </div>
+          )}
 
           {!hasData ? (
             <div className="card shadow-soft mt-6"><NoData msg="No traffic in this range yet. Install your tracking snippet to start receiving data." /></div>

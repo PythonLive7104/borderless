@@ -9,8 +9,8 @@ import { analyticsApi, type Funnel } from "../../lib/api";
  * FunnelReport fetches the workspace funnel; FunnelChart is the presentational
  * half, reused for a single campaign/stream's funnel.
  */
-export default function FunnelReport({ orgId, range, website }: {
-  orgId: number; range: string; website: string;
+export default function FunnelReport({ orgId, range, website, compact }: {
+  orgId: number; range: string; website: string; compact?: boolean;
 }) {
   const [data, setData] = useState<Funnel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,11 +21,11 @@ export default function FunnelReport({ orgId, range, website }: {
       .then(setData).finally(() => setLoading(false));
   }, [orgId, range, website]);
 
-  return <FunnelChart data={data} loading={loading} />;
+  return <FunnelChart data={data} loading={loading} compact={compact} />;
 }
 
-export function FunnelChart({ data, loading, title = "Filtering funnel", subtitle }: {
-  data: Funnel | null; loading?: boolean; title?: string; subtitle?: string;
+export function FunnelChart({ data, loading, title = "Filtering funnel", subtitle, compact }: {
+  data: Funnel | null; loading?: boolean; title?: string; subtitle?: string; compact?: boolean;
 }) {
   if (loading) {
     return <div className="card shadow-soft h-48 animate-pulse rounded-2xl bg-bg-mute/40" />;
@@ -87,6 +87,13 @@ export function FunnelChart({ data, loading, title = "Filtering funnel", subtitl
         </div>
       </div>
 
+      {compact && (
+        <a href="/dashboard/reports" className="mt-4 inline-block text-sm font-semibold text-brand hover:underline">
+          See why & full breakdown →
+        </a>
+      )}
+
+      {!compact && (<>
       {/* why + classification */}
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div>
@@ -125,6 +132,7 @@ export function FunnelChart({ data, loading, title = "Filtering funnel", subtitl
           </ul>
         </div>
       </div>
+      </>)}
     </div>
   );
 }
