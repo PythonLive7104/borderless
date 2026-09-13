@@ -16,12 +16,12 @@ function GetStarted({ orgId }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     let alive = true;
-    let dismissed = false;
+    let dismissed2 = false;
     try {
-      dismissed = localStorage.getItem(dismissKey(orgId)) === "1";
+      dismissed2 = localStorage.getItem(dismissKey(orgId)) === "1";
     } catch {
     }
-    if (dismissed) return;
+    if (dismissed2) return;
     Promise.all([websiteApi.list(orgId), linkApi.list(orgId)]).then(([w, l]) => {
       if (alive) setShow(w.results.length === 0 && l.results.length === 0);
     }).catch(() => {
@@ -78,6 +78,51 @@ function GetStarted({ orgId }) {
     ] })
   ] });
 }
+const KEY = "tnb:whatsnew:2026-09";
+function dismissed() {
+  try {
+    return localStorage.getItem(KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function WhatsNew() {
+  const [hidden, setHidden] = useState(dismissed);
+  if (hidden) return null;
+  const close = () => {
+    try {
+      localStorage.setItem(KEY, "1");
+    } catch {
+    }
+    setHidden(true);
+  };
+  return /* @__PURE__ */ jsx("div", { className: "mb-5 rounded-2xl border border-brand/25 bg-brand/5 p-4", children: /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3", children: [
+    /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { className: "rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white", children: "New" }),
+        /* @__PURE__ */ jsx("span", { className: "text-sm font-bold", children: "Filtering funnel is live" })
+      ] }),
+      /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+        "See exactly how much traffic we check and how much we filter out — with the reasons.",
+        " ",
+        /* @__PURE__ */ jsx(Link, { to: "/dashboard/reports", className: "font-semibold text-brand hover:underline", children: "Open Reports →" })
+      ] }),
+      /* @__PURE__ */ jsxs("p", { className: "mt-2 text-xs text-fg-dim", children: [
+        /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Coming next:" }),
+        " deeper targeting (ISP/ASN, carrier, language & timezone checks), JA4 fingerprinting, per-campaign streams, and faster decisions."
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        onClick: close,
+        "aria-label": "Dismiss",
+        className: "shrink-0 rounded-lg p-1 text-fg-dim hover:bg-brand/10 hover:text-fg",
+        children: /* @__PURE__ */ jsx("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx("path", { d: "M18 6L6 18M6 6l12 12" }) })
+      }
+    )
+  ] }) });
+}
 const CLASS_COLORS = {
   human: "#16a34a",
   suspicious: "#d97706",
@@ -106,6 +151,7 @@ function Overview() {
   const hasData = ((t == null ? void 0 : t.events) ?? 0) > 0;
   return /* @__PURE__ */ jsxs("div", { children: [
     current && /* @__PURE__ */ jsx(GetStarted, { orgId: current.id }),
+    /* @__PURE__ */ jsx(WhatsNew, {}),
     /* @__PURE__ */ jsxs(PageNote, { id: "overview", children: [
       "This is your ",
       /* @__PURE__ */ jsx("b", { children: "control center" }),

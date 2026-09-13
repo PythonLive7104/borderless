@@ -245,7 +245,8 @@ const analyticsApi = {
   visitor: (id) => http.get(`/analytics/visitors/${id}/`),
   events: (orgId, params = {}) => http.get(`/analytics/events/?${qs({ organization: orgId, ...params })}`),
   sources: (orgId, range = "7d", website = "") => http.get(`/analytics/sources/?${qs({ organization: orgId, range, website })}`),
-  report: (orgId, dimension, range = "7d", website = "") => http.get(`/analytics/report/?${qs({ organization: orgId, dimension, range, website })}`)
+  report: (orgId, dimension, range = "7d", website = "") => http.get(`/analytics/report/?${qs({ organization: orgId, dimension, range, website })}`),
+  funnel: (orgId, range = "7d", website = "") => http.get(`/analytics/funnel/?${qs({ organization: orgId, range, website })}`)
 };
 async function downloadReportCsv(orgId, dimension, range, website = "") {
   const res = await fetch(`/api/analytics/report/?${qs({ organization: orgId, dimension, range, website, export: "csv" })}`, {
@@ -1966,7 +1967,7 @@ const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
 const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CtxzvdYQ.js"));
-const Overview = lazy(() => import("./assets/Overview-RIPeeabL.js"));
+const Overview = lazy(() => import("./assets/Overview-C0MYinCl.js"));
 const Websites = lazy(() => import("./assets/Websites-DwxwFvMr.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-BmvJNvZG.js"));
 const Campaigns = lazy(() => import("./assets/Campaigns-Q6xl3bae.js"));
@@ -1987,7 +1988,7 @@ const Billing = lazy(() => import("./assets/Billing-DLGsKG8K.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-CxZbScxD.js"));
 const Team = lazy(() => import("./assets/Team-BRQ3BDZX.js"));
 const Settings = lazy(() => import("./assets/Settings-DHJ8kh4S.js"));
-const Reports = lazy(() => import("./assets/Reports-Cv2RIF-d.js"));
+const Reports = lazy(() => import("./assets/Reports-Bd47Cq-k.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
 const AdminOverview = lazy(() => import("./assets/AdminOverview-D6-INi4v.js"));
 const AdminUsers = lazy(() => import("./assets/AdminUsers-DyEZ0hLp.js"));

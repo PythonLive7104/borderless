@@ -265,3 +265,84 @@ class ReportView(views.APIView):
 
         return Response({"dimension": dim, "rows": rows,
                          "dimensions": list(REPORT_DIMENSIONS.keys())})
+
+
+# Human-readable labels for the risk signals the engine records, so the funnel's
+# "why filtered" list reads in plain language instead of raw signal keys.
+SIGNAL_LABELS = {
+    "known_bot": "Known bot user-agent",
+    "automation": "Automation tool (headless/webdriver)",
+    "headless": "Headless browser",
+    "webdriver": "WebDriver / automation flag",
+    "headless_fp": "Headless fingerprint",
+    "datacenter": "Datacenter IP",
+    "proxy": "Proxy / VPN",
+    "no_fingerprint": "No browser fingerprint",
+    "abnormal_rate": "Abnormal request rate",
+    "bad_ja3": "Known-bad TLS fingerprint (JA3)",
+    "ip_blocklisted": "IP on your block list",
+    "ip_allowlisted": "IP on your allow list",
+    "verified_crawler": "Verified search crawler",
+}
+
+
+class FunnelView(views.APIView):
+    """The filtering funnel: of everything the engine checked, how much reached
+    the page, how much was turned away, and why. This is the view that makes the
+    protection visible — "10,000 checked -> 6,800 filtered" — instead of leaving
+    people to wonder whether it's doing anything."""
+
+    def get(self, request):
+        p = request.query_params
+        days = _days(p)
+        since = timezone.now() - timedelta(days=days)
+        # Decisions only: pageviews and server-side checks carry an action.
+        # Conversions and custom events aren't gate decisions, so exclude them.
+        qs = (_events(request.user, p)
+              .filter(created_at__gte=since)
+              .exclude(type="conversion"))
+
+        total = qs.count()
+        by_action = dict(qs.values_list("action").annotate(n=Count("id"))
+                         .values_list("action", "n"))
+        allowed = by_action.get("allow", 0)
+        blocked = by_action.get("block", 0)
+        redirected = by_action.get("redirect", 0)
+        flagged = by_action.get("review", 0) + by_action.get("tag", 0)
+        turned_away = blocked + redirected
+
+        by_class = dict(qs.exclude(classification="")
+                        .values_list("classification").annotate(n=Count("id"))
+                        .values_list("classification", "n"))
+
+        # Why traffic was turned away: aggregate the signals on filtered events.
+        # Bounded pull so a huge window can't turn this into a slow scan.
+        reason_counts = {}
+        filtered_qs = qs.filter(action__in=["block", "redirect"])
+        for sigs in filtered_qs.values_list("signals", flat=True)[:20000]:
+            for s in (sigs or []):
+                reason_counts[s] = reason_counts.get(s, 0) + 1
+        reasons = sorted(
+            ({"key": k, "label": SIGNAL_LABELS.get(k, k.replace("_", " ").title()),
+              "count": v} for k, v in reason_counts.items()),
+            key=lambda r: -r["count"])[:10]
+
+        return Response({
+            "range": {"days": days},
+            "total": total,
+            "passed": allowed,
+            "turned_away": turned_away,
+            "flagged": flagged,
+            "pass_rate": round(allowed / total, 4) if total else 0.0,
+            "filter_rate": round(turned_away / total, 4) if total else 0.0,
+            "stages": [
+                {"key": "checked", "label": "Traffic checked", "count": total},
+                {"key": "allowed", "label": "Reached your page", "count": allowed},
+                {"key": "flagged", "label": "Passed but flagged", "count": flagged},
+                {"key": "redirected", "label": "Redirected away", "count": redirected},
+                {"key": "blocked", "label": "Blocked", "count": blocked},
+            ],
+            "by_classification": [{"key": k, "count": v} for k, v in
+                                  sorted(by_class.items(), key=lambda x: -x[1])],
+            "reasons": reasons,
+        })

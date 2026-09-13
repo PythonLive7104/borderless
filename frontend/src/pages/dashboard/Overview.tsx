@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import PageNote from "../../components/dashboard/PageNote";
 import GetStarted from "../../components/dashboard/GetStarted";
+import WhatsNew from "../../components/dashboard/WhatsNew";
 import WebsitePicker from "../../components/dashboard/WebsitePicker";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type Overview as OverviewT } from "../../lib/api";
@@ -46,6 +47,7 @@ export default function Overview() {
   return (
     <div>
       {current && <GetStarted orgId={current.id} />}
+      <WhatsNew />
       <PageNote id="overview">This is your <b>control center</b>. It shows how many people visit your sites and how many are real vs. bots. A higher <b>Traffic quality</b> is better — it means most visitors are genuine. Use the date buttons on the right to change the time period.</PageNote>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

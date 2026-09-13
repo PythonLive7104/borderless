@@ -5,6 +5,7 @@ import RangeTabs from "../../components/dashboard/RangeTabs";
 import NoData from "../../components/dashboard/NoData";
 import PageNote from "../../components/dashboard/PageNote";
 import WebsitePicker from "../../components/dashboard/WebsitePicker";
+import FunnelReport from "../../components/dashboard/FunnelReport";
 
 const DIM_LABELS: Record<string, string> = {
   country: "Country", device: "Device", browser: "Browser", os: "OS",
@@ -39,7 +40,9 @@ export default function Reports() {
         <RangeTabs value={range} onChange={setRange} />
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-2">
+      {current && <div className="mt-5"><FunnelReport orgId={current.id} range={range} website={website} /></div>}
+
+      <div className="mt-8 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-fg-muted">Group by</span>
         <select value={dimension} onChange={(e) => setDimension(e.target.value)}
           className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand">

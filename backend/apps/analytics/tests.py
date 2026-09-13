@@ -159,3 +159,59 @@ class VisitorIpRuleTest(TestCase):
         other_org = create_workspace(other, "Other")
         IPListEntry.objects.create(organization=other_org, value="1.2.3.4", kind="deny")
         self.assertIsNone(self._rows()["1.2.3.4"])
+
+
+class FunnelTest(TestCase):
+    """The filtering funnel: total checked, how much reached the page vs was
+    turned away, and why."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="fn@example.com", email="fn@example.com", password="testpass123")
+        self.org = create_workspace(user, "Funnel Co")
+        self.site = Website.objects.create(organization=self.org, name="S", domain="s.example")
+
+        def ev(action, classification, signals):
+            v = Visitor.objects.create(website=self.site, visitor_id=f"v{TrafficEvent.objects.count()}")
+            sess = Session.objects.create(website=self.site, visitor=v, session_id=f"s{TrafficEvent.objects.count()}")
+            TrafficEvent.objects.create(
+                website=self.site, visitor=v, session=sess, type="pageview",
+                action=action, classification=classification, signals=signals,
+                created_at=timezone.now())
+
+        for _ in range(6):
+            ev("allow", "human", [])
+        for _ in range(3):
+            ev("block", "bot", ["known_bot", "datacenter"])
+        ev("redirect", "fraud", ["known_bot"])
+        # A conversion must NOT count as a checked decision.
+        v = Visitor.objects.create(website=self.site, visitor_id="conv")
+        sess = Session.objects.create(website=self.site, visitor=v, session_id="convs")
+        TrafficEvent.objects.create(website=self.site, visitor=v, session=sess,
+                                    type="conversion", action="allow", created_at=timezone.now())
+
+        self.c = APIClient()
+        self.c.force_authenticate(user=user)
+
+    def _funnel(self):
+        return self.c.get(f"/api/analytics/funnel/?organization={self.org.id}").json()
+
+    def test_totals_split_passed_and_turned_away(self):
+        r = self._funnel()
+        self.assertEqual(r["total"], 10)          # 6 allow + 3 block + 1 redirect, no conversion
+        self.assertEqual(r["passed"], 6)
+        self.assertEqual(r["turned_away"], 4)     # 3 block + 1 redirect
+        self.assertEqual(r["pass_rate"], 0.6)
+
+    def test_reasons_are_aggregated_and_labelled(self):
+        reasons = {x["key"]: x["count"] for x in self._funnel()["reasons"]}
+        self.assertEqual(reasons["known_bot"], 4)   # 3 block + 1 redirect
+        self.assertEqual(reasons["datacenter"], 3)
+        labels = {x["key"]: x["label"] for x in self._funnel()["reasons"]}
+        self.assertEqual(labels["known_bot"], "Known bot user-agent")
+
+    def test_classification_breakdown(self):
+        by = {x["key"]: x["count"] for x in self._funnel()["by_classification"]}
+        self.assertEqual(by["human"], 6)
+        self.assertEqual(by["bot"], 3)
+        self.assertEqual(by["fraud"], 1)

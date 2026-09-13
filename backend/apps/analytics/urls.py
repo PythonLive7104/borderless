@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import OverviewView, VisitorListView, VisitorDetailView, EventListView, SourcesView, ConversionsView, ReportView
+from .views import OverviewView, VisitorListView, VisitorDetailView, EventListView, SourcesView, ConversionsView, ReportView, FunnelView
 
 urlpatterns = [
     path("overview/", OverviewView.as_view(), name="overview"),
@@ -9,4 +9,5 @@ urlpatterns = [
     path("sources/", SourcesView.as_view(), name="sources"),
     path("conversions/", ConversionsView.as_view(), name="conversions"),
     path("report/", ReportView.as_view(), name="report"),
+    path("funnel/", FunnelView.as_view(), name="funnel"),
 ]

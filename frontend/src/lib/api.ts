@@ -366,7 +366,19 @@ export const analyticsApi = {
     http.get<{ sources: SourceRow[] }>(`/analytics/sources/?${qs({ organization: orgId, range, website })}`),
   report: (orgId: number, dimension: string, range = "7d", website = "") =>
     http.get<{ dimension: string; rows: ReportRow[]; dimensions: string[] }>(`/analytics/report/?${qs({ organization: orgId, dimension, range, website })}`),
+  funnel: (orgId: number, range = "7d", website = "") =>
+    http.get<Funnel>(`/analytics/funnel/?${qs({ organization: orgId, range, website })}`),
 };
+
+export interface FunnelStage { key: string; label: string; count: number; }
+export interface Funnel {
+  range: { days: number };
+  total: number; passed: number; turned_away: number; flagged: number;
+  pass_rate: number; filter_rate: number;
+  stages: FunnelStage[];
+  by_classification: { key: string; count: number }[];
+  reasons: { key: string; label: string; count: number }[];
+}
 export interface ReportRow { key: string; events: number; visitors: number; human: number; conversions: number; quality: number; }
 
 // CSV download (uses the stored token; browser saves the file)
