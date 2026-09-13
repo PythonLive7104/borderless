@@ -75,6 +75,16 @@ class CampaignViewSet(viewsets.ModelViewSet):
             "flagged": flagged,
         })
 
+    @action(detail=True, methods=["get"])
+    def funnel(self, request, pk=None):
+        """This campaign's filtering funnel (a stream's own stats): checked ->
+        reached the page -> turned away, with reasons. Same shape and helper as
+        the workspace funnel, scoped to traffic attributed to this campaign."""
+        from apps.analytics.views import compute_funnel, RANGES
+        campaign = self.get_object()
+        days = RANGES.get(request.query_params.get("range", "7d"), 7)
+        return Response(compute_funnel(campaign.matched_events(), days))
+
     @action(detail=True, methods=["get"], url_path="variant-stats")
     def variant_stats(self, request, pk=None):
         """Per-variant A/B results, derived from deterministic assignment over

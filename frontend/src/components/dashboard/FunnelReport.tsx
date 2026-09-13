@@ -4,7 +4,10 @@ import { analyticsApi, type Funnel } from "../../lib/api";
 /**
  * The filtering funnel — the view that makes the protection visible. Instead of
  * a wall of tables, it answers the one question people actually have: "is this
- * doing anything?" — checked → reached the page → turned away, and why.
+ * doing anything?" — checked -> reached the page -> turned away, and why.
+ *
+ * FunnelReport fetches the workspace funnel; FunnelChart is the presentational
+ * half, reused for a single campaign/stream's funnel.
  */
 export default function FunnelReport({ orgId, range, website }: {
   orgId: number; range: string; website: string;
@@ -18,6 +21,12 @@ export default function FunnelReport({ orgId, range, website }: {
       .then(setData).finally(() => setLoading(false));
   }, [orgId, range, website]);
 
+  return <FunnelChart data={data} loading={loading} />;
+}
+
+export function FunnelChart({ data, loading, title = "Filtering funnel", subtitle }: {
+  data: Funnel | null; loading?: boolean; title?: string; subtitle?: string;
+}) {
   if (loading) {
     return <div className="card shadow-soft h-48 animate-pulse rounded-2xl bg-bg-mute/40" />;
   }
@@ -29,7 +38,6 @@ export default function FunnelReport({ orgId, range, website }: {
       </div>
     );
   }
-
   const pct = (n: number) => (data.total ? (n / data.total) * 100 : 0);
   const segs = [
     { key: "allowed", label: "Reached your page", count: data.passed, cls: "bg-success" },
@@ -45,12 +53,11 @@ export default function FunnelReport({ orgId, range, website }: {
   return (
     <div className="card shadow-soft p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-bold">Filtering funnel</h2>
+        <h2 className="text-lg font-bold">{title}</h2>
         <span className="text-xs text-fg-dim">last {data.range.days} day{data.range.days === 1 ? "" : "s"}</span>
       </div>
       <p className="mt-1 text-sm text-fg-muted">
-        What the engine did with your traffic — real visitors through, automated
-        traffic turned away.
+        {subtitle || "What the engine did with your traffic — real visitors through, automated traffic turned away."}
       </p>
 
       {/* headline tiles */}

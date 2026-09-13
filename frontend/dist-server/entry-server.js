@@ -152,6 +152,7 @@ const campaignApi = {
   update: (id, p) => http.patch(`/campaigns/${id}/`, p),
   remove: (id) => http.del(`/campaigns/${id}/`),
   stats: (id) => http.get(`/campaigns/${id}/stats/`),
+  funnel: (id, range = "7d") => http.get(`/campaigns/${id}/funnel/?range=${range}`),
   variantStats: (id) => http.get(`/campaigns/${id}/variant-stats/`),
   scanUrl: (id) => http.post(`/campaigns/${id}/scan-url/`, {})
 };
@@ -1988,7 +1989,7 @@ const Overview = lazy(() => import("./assets/Overview-C0MYinCl.js"));
 const Websites = lazy(() => import("./assets/Websites-DwxwFvMr.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-BmvJNvZG.js"));
 const Campaigns = lazy(() => import("./assets/Campaigns-Q6xl3bae.js"));
-const CampaignDetail = lazy(() => import("./assets/CampaignDetail-bBQ4uavW.js"));
+const CampaignDetail = lazy(() => import("./assets/CampaignDetail-BiHS8Cas.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-Bl5INGJf.js"));
 const Shield = lazy(() => import("./assets/Shield-DyK0fF8q.js"));
 const Links = lazy(() => import("./assets/Links-C5FL59Hm.js"));
@@ -2005,7 +2006,7 @@ const Billing = lazy(() => import("./assets/Billing-DLGsKG8K.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-CxZbScxD.js"));
 const Team = lazy(() => import("./assets/Team-BRQ3BDZX.js"));
 const Settings = lazy(() => import("./assets/Settings-DHJ8kh4S.js"));
-const Reports = lazy(() => import("./assets/Reports-Bd47Cq-k.js"));
+const Reports = lazy(() => import("./assets/Reports-B1SGnKsi.js"));
 const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
 const AdminOverview = lazy(() => import("./assets/AdminOverview-D6-INi4v.js"));
 const AdminUsers = lazy(() => import("./assets/AdminUsers-DyEZ0hLp.js"));

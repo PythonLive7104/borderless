@@ -247,6 +247,7 @@ export const campaignApi = {
   update: (id: number, p: Partial<Campaign>) => http.patch<Campaign>(`/campaigns/${id}/`, p),
   remove: (id: number) => http.del(`/campaigns/${id}/`),
   stats: (id: number) => http.get<CampaignStats>(`/campaigns/${id}/stats/`),
+  funnel: (id: number, range = "7d") => http.get<Funnel>(`/campaigns/${id}/funnel/?range=${range}`),
   variantStats: (id: number) => http.get<VariantStats>(`/campaigns/${id}/variant-stats/`),
   scanUrl: (id: number) =>
     http.post<{ safe: boolean | null; flagged_by: string[]; threats: string[]; checked: boolean; detail?: string }>(`/campaigns/${id}/scan-url/`, {}),

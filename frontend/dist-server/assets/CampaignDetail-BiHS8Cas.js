@@ -2,6 +2,7 @@ import { jsxs, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { d as useDialog, B as Button, D as variantApi, C as campaignApi, c as useWorkspace } from "../entry-server.js";
+import { F as FunnelChart } from "./FunnelReport-DaniWWhv.js";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { C as ClassBadge } from "./ClassBadge-B1OvS151.js";
 import "react-dom/server";
@@ -184,9 +185,13 @@ function CampaignDetail() {
   const { current } = useWorkspace();
   const [c, setC] = useState(null);
   const [stats, setStats] = useState(null);
+  const [funnel, setFunnel] = useState(null);
+  const [funnelLoading, setFunnelLoading] = useState(true);
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   async function load() {
     const [camp, st] = await Promise.all([campaignApi.get(Number(id)), campaignApi.stats(Number(id))]);
+    setFunnelLoading(true);
+    campaignApi.funnel(Number(id), "30d").then(setFunnel).finally(() => setFunnelLoading(false));
     setC(camp);
     setStats(st);
   }
@@ -258,6 +263,15 @@ function CampaignDetail() {
       /* @__PURE__ */ jsx("div", { className: "text-xs font-semibold uppercase tracking-wide text-fg-dim", children: k }),
       /* @__PURE__ */ jsx("div", { className: "mt-2 text-2xl font-extrabold", children: v })
     ] }, k)) }),
+    /* @__PURE__ */ jsx("div", { className: "mt-6", children: /* @__PURE__ */ jsx(
+      FunnelChart,
+      {
+        data: funnel,
+        loading: funnelLoading,
+        title: "Filtering funnel — this campaign",
+        subtitle: "How this campaign's traffic split: real visitors through, automated traffic turned away."
+      }
+    ) }),
     /* @__PURE__ */ jsxs("div", { className: "mt-6 grid gap-5 lg:grid-cols-2", children: [
       /* @__PURE__ */ jsxs("div", { className: "card shadow-soft p-6", children: [
         /* @__PURE__ */ jsx("h2", { className: "text-sm font-bold uppercase tracking-wide text-fg-dim", children: "Traffic classification" }),

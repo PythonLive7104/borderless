@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { campaignApi, type Campaign, type CampaignStats } from "../../lib/api";
+import { campaignApi, type Campaign, type CampaignStats, type Funnel } from "../../lib/api";
+import { FunnelChart } from "../../components/dashboard/FunnelReport";
 import PageNote from "../../components/dashboard/PageNote";
 import CampaignVariants from "../../components/dashboard/CampaignVariants";
 import { useWorkspace } from "../../context/WorkspaceContext";
@@ -15,10 +16,14 @@ export default function CampaignDetail() {
   const { current } = useWorkspace();
   const [c, setC] = useState<Campaign | null>(null);
   const [stats, setStats] = useState<CampaignStats | null>(null);
+  const [funnel, setFunnel] = useState<Funnel | null>(null);
+  const [funnelLoading, setFunnelLoading] = useState(true);
   const canManage = current?.role === "owner" || current?.role === "admin";
 
   async function load() {
     const [camp, st] = await Promise.all([campaignApi.get(Number(id)), campaignApi.stats(Number(id))]);
+    setFunnelLoading(true);
+    campaignApi.funnel(Number(id), "30d").then(setFunnel).finally(() => setFunnelLoading(false));
     setC(camp); setStats(st);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -82,6 +87,12 @@ export default function CampaignDetail() {
             <div className="mt-2 text-2xl font-extrabold">{v}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-6">
+        <FunnelChart data={funnel} loading={funnelLoading}
+          title="Filtering funnel — this campaign"
+          subtitle="How this campaign's traffic split: real visitors through, automated traffic turned away." />
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
