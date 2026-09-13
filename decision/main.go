@@ -182,13 +182,17 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// One intel read feeds both the score and the rule fields (the datacenter/
+	// proxy sets used to be checked twice per decision).
+	intel := h.knownIntel(rctx, fp.IP)
+	h.warmIntel(fp.IP, intel.ISP != "") // fill ISP/ASN/conn for next time, off the hot path
 	result := risk.Evaluate(risk.Input{
 		KnownBot:      fp.IsBot,
 		Webdriver:     webdriver,
 		HeadlessFP:    headlessFP,
 		Automation:    fp.IsHeadless,
-		Datacenter:    h.st.InSet(rctx, "ipintel:datacenter", fp.IP),
-		Proxy:         h.st.InSet(rctx, "ipintel:proxy", fp.IP),
+		Datacenter:    intel.Datacenter,
+		Proxy:         intel.Proxy || intel.VPN,
 		NoFingerprint: noFP,
 		AbnormalRate:  rate > 20, // >20 events/min from one visitor
 		BadJA3:        ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
@@ -196,8 +200,6 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	})
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
-	intel := h.knownIntel(rctx, fp.IP)
-	h.warmIntel(fp.IP) // fill ISP/ASN/conn for next time, off the hot path
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
@@ -324,19 +326,21 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 		fp.Country = geo.Country(fp.IP)
 	}
 	rate := h.st.RateIncr(ctx, "srate:"+siteID+":"+fp.IP, time.Minute)
+	// One intel read feeds both the risk score and the rule fields — the
+	// datacenter/proxy sets used to be checked twice per decision.
+	intel := h.knownIntel(ctx, fp.IP)
+	h.warmIntel(fp.IP, intel.ISP != "")
 	result := risk.Evaluate(risk.Input{
 		KnownBot:      fp.IsBot,
 		Automation:    fp.IsHeadless,
-		Datacenter:    h.st.InSet(ctx, "ipintel:datacenter", fp.IP),
-		Proxy:         h.st.InSet(ctx, "ipintel:proxy", fp.IP),
+		Datacenter:    intel.Datacenter,
+		Proxy:         intel.Proxy || intel.VPN,
 		NoFingerprint: false,
 		AbnormalRate:  rate > 40,
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
 	})
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
-	intel := h.knownIntel(ctx, fp.IP)
-	h.warmIntel(fp.IP)
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
@@ -796,16 +800,13 @@ var intelClient = &http.Client{Timeout: 700 * time.Millisecond}
 // when it isn't cached yet, so the hot path never blocks on the provider. The
 // lookup is cache-first and 24h-cached, so a busy IP is fetched at most once a
 // day. Fire-and-forget: a failure just means we try again next time.
-func (h *handler) warmIntel(ip string) {
-	if ip == "" {
+func (h *handler) warmIntel(ip string, alreadyKnown bool) {
+	if ip == "" || alreadyKnown {
 		return
 	}
 	if env("IPQUALITYSCORE_KEY", "") == "" ||
 		!strings.EqualFold(env("IP_INTEL_PROVIDER", ""), "ipqualityscore") {
 		return
-	}
-	if h.st.GetStr(context.Background(), "ipintel:cache:"+ip) != "" {
-		return // already known
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)

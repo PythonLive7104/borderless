@@ -9,14 +9,38 @@ import (
 
 type Store struct {
 	rdb *redis.Client
+	cfg *ttlCache // per-site config (rules, ip-filter) — read every request
 }
 
 func New(redisURL string) (*Store, error) {
+	return NewWithTTL(redisURL, 3*time.Second)
+}
+
+// NewWithTTL lets the config-cache TTL be tuned (0 disables caching).
+func NewWithTTL(redisURL string, cfgTTL time.Duration) (*Store, error) {
 	opt, err := redis.ParseURL(redisURL)
 	if err != nil {
 		return nil, err
 	}
-	return &Store{rdb: redis.NewClient(opt)}, nil
+	return &Store{rdb: redis.NewClient(opt), cfg: newTTLCache(cfgTTL)}, nil
+}
+
+// cachedGet fronts a Redis GET with the in-process config cache. A miss (and a
+// disabled cache, ttl<=0) falls through to Redis and is cached on the way back.
+func (s *Store) cachedGet(ctx context.Context, key string) string {
+	if s.cfg != nil && s.cfg.ttl > 0 {
+		if v, ok := s.cfg.get(key); ok {
+			return v
+		}
+	}
+	v, err := s.rdb.Get(ctx, key).Result()
+	if err != nil {
+		v = ""
+	}
+	if s.cfg != nil && s.cfg.ttl > 0 {
+		s.cfg.set(key, v)
+	}
+	return v
 }
 
 func (s *Store) Ping(ctx context.Context) error {
@@ -68,20 +92,12 @@ func (s *Store) GetStr(ctx context.Context, key string) string {
 
 // GetRules returns the raw rules JSON for a site (empty string if none).
 func (s *Store) GetRules(ctx context.Context, siteID string) string {
-	v, err := s.rdb.Get(ctx, "rules:"+siteID).Result()
-	if err != nil {
-		return ""
-	}
-	return v
+	return s.cachedGet(ctx, "rules:"+siteID)
 }
 
 // GetIPFilter returns the raw JSON allow/deny lists for a site ("" if none).
 func (s *Store) GetIPFilter(ctx context.Context, siteID string) string {
-	v, err := s.rdb.Get(ctx, "ipfilter:"+siteID).Result()
-	if err != nil {
-		return ""
-	}
-	return v
+	return s.cachedGet(ctx, "ipfilter:"+siteID)
 }
 
 // SetEx writes a value with a TTL. Used to share the IP-intelligence cache with

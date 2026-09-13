@@ -56,6 +56,16 @@ class OrganizationDetailView(generics.RetrieveUpdateAPIView):
         org._member = ensure_membership(self.request.user, org)
         return org
 
+    def perform_update(self, serializer):
+        before = serializer.instance.link_scan_optout
+        org = serializer.save()
+        # Changing the safety setting takes effect on existing links right away —
+        # otherwise a link disabled under the old setting stays dark until it
+        # happens to be re-scanned, which looks broken.
+        if org.link_scan_optout != before:
+            from apps.links.sync import reevaluate_workspace_links
+            reevaluate_workspace_links(org)
+
 
 class MemberListView(generics.ListAPIView):
     serializer_class = MemberSerializer

@@ -1225,3 +1225,52 @@ class ScanOptoutPolicyTest(TestCase):
     def test_private_still_strict_without_optout(self):
         link = self._link(self._domain(shared=False))
         self.assertTrue(self._apply(link, ["google_safe_browsing"]))
+
+
+class ReevaluateOnOptoutTest(TestCase):
+    """Flipping the workspace safety setting re-evaluates existing flagged links
+    immediately — the reason a user saw a disabled link after turning scan off."""
+
+    def setUp(self):
+        self.org = _workspace("reeval@example.com")
+
+    def _domain(self, *, shared):
+        from django.utils import timezone
+        return ShortDomain.objects.create(
+            host=f"{'sh' if shared else 'pv'}{ShortDomain.objects.count()}.cc",
+            is_shared=shared, organization=None if shared else self.org,
+            active=True, verified_at=timezone.now())
+
+    def _flagged_link(self, domain, threats):
+        return ShortLink.objects.create(
+            organization=self.org, domain=domain, slug=f"s{ShortLink.objects.count()}",
+            destination_url="https://dest.example", active=False,
+            url_safe=False, url_threats=threats)
+
+    def test_optout_reactivates_a_vt_flagged_private_link(self):
+        from apps.links.sync import reevaluate_workspace_links
+        link = self._flagged_link(self._domain(shared=False), ["virustotal:3_engines"])
+        self.org.link_scan_optout = True; self.org.save()
+        n = reevaluate_workspace_links(self.org)
+        link.refresh_from_db()
+        self.assertTrue(link.active)
+        self.assertEqual(n, 1)
+
+    def test_optout_does_not_reactivate_safe_browsing_on_shared(self):
+        from apps.links.sync import reevaluate_workspace_links
+        link = self._flagged_link(self._domain(shared=True), ["SOCIAL_ENGINEERING"])
+        self.org.link_scan_optout = True; self.org.save()
+        reevaluate_workspace_links(self.org)
+        link.refresh_from_db()
+        self.assertFalse(link.active)  # floor holds even with opt-out
+
+    def test_patch_endpoint_reactivates(self):
+        from rest_framework.test import APIClient
+        from apps.organizations.models import OrganizationMember
+        link = self._flagged_link(self._domain(shared=False), ["virustotal:2_engines"])
+        user = OrganizationMember.objects.get(organization=self.org, role="owner").user
+        c = APIClient(); c.force_authenticate(user=user)
+        r = c.patch(f"/api/organizations/{self.org.id}/", {"link_scan_optout": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        link.refresh_from_db()
+        self.assertTrue(link.active)

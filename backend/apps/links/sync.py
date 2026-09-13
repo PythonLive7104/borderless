@@ -39,7 +39,7 @@ def _payload(link) -> str:
         # these over the attached website's rules.
         "rules": _link_rules(link),
         # a link that's inactive OR flagged unsafe stops redirecting
-        "active": bool(link.active and link.url_safe is not False),
+        "active": bool(link.active),  # _should_disable() already applied the safety policy
     })
 
 
@@ -117,6 +117,39 @@ def scan_and_flag(link):
     if link.url_safe is False and _should_disable(link, flagged_by):
         link.active = False  # kill malicious links automatically
     link.save(update_fields=["url_safe", "url_threats", "url_scanned_at", "active"])
+
+
+def _flagged_by_from_threats(threats) -> list:
+    """Recover which scanners flagged a link from its stored threat keys, so we
+    can re-apply the disable policy without paying for a fresh scan."""
+    blob = " ".join(threats or []).lower()
+    out = []
+    if any(k in blob for k in ("social_engineering", "malware", "unwanted", "harmful")):
+        out.append("google_safe_browsing")
+    if "virustotal" in blob:
+        out.append("virustotal")
+    return out
+
+
+def reevaluate_workspace_links(organization) -> int:
+    """Re-apply the disable policy to a workspace's flagged links after its
+    safety setting changed. Reactivates links the new policy allows (and would
+    re-disable any that it no longer allows), republishing each to the engine.
+    Uses the stored scan result — no new scan, no API cost. Returns the number
+    of links whose state changed."""
+    from .models import ShortLink
+    changed = 0
+    qs = ShortLink.objects.filter(organization=organization, url_safe=False).select_related("domain")
+    for link in qs:
+        flagged_by = _flagged_by_from_threats(link.url_threats)
+        should_disable = _should_disable(link, flagged_by)
+        want_active = not should_disable
+        if link.active != want_active:
+            link.active = want_active
+            link.save(update_fields=["active"])
+            publish_link(link)
+            changed += 1
+    return changed
 
 
 def _should_disable(link, flagged_by) -> bool:
