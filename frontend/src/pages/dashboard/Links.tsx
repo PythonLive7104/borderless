@@ -207,10 +207,10 @@ export default function Links() {
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; block_datacenter: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string; decoy_url: string;
+  const [form, setForm] = useState<{ destination_url: string; title: string; slug: string; bot_action: BotAction; website: string; challenge: boolean; challenge_style: ChallengeStyle; forward_params: boolean; forward_param_keys: string; block_vpn: boolean; block_datacenter: boolean; deep_check: boolean; domain: string; country_mode: "off" | "allow" | "block"; countries: string; decoy_url: string;
     device_mode: "off" | "allow" | "block"; devices: string;
     os_mode: "off" | "allow" | "block"; operating_systems: string; max_risk: number }>(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, deep_check: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
   const canManage = current?.role === "owner" || current?.role === "admin";
   // Mirrors link_shortener_enabled() on the server: every paid tier includes
   // the shortener, but only while the access period is still running.
@@ -280,7 +280,7 @@ export default function Links() {
   function openCreate() {
     setErr(""); setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, deep_check: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l: ShortLink) {
@@ -290,7 +290,7 @@ export default function Links() {
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
       challenge: !!l.challenge, challenge_style: l.challenge_style || "hold",
       forward_params: !!l.forward_params,
-      forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn, block_datacenter: !!l.block_datacenter,
+      forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn, block_datacenter: !!l.block_datacenter, deep_check: !!l.deep_check,
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off", countries: l.countries || "",
       decoy_url: l.decoy_url || "",
@@ -319,6 +319,7 @@ export default function Links() {
       challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
       block_datacenter: form.block_datacenter,
+      deep_check: form.deep_check,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
       decoy_url: form.bot_action === "decoy" ? form.decoy_url.trim() : "",
@@ -491,6 +492,7 @@ export default function Links() {
                     {domains.length > 1 && l.domain_host && <> · <b className="text-fg-muted">{l.domain_host}</b></>}
                     {l.block_vpn && <> · <b className="text-fg-muted">VPN/RDP blocked</b></>}
                     {l.block_datacenter && !l.block_vpn && <> · <b className="text-fg-muted">Datacenter blocked</b></>}
+                    {l.deep_check && <> · <b className="text-fg-muted">Browser check</b></>}
                     {l.country_mode !== "off" && l.countries && <> · <b className="text-fg-muted">
                       {l.country_mode === "allow" ? "Only" : "Not"} {l.countries}</b></>}
                     {l.challenge && <> · <b className="text-fg-muted">Human check: {CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))?.label}</b></>}
@@ -671,6 +673,19 @@ export default function Links() {
                 Recommended for paid ads. Turns away visitors coming from servers/hosting
                 (AWS, Google Cloud, OVH…), where bots run — while still letting real people on a
                 VPN through. Tick the box above instead if you want to block VPNs too.
+              </span>
+            </span>
+          </label>
+
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.deep_check ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
+            <input type="checkbox" checked={form.deep_check} className="mt-0.5"
+              onChange={(e) => setForm({ ...form, deep_check: e.target.checked })} />
+            <span>
+              <span className="block text-sm font-semibold">Deep browser check</span>
+              <span className="block text-xs text-fg-muted">
+                Shows a split-second "checking your browser…" screen before the redirect, to catch
+                automated browsers real people never use. No clicking for the visitor. Strongest
+                setting — adds about a second, so best for high-value campaigns.
               </span>
             </span>
           </label>

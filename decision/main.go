@@ -94,6 +94,7 @@ func main() {
 	mux.HandleFunc("/v1/decide", h.decide)
 	mux.HandleFunc("/v1/guard", h.guard)
 	mux.HandleFunc("/v1/challenge", h.challenge)
+	mux.HandleFunc("/v1/lcheck", h.lcheck)
 	mux.HandleFunc("/l/", h.shortlink) // legacy /l/<slug>
 	mux.HandleFunc("/", h.shortlink)   // bare /<slug> (short domain)
 
@@ -539,6 +540,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		ForwardKeys    []string `json:"forward_keys"`
 		BlockVPN       bool     `json:"block_vpn"`
 		BlockDatacenter bool    `json:"block_datacenter"`
+		DeepCheck      bool     `json:"deep_check"`
 		CountryMode    string   `json:"country_mode"` // off | allow | block
 		Countries      []string `json:"countries"`
 		DeviceMode     string   `json:"device_mode"`
@@ -700,8 +702,12 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// Human check. Only stands between a visitor and the destination when we
 	// were going to let them through anyway — a bot already has its own
 	// outcome, and re-checking it here would just leak that it was detected.
-	if link.Challenge && (mode == "allow" || mode == "redirect") && !challengePassed(r) {
-		mode = "challenge"
+	if (mode == "allow" || mode == "redirect") && !challengePassed(r) {
+		if link.DeepCheck {
+			mode = "deepcheck" // silent browser check, no user interaction
+		} else if link.Challenge {
+			mode = "challenge"
+		}
 	}
 
 	sigJSON, _ := json.Marshal(result.Signals)
@@ -719,6 +725,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	})
 
 	switch mode {
+	case "deepcheck":
+		writeDeepCheckPage(w, slug)
 	case "challenge":
 		writeChallengePage(w, slug, r.URL.RawQuery, link.ChallengeStyle)
 	case "block":
@@ -967,6 +975,128 @@ func env(k, def string) string {
 // past its expiry.
 
 const challengeCookie = "tnb_hc"
+
+// --- Deep check (silent "checking your browser" interstitial) -----------------
+
+// signLCheck ties a deep-check page to one slug for a short window, so the
+// /v1/lcheck endpoint can't be driven for arbitrary slugs. It's a bound, not the
+// security itself — the endpoint re-scores the visitor regardless.
+func signLCheck(slug string, exp int64) string {
+	return fmt.Sprintf("%d.%s", exp, sign("lc|"+slug, exp))
+}
+
+func lcheckValid(slug, token string) bool {
+	parts := strings.SplitN(token, ".", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	var exp int64
+	if _, err := fmt.Sscanf(parts[0], "%d", &exp); err != nil {
+		return false
+	}
+	if time.Now().Unix() > exp {
+		return false
+	}
+	return hmac.Equal([]byte(signLCheck(slug, exp)), []byte(token))
+}
+
+// clientBotSignals reads the two verdict-moving flags out of a posted browser
+// fingerprint: webdriver, and "headless-like" when two or more anomaly flags
+// are present (same threshold the tracker path uses). Pure and nil-safe.
+func clientBotSignals(fp *FP) (webdriver, headlessFP bool) {
+	if fp == nil {
+		return false, false
+	}
+	return fp.Webdriver, len(fp.Flags) >= 2
+}
+
+func hostOf(r *http.Request) string {
+	host := r.Host
+	if i := strings.IndexByte(host, ':'); i >= 0 {
+		host = host[:i]
+	}
+	return strings.ToLower(host)
+}
+
+// POST /v1/lcheck — the deep-check verdict. The interstitial posts a browser
+// fingerprint; we re-score WITH those client-side signals (the ones a bare
+// redirect can't see) and either let the visitor through (set the pass cookie,
+// tell the page to reload) or hand back the link's bot handling.
+func (h *handler) lcheck(w http.ResponseWriter, r *http.Request) {
+	cors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Slug  string `json:"slug"`
+		Token string `json:"token"`
+		FP    *FP    `json:"fp"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 32*1024)).Decode(&body); err != nil || body.Slug == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"action": "notfound"})
+		return
+	}
+	if !lcheckValid(body.Slug, body.Token) {
+		writeJSON(w, http.StatusOK, map[string]string{"action": "notfound"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	raw := h.st.GetStr(ctx, "shortlink:"+hostOf(r)+":"+body.Slug)
+	if raw == "" {
+		writeJSON(w, http.StatusOK, map[string]string{"action": "notfound"})
+		return
+	}
+	var link struct {
+		Active    bool   `json:"active"`
+		BotAction string `json:"bot_action"`
+		DecoyURL  string `json:"decoy_url"`
+		DeepCheck bool   `json:"deep_check"`
+	}
+	if json.Unmarshal([]byte(raw), &link) != nil || !link.Active {
+		writeJSON(w, http.StatusOK, map[string]string{"action": "notfound"})
+		return
+	}
+
+	fp := fingerprint.Extract(r)
+	webdriver, headlessFP := clientBotSignals(body.FP)
+	intel := h.knownIntel(ctx, fp.IP)
+	result := risk.Evaluate(risk.Input{
+		KnownBot:     fp.IsBot,
+		Webdriver:    webdriver,
+		HeadlessFP:   headlessFP,
+		Automation:   fp.IsHeadless,
+		Datacenter:   intel.Datacenter,
+		Proxy:        intel.Proxy || intel.VPN,
+		IPBot:        intel.BotStatus,
+		RecentAbuse:  intel.RecentAbuse,
+		IPFraudScore: intel.FraudScore,
+	})
+	human := !(fp.IsBot || fp.IsHeadless || webdriver || headlessFP || result.Score >= 40)
+
+	if human {
+		exp := time.Now().Add(30 * time.Minute).Unix()
+		http.SetCookie(w, &http.Cookie{
+			Name: challengeCookie, Value: signChallenge(exp), Path: "/",
+			Expires: time.Unix(exp, 0), HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		})
+		writeJSON(w, http.StatusOK, map[string]string{"action": "go"})
+		return
+	}
+	// Bot: hand back the link's chosen handling for the page to carry out.
+	act := link.BotAction
+	if act != "decoy" && act != "notfound" && act != "blank" {
+		act = "notfound"
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"action": act, "url": link.DecoyURL})
+}
+
 const challengeTTL = 30 * time.Minute
 
 // How long the visitor must hold the button. Enforced on BOTH sides: the page
@@ -1080,6 +1210,87 @@ func (h *handler) challenge(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, back, http.StatusFound)
 }
+
+func writeDeepCheckPage(w http.ResponseWriter, slug string) {
+	exp := time.Now().Add(2 * time.Minute).Unix()
+	token := signLCheck(slug, exp)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, deepCheckHTML, template.JSEscapeString(slug), template.JSEscapeString(token))
+}
+
+// %[1]s = slug, %[2]s = lcheck token. The page collects a compact browser
+// fingerprint, posts it, and acts on the verdict. Everything is wrapped so a
+// quirky browser still submits *something* rather than hanging forever.
+const deepCheckHTML = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Just a moment…</title>
+<style>
+ :root{color-scheme:light}*{box-sizing:border-box}
+ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+   font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f7f8fa;color:#12151c}
+ .card{text-align:center;padding:28px}
+ .spin{width:34px;height:34px;margin:0 auto 14px;border:3px solid #e3e6ec;border-top-color:#2563eb;
+   border-radius:50%%;animation:s 0.8s linear infinite}
+ @keyframes s{to{transform:rotate(360deg)}}
+ .muted{color:#5a6272;font-size:13px}
+ a{color:#2563eb}
+</style></head>
+<body>
+<div class="card">
+  <div class="spin" id="sp"></div>
+  <div id="msg">Checking your browser…</div>
+  <div class="muted" id="sub">This takes a moment.</div>
+</div>
+<script>
+(function(){
+  var SLUG="%[1]s", TOKEN="%[2]s", done=false;
+  function fp(){
+    var n=navigator, sc=screen, o={flags:[]};
+    try{
+      o.webdriver=!!n.webdriver;
+      o.plugins=(n.plugins&&n.plugins.length)||0;
+      o.hw=n.hardwareConcurrency||0;
+      var ua=n.userAgent||"", lang=n.language||"";
+      if(o.webdriver) o.flags.push("webdriver");
+      if(!lang && !(n.languages&&n.languages.length)) o.flags.push("no_languages");
+      if(o.plugins===0 && /chrome/i.test(ua) && !/mobi|android|iphone|ipad/i.test(ua)) o.flags.push("no_plugins");
+      if(/chrome/i.test(ua) && !window.chrome) o.flags.push("no_chrome_object");
+      if(o.hw===0) o.flags.push("no_hardware_concurrency");
+      try{var c=document.createElement("canvas");if(!c.getContext("2d"))o.flags.push("no_canvas");}catch(e){o.flags.push("no_canvas");}
+    }catch(e){}
+    return o;
+  }
+  function fail(){
+    if(done)return; done=true;
+    document.getElementById("sp").style.display="none";
+    document.getElementById("msg").textContent="Couldn't verify your browser.";
+    document.getElementById("sub").innerHTML='<a href="javascript:location.reload()">Try again</a>';
+  }
+  function act(d){
+    if(done)return; done=true;
+    if(d.action==="go"){ location.reload(); return; }
+    if(d.action==="decoy" && d.url){ location.replace(d.url); return; }
+    if(d.action==="blank"){ document.documentElement.innerHTML=""; return; }
+    // notfound (and anything else)
+    document.getElementById("sp").style.display="none";
+    document.getElementById("msg").textContent="Not available.";
+    document.getElementById("sub").textContent="";
+  }
+  var t=setTimeout(fail, 8000);
+  try{
+    fetch("/v1/lcheck",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({slug:SLUG,token:TOKEN,fp:fp()})})
+      .then(function(r){return r.json();})
+      .then(function(d){clearTimeout(t);act(d);})
+      .catch(function(){clearTimeout(t);fail();});
+  }catch(e){clearTimeout(t);fail();}
+})();
+</script>
+</body></html>`
 
 func writeChallengePage(w http.ResponseWriter, slug, rawQuery, style string) {
 	iat := time.Now().Unix()

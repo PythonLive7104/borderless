@@ -199,7 +199,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, deep_check: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -259,7 +259,7 @@ function Links() {
     setErr("");
     setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, deep_check: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l) {
@@ -277,6 +277,7 @@ function Links() {
       forward_param_keys: l.forward_param_keys || "",
       block_vpn: !!l.block_vpn,
       block_datacenter: !!l.block_datacenter,
+      deep_check: !!l.deep_check,
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off",
       countries: l.countries || "",
@@ -313,6 +314,7 @@ function Links() {
       challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
       block_datacenter: form.block_datacenter,
+      deep_check: form.deep_check,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
       decoy_url: form.bot_action === "decoy" ? form.decoy_url.trim() : "",
@@ -522,6 +524,10 @@ function Links() {
             l.block_datacenter && !l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
               " · ",
               /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Datacenter blocked" })
+            ] }),
+            l.deep_check && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Browser check" })
             ] }),
             l.country_mode !== "off" && l.countries && /* @__PURE__ */ jsxs(Fragment, { children: [
               " · ",
@@ -774,6 +780,21 @@ function Links() {
         /* @__PURE__ */ jsxs("span", { children: [
           /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Block datacenter & hosting traffic" }),
           /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: "Recommended for paid ads. Turns away visitors coming from servers/hosting (AWS, Google Cloud, OVH…), where bots run — while still letting real people on a VPN through. Tick the box above instead if you want to block VPNs too." })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.deep_check ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: form.deep_check,
+            className: "mt-0.5",
+            onChange: (e) => setForm({ ...form, deep_check: e.target.checked })
+          }
+        ),
+        /* @__PURE__ */ jsxs("span", { children: [
+          /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Deep browser check" }),
+          /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: 'Shows a split-second "checking your browser…" screen before the redirect, to catch automated browsers real people never use. No clicking for the visitor. Strongest setting — adds about a second, so best for high-value campaigns.' })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [

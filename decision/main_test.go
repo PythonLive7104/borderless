@@ -1,6 +1,12 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
 
 func TestMergeQuery(t *testing.T) {
 	cases := []struct{ name, dest, raw, want string }{
@@ -97,5 +103,76 @@ func TestMergeQueryRealWorldFormats(t *testing.T) {
 	// Without an allow-list it still travels, but as a nonsense key.
 	if got := mergeQuery(dest, "rid-8842", nil); got != "https://form.example/s?rid-8842=" {
 		t.Errorf("malformed key passthrough: got %s", got)
+	}
+}
+
+func TestLCheckTokenRoundTrip(t *testing.T) {
+	slug := "abc123"
+	exp := time.Now().Add(time.Minute).Unix()
+	tok := signLCheck(slug, exp)
+	if !lcheckValid(slug, tok) {
+		t.Fatal("a freshly signed token should be valid")
+	}
+	if lcheckValid("other", tok) {
+		t.Fatal("token must not validate for a different slug")
+	}
+	if lcheckValid(slug, "garbage") || lcheckValid(slug, "") {
+		t.Fatal("malformed tokens must be rejected")
+	}
+	// tampered signature
+	if lcheckValid(slug, fmtSprintfExp(exp)+".deadbeef") {
+		t.Fatal("a wrong signature must be rejected")
+	}
+}
+
+func TestLCheckTokenExpiry(t *testing.T) {
+	slug := "x"
+	past := time.Now().Add(-time.Second).Unix()
+	if lcheckValid(slug, signLCheck(slug, past)) {
+		t.Fatal("an expired token must be rejected")
+	}
+}
+
+func TestClientBotSignals(t *testing.T) {
+	if wd, hl := clientBotSignals(nil); wd || hl {
+		t.Fatal("nil fingerprint should yield no signals")
+	}
+	if wd, _ := clientBotSignals(&FP{Webdriver: true}); !wd {
+		t.Fatal("webdriver flag should surface")
+	}
+	if _, hl := clientBotSignals(&FP{Flags: []string{"a"}}); hl {
+		t.Fatal("one flag should not be headless-like")
+	}
+	if _, hl := clientBotSignals(&FP{Flags: []string{"a", "b"}}); !hl {
+		t.Fatal("two+ flags should be headless-like")
+	}
+}
+
+func fmtSprintfExp(exp int64) string { return fmtInt(exp) }
+
+func fmtInt(v int64) string { return fmt.Sprintf("%d", v) }
+
+func TestDeepCheckPageRenders(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeDeepCheckPage(rec, "aB3xK9")
+	out := rec.Body.String()
+	if strings.Contains(out, "%!") {
+		t.Fatalf("template has an unescaped format verb: %s", out[:200])
+	}
+	if !strings.Contains(out, "aB3xK9") {
+		t.Fatal("page should embed the slug")
+	}
+	if !strings.Contains(out, "/v1/lcheck") {
+		t.Fatal("page should post to the verify endpoint")
+	}
+	// the embedded token must validate for this slug
+	i := strings.Index(out, "TOKEN=\"")
+	if i < 0 {
+		t.Fatal("no token in page")
+	}
+	rest := out[i+len("TOKEN=\""):]
+	tok := rest[:strings.IndexByte(rest, '"')]
+	if !lcheckValid("aB3xK9", tok) {
+		t.Fatalf("embedded token should validate; got %q", tok)
 	}
 }

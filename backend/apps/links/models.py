@@ -177,6 +177,12 @@ class ShortLink(models.Model):
     block_datacenter = models.BooleanField(
         default=False,
         help_text="Give datacenter/hosting visitors the bot handling (allows VPN).")
+    # Silent "checking your browser" step: runs a JS fingerprint before the
+    # redirect, catching real-browser automation that server-side signals miss.
+    # No user interaction, unlike the challenge.
+    deep_check = models.BooleanField(
+        default=False,
+        help_text="Run a silent browser check before redirecting (catches headless bots).")
 
     # Country gate. Expressed as a plain list rather than making the user build
     # a rule, because "only these countries" is the single most common thing an

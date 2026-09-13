@@ -1334,3 +1334,25 @@ class BlockDatacenterTest(TestCase):
         link = ShortLink.objects.create(organization=self.org, domain=_domain(),
                                         slug="dc2", destination_url="https://e.example")
         self.assertFalse(json.loads(_payload(link))["block_datacenter"])
+
+
+class DeepCheckTest(TestCase):
+    """The silent browser-check flag reaches the engine payload."""
+
+    def setUp(self):
+        self.org = _workspace("deep@example.com")
+
+    def test_flag_in_payload(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                        slug="dp1", destination_url="https://e.example",
+                                        deep_check=True)
+        self.assertTrue(json.loads(_payload(link))["deep_check"])
+
+    def test_default_off(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                        slug="dp2", destination_url="https://e.example")
+        self.assertFalse(json.loads(_payload(link))["deep_check"])
