@@ -120,6 +120,7 @@ const authApi = {
 const orgApi = {
   list: () => http.get("/organizations/"),
   create: (name) => http.post("/organizations/", { name }),
+  update: (id, patch) => http.patch(`/organizations/${id}/`, patch),
   members: (orgId) => http.get(`/organizations/${orgId}/members/`),
   invite: (orgId, email, role) => http.post(`/organizations/${orgId}/invitations/`, { email, role }),
   changeRole: (orgId, memberId, role) => http.patch(`/organizations/${orgId}/members/${memberId}/`, { role }),
@@ -1992,7 +1993,7 @@ const Campaigns = lazy(() => import("./assets/Campaigns-Q6xl3bae.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-BiHS8Cas.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-Bl5INGJf.js"));
 const Shield = lazy(() => import("./assets/Shield-DyK0fF8q.js"));
-const Links = lazy(() => import("./assets/Links-C5FL59Hm.js"));
+const Links = lazy(() => import("./assets/Links-CShkwFza.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-BVeod6fO.js"));
 const Visitors = lazy(() => import("./assets/Visitors-CXCEcu0C.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-D5GLziLZ.js"));

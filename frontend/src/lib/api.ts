@@ -132,12 +132,13 @@ export const authApi = {
 
 // ---- organizations ----
 export type Role = "owner" | "admin" | "analyst";
-export interface Organization { id: number; name: string; slug: string; role: Role; member_count: number; created_at: string; }
+export interface Organization { id: number; name: string; slug: string; role: Role; member_count: number; link_scan_optout: boolean; created_at: string; }
 export interface Member { id: number; email: string; first_name: string; last_name: string; role: Role; created_at: string; }
 
 export const orgApi = {
   list: () => http.get<{ results: Organization[] } | Organization[]>("/organizations/"),
   create: (name: string) => http.post<Organization>("/organizations/", { name }),
+  update: (id: number, patch: Partial<Organization>) => http.patch<Organization>(`/organizations/${id}/`, patch),
   members: (orgId: number) => http.get<{ results: Member[] }>(`/organizations/${orgId}/members/`),
   invite: (orgId: number, email: string, role: Role) =>
     http.post(`/organizations/${orgId}/invitations/`, { email, role }),

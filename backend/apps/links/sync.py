@@ -98,6 +98,7 @@ def scan_and_flag(link):
     except Exception:
         return
     threats = list(result.get("threats", []) or [])
+    flagged_by = list(result.get("flagged_by", []) or [])
     safe = result.get("safe")
     # A custom decoy is a second destination the link can serve, so it gets the
     # same scrutiny — otherwise it's an unscanned way to deliver a payload.
@@ -107,11 +108,29 @@ def scan_and_flag(link):
             if decoy.get("safe") is False:
                 safe = False
                 threats.extend(f"decoy:{t}" for t in (decoy.get("threats") or []))
+                flagged_by.extend(decoy.get("flagged_by", []) or [])
         except Exception:
             pass
     link.url_safe = safe
     link.url_threats = threats
     link.url_scanned_at = timezone.now()
-    if link.url_safe is False:
+    if link.url_safe is False and _should_disable(link, flagged_by):
         link.active = False  # kill malicious links automatically
     link.save(update_fields=["url_safe", "url_threats", "url_scanned_at", "active"])
+
+
+def _should_disable(link, flagged_by) -> bool:
+    """Whether a flagged destination auto-disables the link.
+
+    Default is strict: any flag disables. A workspace can opt out
+    (link_scan_optout) — then flagged links stay live — with one floor that no
+    opt-out can lift: a Google Safe Browsing hit on a SHARED domain always
+    disables, because that flag gets the whole shared domain blacklisted and
+    would take down every other customer's links, not just this owner's.
+    """
+    d = link.domain
+    own_private = bool(d and not d.is_shared and d.organization_id == link.organization_id)
+    sb_flagged = "google_safe_browsing" in flagged_by
+    if sb_flagged and not own_private:
+        return True  # protect the shared domain for everyone — non-negotiable
+    return not bool(getattr(link.organization, "link_scan_optout", False))

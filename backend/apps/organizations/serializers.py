@@ -8,7 +8,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Organization
-        fields = ["id", "name", "slug", "role", "member_count", "created_at"]
+        fields = ["id", "name", "slug", "role", "member_count", "link_scan_optout", "created_at"]
         read_only_fields = ["slug", "created_at"]
 
     def get_role(self, obj):

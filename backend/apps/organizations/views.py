@@ -39,6 +39,24 @@ class OrganizationListCreateView(generics.ListCreateAPIView):
         serializer.instance = org
 
 
+class OrganizationDetailView(generics.RetrieveUpdateAPIView):
+    """Read/update one workspace's settings (e.g. link_scan_optout). Managers
+    only — the safety opt-out is not something an analyst should flip."""
+    serializer_class = OrganizationSerializer
+    permission_classes = [IsAuthenticated, IsOrgManager]
+    lookup_url_kwarg = "org_id"
+
+    def get_queryset(self):
+        return Organization.objects.filter(
+            id__in=OrganizationMember.objects.filter(user=self.request.user)
+            .values_list("organization_id", flat=True))
+
+    def get_object(self):
+        org = super().get_object()
+        org._member = ensure_membership(self.request.user, org)
+        return org
+
+
 class MemberListView(generics.ListAPIView):
     serializer_class = MemberSerializer
     permission_classes = [IsOrgMember]

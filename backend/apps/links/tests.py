@@ -1173,3 +1173,55 @@ class DefangTest(TestCase):
         for raw in ("https://phish.example/login", "http://x.test"):
             self.assertNotIn("http://", _defang(raw))
             self.assertNotIn("https://", _defang(raw))
+
+
+class ScanOptoutPolicyTest(TestCase):
+    """The safety opt-out: flagged links stay live when a workspace opts out —
+    except a Google Safe Browsing hit on a SHARED domain, which always disables
+    to protect every other customer on that domain."""
+
+    def setUp(self):
+        self.org = _workspace("scan@optout.example")
+
+    def _domain(self, *, shared):
+        from django.utils import timezone
+        return ShortDomain.objects.create(
+            host=f"{'sh' if shared else 'pv'}{ShortDomain.objects.count()}.cc",
+            is_shared=shared,
+            organization=None if shared else self.org,
+            active=True, verified_at=timezone.now())
+
+    def _link(self, domain):
+        return ShortLink.objects.create(organization=self.org, domain=domain,
+                                        slug=f"s{ShortLink.objects.count()}",
+                                        destination_url="https://dest.example")
+
+    def _apply(self, link, flagged_by):
+        from apps.links.sync import _should_disable
+        return _should_disable(link, flagged_by)
+
+    def test_default_strict_disables_on_any_flag(self):
+        link = self._link(self._domain(shared=True))
+        self.assertTrue(self._apply(link, ["virustotal"]))
+        self.assertTrue(self._apply(link, ["google_safe_browsing"]))
+
+    def test_optout_keeps_vt_flags_live_on_shared(self):
+        self.org.link_scan_optout = True; self.org.save()
+        link = self._link(self._domain(shared=True))
+        self.assertFalse(self._apply(link, ["virustotal"]))
+
+    def test_optout_cannot_lift_safe_browsing_on_shared(self):
+        self.org.link_scan_optout = True; self.org.save()
+        link = self._link(self._domain(shared=True))
+        self.assertTrue(self._apply(link, ["google_safe_browsing"]))  # floor holds
+
+    def test_optout_fully_applies_on_private_domain(self):
+        self.org.link_scan_optout = True; self.org.save()
+        link = self._link(self._domain(shared=False))
+        # Even a Safe Browsing hit is honoured on the owner's own private domain.
+        self.assertFalse(self._apply(link, ["google_safe_browsing"]))
+        self.assertFalse(self._apply(link, ["virustotal"]))
+
+    def test_private_still_strict_without_optout(self):
+        link = self._link(self._domain(shared=False))
+        self.assertTrue(self._apply(link, ["google_safe_browsing"]))
