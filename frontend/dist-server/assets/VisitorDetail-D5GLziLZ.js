@@ -49,6 +49,7 @@ function VisitorDetail() {
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
               e.ja3 && /* @__PURE__ */ jsx("span", { title: `TLS/JA3: ${e.ja3}`, className: "hidden rounded bg-bg-mute px-1.5 py-0.5 font-mono text-[10px] text-fg-dim md:inline", children: "JA3" }),
+              e.ja4 && /* @__PURE__ */ jsx("span", { title: `TLS/JA4: ${e.ja4}`, className: "hidden rounded bg-bg-mute px-1.5 py-0.5 font-mono text-[10px] text-fg-dim md:inline", children: "JA4" }),
               (_a = e.fp_signals) == null ? void 0 : _a.slice(0, 2).map((s) => /* @__PURE__ */ jsx("span", { className: "hidden rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 sm:inline", children: s }, s)),
               /* @__PURE__ */ jsx(ClassBadge, { value: e.classification }),
               /* @__PURE__ */ jsxs("span", { className: "font-mono text-xs text-fg-dim", children: [

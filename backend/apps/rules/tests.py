@@ -125,6 +125,7 @@ class DeeperSignalFieldsTest(TestCase):
             ("isp", "contains", "amazon"), ("asn", "eq", "16509"),
             ("is_mobile", "eq", "1"), ("browser_version", "eq", "120"),
             ("os_version", "eq", "10"), ("language", "contains", "ru"),
+            ("ja4", "eq", "t13d1516h2_8daaf6152771_b186095e22b6"),
         ]:
             r = self.c.post("/api/rules/", {
                 "organization": self.org, "name": f"r-{field}", "priority": 10, "action": "review",

@@ -69,6 +69,7 @@ class TrafficEvent(models.Model):
     fingerprint = models.CharField(max_length=16, blank=True)
     fp_signals = models.JSONField(default=list, blank=True)  # client-side fingerprint flags
     ja3 = models.CharField(max_length=64, blank=True)  # TLS/JA3 fingerprint hash
+    ja4 = models.CharField(max_length=64, blank=True)  # TLS/JA4 fingerprint hash
 
     created_at = models.DateTimeField(db_index=True)
 

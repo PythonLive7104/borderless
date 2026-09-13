@@ -82,3 +82,19 @@ class VirusTotalThresholdTest(TestCase):
 
     def test_the_bar_is_configurable(self):
         self.assertFalse(self._scan(1, minimum=1)["safe"])
+
+
+class JA4BlocklistTest(TestCase):
+    """JA4 mirrors JA3: active rows rebuild the ja4:blocklist Redis set the
+    engine checks for the known_bad_ja4 signal."""
+
+    def test_sync_pushes_active_rows(self):
+        from apps.intelligence.models import JA4Block, sync_ja4_to_redis, JA4_REDIS_SET
+        from apps.intelligence.service import _r
+        JA4Block.objects.create(ja4="t13d1516h2_8daaf6152771_b186095e22b6", label="curl")
+        JA4Block.objects.create(ja4="t13d1516h2_deadbeef0000_cafebabe1111", active=False)
+        n = sync_ja4_to_redis()
+        self.assertEqual(n, 1)  # only the active row
+        r = _r()
+        self.assertTrue(r.sismember(JA4_REDIS_SET, "t13d1516h2_8daaf6152771_b186095e22b6"))
+        self.assertFalse(r.sismember(JA4_REDIS_SET, "t13d1516h2_deadbeef0000_cafebabe1111"))

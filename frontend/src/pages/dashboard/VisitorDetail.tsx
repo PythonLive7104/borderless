@@ -40,6 +40,7 @@ export default function VisitorDetail() {
                 </div>
                 <div className="flex items-center gap-2">
                   {e.ja3 && <span title={`TLS/JA3: ${e.ja3}`} className="hidden rounded bg-bg-mute px-1.5 py-0.5 font-mono text-[10px] text-fg-dim md:inline">JA3</span>}
+                  {e.ja4 && <span title={`TLS/JA4: ${e.ja4}`} className="hidden rounded bg-bg-mute px-1.5 py-0.5 font-mono text-[10px] text-fg-dim md:inline">JA4</span>}
                   {e.fp_signals?.slice(0, 2).map((s) => <span key={s} className="hidden rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 sm:inline">{s}</span>)}
                   <ClassBadge value={e.classification} />
                   <span className="font-mono text-xs text-fg-dim">risk {e.risk_score ?? "—"}</span>

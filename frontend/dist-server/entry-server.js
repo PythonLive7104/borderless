@@ -185,6 +185,7 @@ const RULE_FIELDS = [
   ["utm_campaign", "UTM campaign"],
   ["referrer", "Referrer"],
   ["ja3", "TLS/JA3 hash"],
+  ["ja4", "TLS/JA4 hash"],
   ["path", "URL path"]
 ];
 const RULE_OPS = [
@@ -1993,7 +1994,7 @@ const Shield = lazy(() => import("./assets/Shield-DyK0fF8q.js"));
 const Links = lazy(() => import("./assets/Links-C5FL59Hm.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-BVeod6fO.js"));
 const Visitors = lazy(() => import("./assets/Visitors-CXCEcu0C.js"));
-const VisitorDetail = lazy(() => import("./assets/VisitorDetail-Cf2YSF1h.js"));
+const VisitorDetail = lazy(() => import("./assets/VisitorDetail-D5GLziLZ.js"));
 const ClickLog = lazy(() => import("./assets/ClickLog-vpu5SbAM.js"));
 const TrafficSources = lazy(() => import("./assets/TrafficSources-CJy8Il9l.js"));
 const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));

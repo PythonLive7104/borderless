@@ -104,6 +104,7 @@ Celery was removed to save RAM, so these run from host cron:
 ```cron
 0 3 * * *   docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_retention
 0 * * * *   docker compose -f docker-compose.prod.yml exec -T backend python manage.py sync_ja3
+5 * * * *   docker compose -f docker-compose.prod.yml exec -T backend python manage.py sync_ja4
 15 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py rescan_links
 30 * * * *  docker compose -f docker-compose.prod.yml exec -T backend python manage.py enforce_access
 */10 * * * * docker compose -f docker-compose.prod.yml exec -T backend python manage.py reconcile_payments

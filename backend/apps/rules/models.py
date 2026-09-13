@@ -17,7 +17,7 @@ FIELD_CHOICES = [
     ("browser_version", "Browser version"), ("os_version", "OS version"),
     ("language", "Browser language"),
     ("utm_source", "UTM source"), ("utm_medium", "UTM medium"), ("utm_campaign", "UTM campaign"),
-    ("referrer", "Referrer"), ("ja3", "TLS/JA3 hash"), ("path", "URL path"),
+    ("referrer", "Referrer"), ("ja3", "TLS/JA3 hash"), ("ja4", "TLS/JA4 hash"), ("path", "URL path"),
 ]
 OP_CHOICES = [
     ("eq", "equals"), ("ne", "not equals"), ("gt", "greater than"), ("gte", "≥"),

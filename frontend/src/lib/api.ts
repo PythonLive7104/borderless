@@ -278,7 +278,7 @@ export const RULE_FIELDS = [
   ["is_mobile", "Mobile connection"], ["browser_version", "Browser version"],
   ["os_version", "OS version"], ["language", "Browser language"],
   ["utm_source", "UTM source"], ["utm_medium", "UTM medium"],
-  ["utm_campaign", "UTM campaign"], ["referrer", "Referrer"], ["ja3", "TLS/JA3 hash"],
+  ["utm_campaign", "UTM campaign"], ["referrer", "Referrer"], ["ja3", "TLS/JA3 hash"], ["ja4", "TLS/JA4 hash"],
   ["path", "URL path"],
 ] as const;
 // Plain-English operator labels (values stay the same for the engine).
@@ -357,7 +357,7 @@ export interface EventRow {
   id: number; type: string; visitor_ref: string; ip: string | null; country: string;
   device: string; browser: string; os: string; url: string; referrer: string;
   risk_score: number | null; classification: string; action: string; tag: string;
-  fingerprint: string; fp_signals: string[]; ja3: string; utm_campaign: string; website_name: string; created_at: string;
+  fingerprint: string; fp_signals: string[]; ja3: string; ja4: string; utm_campaign: string; website_name: string; created_at: string;
 }
 export interface SourceRow { key: string; events: number; human: number; quality: number; }
 

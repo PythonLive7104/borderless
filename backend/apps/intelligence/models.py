@@ -8,6 +8,7 @@ by staff — it benefits every workspace automatically.
 from django.db import models
 
 REDIS_SET = "ja3:blocklist"
+JA4_REDIS_SET = "ja4:blocklist"
 
 
 class JA3Block(models.Model):
@@ -32,5 +33,35 @@ def sync_to_redis():
     pipe.delete(REDIS_SET)
     if hashes:
         pipe.sadd(REDIS_SET, *hashes)
+    pipe.execute()
+    return len(hashes)
+
+
+class JA4Block(models.Model):
+    """The JA4 counterpart to JA3Block. JA4 is the newer TLS fingerprint —
+    harder to spoof and more granular — so it deserves its own blocklist synced
+    to `ja4:blocklist`, which the engine checks for the `known_bad_ja4` signal.
+    """
+    ja4 = models.CharField(max_length=64, unique=True, help_text="JA4 fingerprint hash")
+    label = models.CharField(max_length=120, blank=True, help_text="What client this belongs to")
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.ja4} ({self.label or 'unlabeled'})"
+
+
+def sync_ja4_to_redis():
+    """Rebuild the Redis ja4:blocklist set from active rows."""
+    from apps.intelligence.service import _r
+    r = _r()
+    hashes = list(JA4Block.objects.filter(active=True).values_list("ja4", flat=True))
+    pipe = r.pipeline()
+    pipe.delete(JA4_REDIS_SET)
+    if hashes:
+        pipe.sadd(JA4_REDIS_SET, *hashes)
     pipe.execute()
     return len(hashes)

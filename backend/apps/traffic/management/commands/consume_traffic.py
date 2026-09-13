@@ -135,6 +135,7 @@ class Command(BaseCommand):
             fingerprint=f.get("fingerprint", ""),
             fp_signals=[x for x in (f.get("fp_flags", "") or "").split(",") if x],
             ja3=f.get("ja3", "") or "",
+            ja4=f.get("ja4", "") or "",
             created_at=ts,
         )
         # IP intelligence enrichment (populates shared sets + adjusts this event)

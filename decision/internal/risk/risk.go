@@ -22,6 +22,7 @@ const (
 	wNoFingerprint   = 15
 	wAbnormalRate    = 20
 	wKnownBadJA3     = 35
+	wKnownBadJA4     = 35
 )
 
 type Input struct {
@@ -34,6 +35,7 @@ type Input struct {
 	NoFingerprint bool // no JS fingerprint received (non-browser client)
 	AbnormalRate  bool
 	BadJA3        bool // TLS JA3 hash matches a known bad-client fingerprint
+	BadJA4        bool // TLS JA4 hash matches a known bad-client fingerprint
 }
 
 func Evaluate(in Input) Result {
@@ -67,6 +69,9 @@ func Evaluate(in Input) Result {
 	}
 	if in.BadJA3 {
 		add(wKnownBadJA3, "known_bad_ja3")
+	}
+	if in.BadJA4 {
+		add(wKnownBadJA4, "known_bad_ja4")
 	}
 	if score > 100 {
 		score = 100

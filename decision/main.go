@@ -64,6 +64,7 @@ type DecidePayload struct {
 	IP       string `json:"ip"`
 	UA       string `json:"ua"`
 	JA3      string `json:"ja3"`
+	JA4      string `json:"ja4"`
 	Country  string `json:"country"`
 	Referrer string `json:"referrer"`
 	Path     string `json:"path"`
@@ -162,6 +163,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	// TLS/JA3 fingerprint is supplied by a TLS-terminating upstream (Cloudflare,
 	// or an Nginx/HAProxy JA3 module). Empty in plain-HTTP dev unless injected.
 	ja3 := firstHeader(r, "CF-JA3-Hash", "X-JA3-Hash", "X-JA3")
+	ja4 := firstHeader(r, "CF-JA4", "X-JA4-Hash", "X-JA4")
 
 	// --- risk scoring (Phase 6) ---
 	rctx, rcancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
@@ -190,6 +192,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		NoFingerprint: noFP,
 		AbnormalRate:  rate > 20, // >20 events/min from one visitor
 		BadJA3:        ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
+		BadJA4:        ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
 	})
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
@@ -220,6 +223,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 			"utm_campaign":    p.UTMCampaign,
 			"referrer":        p.Referrer,
 			"ja3":             ja3,
+			"ja4":             ja4,
 			"path":            urlPath(p.URL),
 		},
 	})
@@ -268,6 +272,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		"fingerprint":    fpHash,
 		"fp_flags":       fpFlags,
 		"ja3":            ja3,
+		"ja4":            ja4,
 		"action":         action,
 		"tag":            tag,
 		"redirect_url":   redirect,
@@ -313,7 +318,7 @@ func (h *handler) orgForKey(ctx context.Context, rawKey string) string {
 
 // score runs the same risk + rules + IP-filter pipeline the JS path uses, but
 // from server-side signals only, and records the check to the traffic stream.
-func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, referrer, path string) scoreResult {
+func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, referrer, path string) scoreResult {
 	fp := fingerprint.FromValues(ip, ua, country)
 	if fp.Country == "" {
 		fp.Country = geo.Country(fp.IP)
@@ -327,6 +332,7 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 		NoFingerprint: false,
 		AbnormalRate:  rate > 40,
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
 	})
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	intel := h.knownIntel(ctx, fp.IP)
@@ -353,6 +359,7 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 			"language":        fp.Language,
 			"referrer":        referrer,
 			"ja3":             ja3,
+			"ja4":             ja4,
 			"path":            urlPath(path),
 		},
 	})
@@ -377,7 +384,8 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, country, refer
 		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
 		"risk_score": result.Score, "classification": result.Classification,
 		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
-		"ja3": ja3, "action": action, "tag": tag, "redirect_url": redirect,
+		"ja3": ja3,
+		"ja4": ja4, "action": action, "tag": tag, "redirect_url": redirect,
 	})
 	verdict := "allow"
 	if action == "block" {
@@ -429,7 +437,7 @@ func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
 	if ip == "" {
 		ip = firstHeader(r, "X-Forwarded-For", "X-Real-IP")
 	}
-	sr := h.score(ctx, p.SiteID, ip, p.UA, p.JA3, p.Country, p.Referrer, p.Path)
+	sr := h.score(ctx, p.SiteID, ip, p.UA, p.JA3, p.JA4, p.Country, p.Referrer, p.Path)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"action": sr.Action, "redirect": sr.Redirect,
 		"classification": sr.Classification, "risk_score": sr.Score, "reason": sr.Reason,
@@ -463,6 +471,7 @@ func (h *handler) guard(w http.ResponseWriter, r *http.Request) {
 		firstHeader(r, "X-TA-IP", "X-Real-IP", "X-Forwarded-For"),
 		r.Header.Get("X-TA-UA"),
 		firstHeader(r, "X-TA-JA3", "CF-JA3-Hash"),
+		firstHeader(r, "X-TA-JA4", "CF-JA4"),
 		"", r.Header.Get("X-TA-Referrer"), r.Header.Get("X-TA-Path"))
 	switch sr.Action {
 	case "block":
@@ -539,6 +548,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		fp.Country = geo.Country(fp.IP)
 	}
 	ja3 := firstHeader(r, "CF-JA3-Hash", "X-JA3-Hash", "X-JA3")
+	ja4 := firstHeader(r, "CF-JA4", "X-JA4-Hash", "X-JA4")
 	rate := h.st.RateIncr(ctx, "lrate:"+slug+":"+fp.IP, time.Minute)
 	result := risk.Evaluate(risk.Input{
 		KnownBot:      fp.IsBot,
@@ -548,6 +558,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		NoFingerprint: false,
 		AbnormalRate:  rate > 40,
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
 	})
 
 	// A link filters more eagerly than a page: known-bot UAs, automation tools,
@@ -650,6 +661,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 				"os_version":      fp.OSVersion,
 				"language":        fp.Language,
 				"ja3":             ja3,
+				"ja4":             ja4,
 			},
 		})
 		if link.TID != "" {
@@ -687,7 +699,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
 		"risk_score": result.Score, "classification": result.Classification,
 		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
-		"ja3": ja3, "action": mode, "tag": "", "redirect_url": "",
+		"ja3": ja3,
+		"ja4": ja4, "action": mode, "tag": "", "redirect_url": "",
 	})
 
 	switch mode {

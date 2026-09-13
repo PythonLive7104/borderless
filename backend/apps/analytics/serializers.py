@@ -11,7 +11,7 @@ class EventSerializer(serializers.ModelSerializer):
         model = TrafficEvent
         fields = ["id", "type", "visitor_ref", "ip", "country", "device", "browser", "os",
                   "url", "referrer", "risk_score", "classification", "action", "tag",
-                  "fingerprint", "fp_signals", "ja3", "utm_campaign", "website_name", "created_at"]
+                  "fingerprint", "fp_signals", "ja3", "ja4", "utm_campaign", "website_name", "created_at"]
 
 
 class VisitorSerializer(serializers.ModelSerializer):
