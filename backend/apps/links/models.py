@@ -172,6 +172,11 @@ class ShortLink(models.Model):
     block_vpn = models.BooleanField(
         default=False,
         help_text="Give VPN, proxy and datacenter/RDP visitors the bot handling.")
+    # Lighter than block_vpn: turns away only datacenter/hosting traffic (where
+    # bots run) while still letting privacy-VPN real people through.
+    block_datacenter = models.BooleanField(
+        default=False,
+        help_text="Give datacenter/hosting visitors the bot handling (allows VPN).")
 
     # Country gate. Expressed as a plain list rather than making the user build
     # a rule, because "only these countries" is the single most common thing an

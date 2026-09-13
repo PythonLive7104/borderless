@@ -199,7 +199,7 @@ function Links() {
   const [sites, setSites] = useState([]);
   const [sub, setSub] = useState(null);
   const [form, setForm] = useState(
-    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
+    { destination_url: "", title: "", slug: "", bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, domain: "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 }
   );
   const canManage = (current == null ? void 0 : current.role) === "owner" || (current == null ? void 0 : current.role) === "admin";
   const serviceUp = linkBase !== "";
@@ -259,7 +259,7 @@ function Links() {
     setErr("");
     setEditing(null);
     const def = domains.find((d) => d.is_default) || domains[0];
-    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
+    setForm({ destination_url: "", title: "", slug: randSlug(), bot_action: "decoy", website: "", challenge: false, challenge_style: "hold", forward_params: false, forward_param_keys: "", block_vpn: false, block_datacenter: false, domain: def ? String(def.id) : "", country_mode: "off", countries: "", decoy_url: "", device_mode: "off", devices: "", os_mode: "off", operating_systems: "", max_risk: 0 });
     setOpen(true);
   }
   function openEdit(l) {
@@ -276,6 +276,7 @@ function Links() {
       forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "",
       block_vpn: !!l.block_vpn,
+      block_datacenter: !!l.block_datacenter,
       domain: l.domain ? String(l.domain) : "",
       country_mode: l.country_mode || "off",
       countries: l.countries || "",
@@ -311,6 +312,7 @@ function Links() {
       challenge: form.challenge,
       challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
+      block_datacenter: form.block_datacenter,
       country_mode: form.country_mode,
       countries: form.country_mode === "off" ? "" : form.countries.trim(),
       decoy_url: form.bot_action === "decoy" ? form.decoy_url.trim() : "",
@@ -516,6 +518,10 @@ function Links() {
             l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
               " · ",
               /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
+            ] }),
+            l.block_datacenter && !l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
+              " · ",
+              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Datacenter blocked" })
             ] }),
             l.country_mode !== "off" && l.countries && /* @__PURE__ */ jsxs(Fragment, { children: [
               " · ",
@@ -753,6 +759,21 @@ function Links() {
         /* @__PURE__ */ jsxs("span", { children: [
           /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Block VPN, proxy and RDP traffic" }),
           /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: "Visitors on a VPN, proxy, Tor, or a datacenter/RDP connection get the bot handling above instead of your destination — they're never told why. Useful when you're paying for ad clicks and don't want to pay for masked traffic." })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.block_datacenter ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: form.block_datacenter,
+            className: "mt-0.5",
+            onChange: (e) => setForm({ ...form, block_datacenter: e.target.checked })
+          }
+        ),
+        /* @__PURE__ */ jsxs("span", { children: [
+          /* @__PURE__ */ jsx("span", { className: "block text-sm font-semibold", children: "Block datacenter & hosting traffic" }),
+          /* @__PURE__ */ jsx("span", { className: "block text-xs text-fg-muted", children: "Recommended for paid ads. Turns away visitors coming from servers/hosting (AWS, Google Cloud, OVH…), where bots run — while still letting real people on a VPN through. Tick the box above instead if you want to block VPNs too." })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("label", { className: `flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`, children: [

@@ -190,6 +190,7 @@ export interface ShortLink {
   forward_params: boolean;
   forward_param_keys: string;
   block_vpn: boolean;
+  block_datacenter: boolean;
   country_mode: "off" | "allow" | "block";
   countries: string;
   decoy_url: string;

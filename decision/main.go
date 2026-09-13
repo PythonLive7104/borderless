@@ -538,6 +538,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		ForwardQS      bool     `json:"forward_params"`
 		ForwardKeys    []string `json:"forward_keys"`
 		BlockVPN       bool     `json:"block_vpn"`
+		BlockDatacenter bool    `json:"block_datacenter"`
 		CountryMode    string   `json:"country_mode"` // off | allow | block
 		Countries      []string `json:"countries"`
 		DeviceMode     string   `json:"device_mode"`
@@ -635,7 +636,8 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// hard 403 so the visitor sees the same decoy or 404 as any other bot and
 	// isn't told what gave them away. "Send them through too" is not a sensible
 	// outcome for someone who explicitly asked to block these, so fall back to a 404.
-	if link.BlockVPN && linkIntel.flagged() {
+	if (link.BlockVPN && linkIntel.flagged()) ||
+		(link.BlockDatacenter && linkIntel.Datacenter) {
 		isBot = true
 		switch link.BotAction {
 		case "decoy", "notfound", "blank":

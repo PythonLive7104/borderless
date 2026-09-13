@@ -1309,3 +1309,28 @@ class PerLinkScanOptoutTest(TestCase):
         from apps.links.sync import _should_disable
         link = self._link(self._domain(shared=False), scan_optout=False)
         self.assertTrue(_should_disable(link, ["virustotal"]))
+
+
+class BlockDatacenterTest(TestCase):
+    """The one-click datacenter block: a lighter alternative to block_vpn that
+    reaches the engine payload."""
+
+    def setUp(self):
+        self.org = _workspace("dc@example.com")
+
+    def test_flag_travels_in_the_payload(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                        slug="dc1", destination_url="https://e.example",
+                                        block_datacenter=True)
+        p = json.loads(_payload(link))
+        self.assertTrue(p["block_datacenter"])
+        self.assertFalse(p["block_vpn"])
+
+    def test_default_is_off(self):
+        import json
+        from apps.links.sync import _payload
+        link = ShortLink.objects.create(organization=self.org, domain=_domain(),
+                                        slug="dc2", destination_url="https://e.example")
+        self.assertFalse(json.loads(_payload(link))["block_datacenter"])

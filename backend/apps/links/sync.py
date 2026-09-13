@@ -28,6 +28,7 @@ def _payload(link) -> str:
         "forward_params": bool(link.forward_params),
         "forward_keys": link.forward_keys(),
         "block_vpn": bool(link.block_vpn),
+        "block_datacenter": bool(link.block_datacenter),
         "country_mode": link.country_mode or "off",
         "countries": link.country_list(),
         "device_mode": link.device_mode or "off",
