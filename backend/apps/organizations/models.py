@@ -1,6 +1,6 @@
 import secrets
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils.text import slugify
 
 
@@ -74,7 +74,23 @@ class Invitation(models.Model):
 
 
 def create_workspace(user, name: str) -> Organization:
-    """Create an organization and add the user as its owner."""
-    org = Organization.objects.create(name=name, owner=user)
-    OrganizationMember.objects.create(organization=org, user=user, role=Role.OWNER)
+    """Create an organization and add the user as its owner. Atomic, so we can
+    never end up with an org whose owner has no membership row — the drift that
+    locked owners out of their own workspace with "not a member"."""
+    with transaction.atomic():
+        org = Organization.objects.create(name=name, owner=user)
+        OrganizationMember.objects.create(organization=org, user=user, role=Role.OWNER)
     return org
+
+
+def ensure_membership(user, org):
+    """Return the user's membership for org, self-healing the owner's row if it
+    drifted missing. Returns None for a genuine non-member."""
+    m = OrganizationMember.objects.filter(organization=org, user=user).first()
+    if m:
+        return m
+    if org.owner_id == user.id:
+        m, _ = OrganizationMember.objects.get_or_create(
+            organization=org, user=user, defaults={"role": Role.OWNER})
+        return m
+    return None

@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 
 from .models import (
     Organization, OrganizationMember, Invitation, Role, create_workspace,
+    ensure_membership,
 )
 from .permissions import IsOrgMember, IsOrgManager, membership
 from .serializers import (
@@ -21,6 +22,10 @@ class OrganizationListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Heal any workspace this user owns but has no membership row for, so a
+        # drifted owner is never invisible in their own switcher.
+        for org in Organization.objects.filter(owner=self.request.user):
+            ensure_membership(self.request.user, org)
         members = {m.organization_id: m for m in
                    OrganizationMember.objects.filter(user=self.request.user).select_related("organization")}
         orgs = list(Organization.objects.filter(id__in=members.keys()))

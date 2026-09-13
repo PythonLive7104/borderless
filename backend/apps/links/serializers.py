@@ -34,8 +34,9 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         return round(obj.human_clicks / obj.clicks, 4) if obj.clicks else 0.0
 
     def validate_organization(self, org):
+        from apps.organizations.models import ensure_membership
         user = self.context["request"].user
-        m = OrganizationMember.objects.filter(organization=org, user=user).first()
+        m = ensure_membership(user, org)
         if not m:
             raise serializers.ValidationError("You are not a member of this workspace.")
         if not m.can_manage:

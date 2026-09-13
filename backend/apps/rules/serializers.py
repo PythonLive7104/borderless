@@ -20,7 +20,8 @@ class RuleSerializer(serializers.ModelSerializer):
 
     def validate_organization(self, org):
         user = self.context["request"].user
-        m = OrganizationMember.objects.filter(organization=org, user=user).first()
+        from apps.organizations.models import ensure_membership
+        m = ensure_membership(user, org)
         if not m:
             raise serializers.ValidationError("You are not a member of this workspace.")
         if not m.can_manage:
@@ -75,7 +76,8 @@ class IPListEntrySerializer(serializers.ModelSerializer):
 
     def validate_organization(self, org):
         user = self.context["request"].user
-        m = OrganizationMember.objects.filter(organization=org, user=user).first()
+        from apps.organizations.models import ensure_membership
+        m = ensure_membership(user, org)
         if not m:
             raise serializers.ValidationError("You are not a member of this workspace.")
         if not m.can_manage:
