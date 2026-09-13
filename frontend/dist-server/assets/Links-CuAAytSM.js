@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
-import { d as useDialog, c as useWorkspace, z as linkApi, B as Button, y as websiteApi, e as billingApi, o as orgApi } from "../entry-server.js";
+import { d as useDialog, c as useWorkspace, z as linkApi, B as Button, y as websiteApi, e as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
@@ -177,57 +177,14 @@ function LockedBanner({ planName, canManage }) {
 }
 function threatSource(threats) {
   const t = (threats || []).join(" ").toLowerCase();
-  const parts = [];
-  if (t.includes("social_engineering") || t.includes("malware") || t.includes("unwanted") || t.includes("harmful")) parts.push("Google Safe Browsing");
-  if (t.includes("virustotal")) parts.push("VirusTotal");
-  return parts.join(" + ") || "our security scan";
+  if (t.includes("social_engineering") || t.includes("malware") || t.includes("unwanted") || t.includes("harmful")) return "Google";
+  return "Our safety check";
 }
 const BOT_LABEL = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
-function SafetyScanToggle({ org, onChanged }) {
-  const [busy, setBusy] = useState(false);
-  const optout = !!org.link_scan_optout;
-  const { notify } = useDialog();
-  async function toggle() {
-    setBusy(true);
-    try {
-      await orgApi.update(org.id, { link_scan_optout: !optout });
-      await onChanged();
-      notify(optout ? "Auto-disable turned back on." : "Auto-disable turned off for your redirects.");
-    } catch {
-      notify("Could not change that setting.", "danger");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-5 flex flex-wrap items-start justify-between gap-3 p-5", children: [
-    /* @__PURE__ */ jsxs("div", { className: "min-w-0 max-w-2xl", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "Destination safety scan" }),
-      /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "We scan each redirect's destination for malware and phishing. By default a flagged link is switched off automatically. Turn that off to keep flagged links running — useful when a scanner false-flags your pages." }),
-      /* @__PURE__ */ jsxs("p", { className: "mt-1 text-xs text-fg-dim", children: [
-        "For your safety and everyone else's, a link confirmed as phishing/malware by Google on a",
-        /* @__PURE__ */ jsx("b", { children: " shared" }),
-        " domain is always disabled — that flag blacklists the whole domain. On your own ",
-        /* @__PURE__ */ jsx("b", { children: "private" }),
-        " domain, this setting is fully honoured."
-      ] })
-    ] }),
-    /* @__PURE__ */ jsx(
-      "button",
-      {
-        onClick: toggle,
-        disabled: busy,
-        role: "switch",
-        "aria-checked": !optout,
-        className: `mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${optout ? "bg-bg-mute" : "bg-brand"}`,
-        children: /* @__PURE__ */ jsx("span", { className: `inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${optout ? "translate-x-0.5" : "translate-x-[22px]"}` })
-      }
-    )
-  ] });
-}
 function Links() {
   var _a, _b, _c;
   const { confirm, notify } = useDialog();
-  const { current, reload: reloadWorkspace } = useWorkspace();
+  const { current } = useWorkspace();
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -463,7 +420,6 @@ function Links() {
         onChanged: load
       }
     ),
-    linkEnabled && current && canManage && /* @__PURE__ */ jsx(SafetyScanToggle, { org: current, onChanged: reloadWorkspace }),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !serviceUp ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl", children: "⏸️" }),
       /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirects are paused" }),
@@ -513,8 +469,8 @@ function Links() {
         /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
           /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
             /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
-            l.url_safe === false && !l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Unsafe — disabled" }),
-            l.url_safe === false && l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "Flagged — kept live" }),
+            l.url_safe === false && !l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Switched off" }),
+            l.url_safe === false && l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "Safety warning" }),
             !l.active && l.url_safe !== false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
           ] }),
           /* @__PURE__ */ jsxs(
@@ -533,17 +489,16 @@ function Links() {
             l.destination_url
           ] }),
           l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: `mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`, children: [
-            "Flagged by ",
             threatSource(l.url_threats),
-            ".",
+            " thinks this page may not be safe.",
             " ",
-            l.active ? "Kept live because you chose to keep flagged links running." : "Switch on “Keep live” if you’re sure the page is safe.",
+            l.active ? "You're keeping this link on." : "This link is off for now.",
             canManage && /* @__PURE__ */ jsx(
               "button",
               {
                 onClick: () => toggleScanOptout(l),
-                className: "ml-2 inline-flex items-center gap-1 font-semibold underline hover:no-underline",
-                children: l.scan_optout ? "Turn off keep-live" : "Keep live"
+                className: "ml-2 font-semibold underline hover:no-underline",
+                children: l.scan_optout ? "Turn it off" : "Keep it on anyway"
               }
             )
           ] }),

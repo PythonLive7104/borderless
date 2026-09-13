@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import HelpVideo from "../../components/dashboard/HelpVideo";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { linkApi, websiteApi, billingApi, orgApi, type ChallengeStyle, type PrivateDomains, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
+import { linkApi, websiteApi, billingApi, type ChallengeStyle, type PrivateDomains, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
@@ -178,58 +178,20 @@ function LockedBanner({ planName, canManage }: { planName?: string; canManage: b
   );
 }
 
-// Turn stored threat keys into a short, honest source label so the user can
-// tell a real Google flag from VirusTotal noise.
+// Plain-word source so a non-technical user still gets the seriousness:
+// Google is the strong signal; everything else is a softer safety check.
 function threatSource(threats: string[]): string {
   const t = (threats || []).join(" ").toLowerCase();
-  const parts: string[] = [];
   if (t.includes("social_engineering") || t.includes("malware") ||
-      t.includes("unwanted") || t.includes("harmful")) parts.push("Google Safe Browsing");
-  if (t.includes("virustotal")) parts.push("VirusTotal");
-  return parts.join(" + ") || "our security scan";
+      t.includes("unwanted") || t.includes("harmful")) return "Google";
+  return "Our safety check";
 }
 
 const BOT_LABEL: Record<BotAction, string> = { decoy: "Decoy page", notfound: "404", blank: "Blank page", off: "No filtering" };
 
-function SafetyScanToggle({ org, onChanged }: { org: any; onChanged: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const optout = !!org.link_scan_optout;
-  const { notify } = useDialog();
-  async function toggle() {
-    setBusy(true);
-    try {
-      await orgApi.update(org.id, { link_scan_optout: !optout });
-      await onChanged();
-      notify(optout ? "Auto-disable turned back on." : "Auto-disable turned off for your redirects.");
-    } catch { notify("Could not change that setting.", "danger"); }
-    finally { setBusy(false); }
-  }
-  return (
-    <div className="card shadow-soft mt-5 flex flex-wrap items-start justify-between gap-3 p-5">
-      <div className="min-w-0 max-w-2xl">
-        <div className="text-sm font-bold">Destination safety scan</div>
-        <p className="mt-1 text-sm text-fg-muted">
-          We scan each redirect's destination for malware and phishing. By default a flagged
-          link is switched off automatically. Turn that off to keep flagged links running —
-          useful when a scanner false-flags your pages.
-        </p>
-        <p className="mt-1 text-xs text-fg-dim">
-          For your safety and everyone else's, a link confirmed as phishing/malware by Google on a
-          <b> shared</b> domain is always disabled — that flag blacklists the whole domain. On your
-          own <b>private</b> domain, this setting is fully honoured.
-        </p>
-      </div>
-      <button onClick={toggle} disabled={busy} role="switch" aria-checked={!optout}
-        className={`mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${optout ? "bg-bg-mute" : "bg-brand"}`}>
-        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${optout ? "translate-x-0.5" : "translate-x-[22px]"}`} />
-      </button>
-    </div>
-  );
-}
-
 export default function Links() {
   const { confirm, notify } = useDialog();
-  const { current, reload: reloadWorkspace } = useWorkspace();
+  const { current } = useWorkspace();
   const navigate = useNavigate();
   const [rows, setRows] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -448,9 +410,6 @@ export default function Links() {
       {linkEnabled && current && <PrivateDomainPanel priv={priv} canManage={canManage}
         orgId={current.id} onChanged={load} />}
 
-      {linkEnabled && current && canManage && (
-        <SafetyScanToggle org={current} onChanged={reloadWorkspace} />
-      )}
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : !serviceUp ? (
@@ -501,8 +460,8 @@ export default function Links() {
                 <div className="min-w-0 flex-1 basis-64">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="min-w-0 break-all font-bold">{l.title || l.slug}</span>
-                    {l.url_safe === false && !l.active && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Unsafe — disabled</span>}
-                    {l.url_safe === false && l.active && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700">Flagged — kept live</span>}
+                    {l.url_safe === false && !l.active && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Switched off</span>}
+                    {l.url_safe === false && l.active && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700">Safety warning</span>}
                     {!l.active && l.url_safe !== false && <span className="rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim">Paused</span>}
                   </div>
                   <button onClick={() => copy(l)}
@@ -513,14 +472,14 @@ export default function Links() {
                   <div className="mt-1 min-w-0 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
                   {l.url_safe === false && (
                     <div className={`mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`}>
-                      Flagged by {threatSource(l.url_threats)}.{" "}
+                      {threatSource(l.url_threats)} thinks this page may not be safe.{" "}
                       {l.active
-                        ? "Kept live because you chose to keep flagged links running."
-                        : "Switch on “Keep live” if you’re sure the page is safe."}
+                        ? "You're keeping this link on."
+                        : "This link is off for now."}
                       {canManage && (
                         <button onClick={() => toggleScanOptout(l)}
-                          className="ml-2 inline-flex items-center gap-1 font-semibold underline hover:no-underline">
-                          {l.scan_optout ? "Turn off keep-live" : "Keep live"}
+                          className="ml-2 font-semibold underline hover:no-underline">
+                          {l.scan_optout ? "Turn it off" : "Keep it on anyway"}
                         </button>
                       )}
                     </div>
