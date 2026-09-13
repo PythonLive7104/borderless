@@ -473,9 +473,11 @@ function Links() {
         /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
           /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
             /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
-            l.url_safe === false && !l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Switched off" }),
-            l.url_safe === false && l.active && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "Safety warning" }),
-            !l.active && l.url_safe !== false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" })
+            l.active ? /* @__PURE__ */ jsxs("span", { className: "inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700", children: [
+              /* @__PURE__ */ jsx("span", { className: "h-1.5 w-1.5 rounded-full bg-success" }),
+              " Live"
+            ] }) : l.url_safe === false ? /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Off · flagged unsafe" }) : /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" }),
+            l.active && l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "⚠ safety warning" })
           ] }),
           /* @__PURE__ */ jsxs(
             "button",
@@ -567,15 +569,18 @@ function Links() {
             /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "bot" })
           ] }),
           canManage && /* @__PURE__ */ jsxs(Fragment, { children: [
-            /* @__PURE__ */ jsx(
-              "button",
-              {
-                onClick: () => toggle(l),
-                title: l.active ? "Active — click to pause" : "Paused — click to activate",
-                className: `h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`,
-                children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
-              }
-            ),
+            /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center gap-0.5", children: [
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  onClick: () => toggle(l),
+                  title: l.active ? "Live — click to pause" : "Paused — click to make live",
+                  className: `h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`,
+                  children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
+                }
+              ),
+              /* @__PURE__ */ jsx("span", { className: "text-[10px] font-semibold text-fg-dim", children: l.active ? "Live" : "Off" })
+            ] }),
             /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
             /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
           ] })

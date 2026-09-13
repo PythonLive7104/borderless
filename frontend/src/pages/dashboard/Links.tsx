@@ -462,9 +462,12 @@ export default function Links() {
                 <div className="min-w-0 flex-1 basis-64">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="min-w-0 break-all font-bold">{l.title || l.slug}</span>
-                    {l.url_safe === false && !l.active && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Switched off</span>}
-                    {l.url_safe === false && l.active && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700">Safety warning</span>}
-                    {!l.active && l.url_safe !== false && <span className="rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim">Paused</span>}
+                    {l.active
+                      ? <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-success" /> Live</span>
+                      : l.url_safe === false
+                        ? <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600">Off · flagged unsafe</span>
+                        : <span className="rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim">Paused</span>}
+                    {l.active && l.url_safe === false && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700">⚠ safety warning</span>}
                   </div>
                   <button onClick={() => copy(l)}
                     className="mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline">
@@ -506,10 +509,13 @@ export default function Links() {
                   <div className="text-center"><div className="font-bold tabular-nums text-red-500">{l.bot_clicks}</div><div className="text-[11px] text-fg-dim">bot</div></div>
                   {canManage && (
                     <>
-                      <button onClick={() => toggle(l)} title={l.active ? "Active — click to pause" : "Paused — click to activate"}
-                        className={`h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`}>
-                        <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}`} />
-                      </button>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <button onClick={() => toggle(l)} title={l.active ? "Live — click to pause" : "Paused — click to make live"}
+                          className={`h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`}>
+                          <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}`} />
+                        </button>
+                        <span className="text-[10px] font-semibold text-fg-dim">{l.active ? "Live" : "Off"}</span>
+                      </div>
                       <button onClick={() => openEdit(l)} className="text-brand hover:underline">Edit</button>
                       <button onClick={() => remove(l.id)} className="text-red-500 hover:underline">Delete</button>
                     </>
