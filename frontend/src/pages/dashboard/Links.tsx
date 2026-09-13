@@ -489,19 +489,27 @@ export default function Links() {
                       )}
                     </div>
                   )}
-                  <div className="mt-1 text-xs text-fg-dim">
-                    Bots get: <b className="text-fg-muted">{BOT_LABEL[l.bot_action]}</b>
-                    {l.website && <> · Rules: <b className="text-fg-muted">{siteName(l.website) || "a website"}</b></>}
-                    {domains.length > 1 && l.domain_host && <> · <b className="text-fg-muted">{l.domain_host}</b></>}
-                    {l.block_vpn && <> · <b className="text-fg-muted">VPN/RDP blocked</b></>}
-                    {l.block_datacenter && !l.block_vpn && <> · <b className="text-fg-muted">Datacenter blocked</b></>}
-                    {l.deep_check && <> · <b className="text-fg-muted">Browser check</b></>}
-                    {l.country_mode !== "off" && l.countries && <> · <b className="text-fg-muted">
-                      {l.country_mode === "allow" ? "Only" : "Not"} {l.countries}</b></>}
-                    {l.challenge && <> · <b className="text-fg-muted">Human check: {CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))?.label}</b></>}
-                    {l.forward_params && <> · <b className="text-fg-muted">
-                      Forwards {l.forward_param_keys || "all params"}</b></>}
+                  <div className="mt-2 text-xs text-fg-muted">
+                    Real people go to your page · bots get <b className="text-fg">{BOT_LABEL[l.bot_action]}</b>
                   </div>
+                  {(() => {
+                    const chips: string[] = [];
+                    if (domains.length > 1 && l.domain_host) chips.push(l.domain_host);
+                    if (l.block_vpn) chips.push("Blocks VPN & proxy");
+                    if (l.block_datacenter && !l.block_vpn) chips.push("Blocks datacenter");
+                    if (l.deep_check) chips.push("Browser check");
+                    if (l.challenge) chips.push(`Human check (${CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))?.label.toLowerCase()})`);
+                    if (l.country_mode !== "off" && l.countries) chips.push(`${l.country_mode === "allow" ? "Only" : "Not"} ${l.countries}`);
+                    if (l.forward_params) chips.push(l.forward_param_keys ? `Passes ${l.forward_param_keys}` : "Passes link data");
+                    if (l.website) chips.push(`Uses ${siteName(l.website) || "a website"}'s rules`);
+                    return chips.length ? (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {chips.map((c) => (
+                          <span key={c} className="rounded bg-bg-mute px-1.5 py-0.5 text-[11px] text-fg-muted">{c}</span>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                   <div className="text-center"><div className="font-bold tabular-nums">{l.clicks}</div><div className="text-[11px] text-fg-dim">clicks</div></div>

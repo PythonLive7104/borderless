@@ -467,126 +467,94 @@ function Links() {
         ] })
       ] }),
       linkEnabled && /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-3", children: /* @__PURE__ */ jsx(NoData, { msg: "No links yet. Create one to start filtering clicks." }) })
-    ] }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => {
-      var _a2;
-      return /* @__PURE__ */ jsx("div", { className: "card shadow-soft p-5", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
-        /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
-            /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
-            l.active ? /* @__PURE__ */ jsxs("span", { className: "inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700", children: [
-              /* @__PURE__ */ jsx("span", { className: "h-1.5 w-1.5 rounded-full bg-success" }),
-              " Live"
-            ] }) : l.url_safe === false ? /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Off · flagged unsafe" }) : /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" }),
-            l.active && l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "⚠ safety warning" })
-          ] }),
-          /* @__PURE__ */ jsxs(
+    ] }) : /* @__PURE__ */ jsx("div", { className: "mt-6 space-y-3", children: rows.map((l) => /* @__PURE__ */ jsx("div", { className: "card shadow-soft p-5", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1 basis-64", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2", children: [
+          /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-bold", children: l.title || l.slug }),
+          l.active ? /* @__PURE__ */ jsxs("span", { className: "inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700", children: [
+            /* @__PURE__ */ jsx("span", { className: "h-1.5 w-1.5 rounded-full bg-success" }),
+            " Live"
+          ] }) : l.url_safe === false ? /* @__PURE__ */ jsx("span", { className: "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-red-600", children: "Off · flagged unsafe" }) : /* @__PURE__ */ jsx("span", { className: "rounded-full bg-bg-mute px-2 py-0.5 text-xs font-semibold text-fg-dim", children: "Paused" }),
+          l.active && l.url_safe === false && /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "⚠ safety warning" })
+        ] }),
+        /* @__PURE__ */ jsxs(
+          "button",
+          {
+            onClick: () => copy(l),
+            className: "mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline",
+            children: [
+              /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-mono", children: l.short_url }),
+              /* @__PURE__ */ jsx("span", { className: "shrink-0 text-xs text-fg-dim", children: copied === l.id ? "Copied ✓" : "Copy" })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxs("div", { className: "mt-1 min-w-0 truncate text-xs text-fg-dim", children: [
+          "→ ",
+          l.destination_url
+        ] }),
+        l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: `mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`, children: [
+          threatSource(l.url_threats),
+          " thinks this page may not be safe.",
+          " ",
+          l.active ? "You're keeping this link on." : "This link is off for now.",
+          canManage && /* @__PURE__ */ jsx(
             "button",
             {
-              onClick: () => copy(l),
-              className: "mt-1 flex w-full max-w-full flex-wrap items-center gap-x-2 text-left text-sm text-brand hover:underline",
-              children: [
-                /* @__PURE__ */ jsx("span", { className: "min-w-0 break-all font-mono", children: l.short_url }),
-                /* @__PURE__ */ jsx("span", { className: "shrink-0 text-xs text-fg-dim", children: copied === l.id ? "Copied ✓" : "Copy" })
-              ]
+              onClick: () => toggleScanOptout(l),
+              className: "ml-2 font-semibold underline hover:no-underline",
+              children: l.scan_optout ? "Turn it off" : "Keep it on anyway"
             }
-          ),
-          /* @__PURE__ */ jsxs("div", { className: "mt-1 min-w-0 truncate text-xs text-fg-dim", children: [
-            "→ ",
-            l.destination_url
-          ] }),
-          l.url_safe === false && /* @__PURE__ */ jsxs("div", { className: `mt-1 text-xs ${l.active ? "text-amber-700" : "text-red-600"}`, children: [
-            threatSource(l.url_threats),
-            " thinks this page may not be safe.",
-            " ",
-            l.active ? "You're keeping this link on." : "This link is off for now.",
-            canManage && /* @__PURE__ */ jsx(
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "mt-2 text-xs text-fg-muted", children: [
+          "Real people go to your page · bots get ",
+          /* @__PURE__ */ jsx("b", { className: "text-fg", children: BOT_LABEL[l.bot_action] })
+        ] }),
+        (() => {
+          var _a2;
+          const chips = [];
+          if (domains.length > 1 && l.domain_host) chips.push(l.domain_host);
+          if (l.block_vpn) chips.push("Blocks VPN & proxy");
+          if (l.block_datacenter && !l.block_vpn) chips.push("Blocks datacenter");
+          if (l.deep_check) chips.push("Browser check");
+          if (l.challenge) chips.push(`Human check (${(_a2 = CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))) == null ? void 0 : _a2.label.toLowerCase()})`);
+          if (l.country_mode !== "off" && l.countries) chips.push(`${l.country_mode === "allow" ? "Only" : "Not"} ${l.countries}`);
+          if (l.forward_params) chips.push(l.forward_param_keys ? `Passes ${l.forward_param_keys}` : "Passes link data");
+          if (l.website) chips.push(`Uses ${siteName(l.website) || "a website"}'s rules`);
+          return chips.length ? /* @__PURE__ */ jsx("div", { className: "mt-1.5 flex flex-wrap gap-1.5", children: chips.map((c) => /* @__PURE__ */ jsx("span", { className: "rounded bg-bg-mute px-1.5 py-0.5 text-[11px] text-fg-muted", children: c }, c)) }) : null;
+        })()
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm", children: [
+        /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+          /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums", children: l.clicks }),
+          /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "clicks" })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+          /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-emerald-600", children: l.human_clicks }),
+          /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "human" })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+          /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-red-500", children: l.bot_clicks }),
+          /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "bot" })
+        ] }),
+        canManage && /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center gap-0.5", children: [
+            /* @__PURE__ */ jsx(
               "button",
               {
-                onClick: () => toggleScanOptout(l),
-                className: "ml-2 font-semibold underline hover:no-underline",
-                children: l.scan_optout ? "Turn it off" : "Keep it on anyway"
+                onClick: () => toggle(l),
+                title: l.active ? "Live — click to pause" : "Paused — click to make live",
+                className: `h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`,
+                children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
               }
-            )
+            ),
+            /* @__PURE__ */ jsx("span", { className: "text-[10px] font-semibold text-fg-dim", children: l.active ? "Live" : "Off" })
           ] }),
-          /* @__PURE__ */ jsxs("div", { className: "mt-1 text-xs text-fg-dim", children: [
-            "Bots get: ",
-            /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: BOT_LABEL[l.bot_action] }),
-            l.website && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · Rules: ",
-              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: siteName(l.website) || "a website" })
-            ] }),
-            domains.length > 1 && l.domain_host && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: l.domain_host })
-            ] }),
-            l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "VPN/RDP blocked" })
-            ] }),
-            l.block_datacenter && !l.block_vpn && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Datacenter blocked" })
-            ] }),
-            l.deep_check && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsx("b", { className: "text-fg-muted", children: "Browser check" })
-            ] }),
-            l.country_mode !== "off" && l.countries && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
-                l.country_mode === "allow" ? "Only" : "Not",
-                " ",
-                l.countries
-              ] })
-            ] }),
-            l.challenge && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
-                "Human check: ",
-                (_a2 = CHALLENGE_STYLES.find((c) => c.value === (l.challenge_style || "hold"))) == null ? void 0 : _a2.label
-              ] })
-            ] }),
-            l.forward_params && /* @__PURE__ */ jsxs(Fragment, { children: [
-              " · ",
-              /* @__PURE__ */ jsxs("b", { className: "text-fg-muted", children: [
-                "Forwards ",
-                l.forward_param_keys || "all params"
-              ] })
-            ] })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm", children: [
-          /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
-            /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums", children: l.clicks }),
-            /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "clicks" })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
-            /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-emerald-600", children: l.human_clicks }),
-            /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "human" })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
-            /* @__PURE__ */ jsx("div", { className: "font-bold tabular-nums text-red-500", children: l.bot_clicks }),
-            /* @__PURE__ */ jsx("div", { className: "text-[11px] text-fg-dim", children: "bot" })
-          ] }),
-          canManage && /* @__PURE__ */ jsxs(Fragment, { children: [
-            /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center gap-0.5", children: [
-              /* @__PURE__ */ jsx(
-                "button",
-                {
-                  onClick: () => toggle(l),
-                  title: l.active ? "Live — click to pause" : "Paused — click to make live",
-                  className: `h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`,
-                  children: /* @__PURE__ */ jsx("span", { className: `block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}` })
-                }
-              ),
-              /* @__PURE__ */ jsx("span", { className: "text-[10px] font-semibold text-fg-dim", children: l.active ? "Live" : "Off" })
-            ] }),
-            /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
-            /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
-          ] })
+          /* @__PURE__ */ jsx("button", { onClick: () => openEdit(l), className: "text-brand hover:underline", children: "Edit" }),
+          /* @__PURE__ */ jsx("button", { onClick: () => remove(l.id), className: "text-red-500 hover:underline", children: "Delete" })
         ] })
-      ] }) }, l.id);
-    }) }),
+      ] })
+    ] }) }, l.id)) }),
     /* @__PURE__ */ jsx(Modal, { open, onClose: () => setOpen(false), title: editing ? "Edit redirect" : "Create a redirect", size: "xl", children: /* @__PURE__ */ jsxs("form", { onSubmit: save, className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-brand/30 bg-brand/5 px-4 py-3", children: [
         /* @__PURE__ */ jsx("div", { className: "text-xs font-bold uppercase tracking-wide text-fg-dim", children: "Your link" }),
