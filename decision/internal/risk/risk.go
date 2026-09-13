@@ -23,6 +23,10 @@ const (
 	wAbnormalRate    = 20
 	wKnownBadJA3     = 35
 	wKnownBadJA4     = 35
+	wIPBot           = 35 // IP-intel provider says this IP is a bot
+	wRecentAbuse     = 25 // IP recently seen in abuse/fraud
+	wHighFraudIP     = 40 // provider fraud score very high (>=85): actionable alone
+	wElevatedFraudIP = 20 // provider fraud score elevated (>=75): a nudge
 )
 
 type Input struct {
@@ -36,6 +40,9 @@ type Input struct {
 	AbnormalRate  bool
 	BadJA3        bool // TLS JA3 hash matches a known bad-client fingerprint
 	BadJA4        bool // TLS JA4 hash matches a known bad-client fingerprint
+	IPBot         bool // IP-intelligence provider flags the IP as a bot
+	RecentAbuse   bool // IP-intelligence provider: recent abuse/fraud from this IP
+	IPFraudScore  int  // IP-intelligence fraud score, 0..100 (0 = unknown)
 }
 
 func Evaluate(in Input) Result {
@@ -72,6 +79,22 @@ func Evaluate(in Input) Result {
 	}
 	if in.BadJA4 {
 		add(wKnownBadJA4, "known_bad_ja4")
+	}
+	if in.IPBot {
+		add(wIPBot, "ip_reported_bot")
+	}
+	if in.RecentAbuse {
+		add(wRecentAbuse, "recent_abuse_ip")
+	}
+	// Provider fraud score: two bands so a merely-elevated IP nudges the score
+	// while a very high one contributes strongly. This is what catches a clean
+	// user-agent on a clean-looking residential IP that the provider already
+	// knows is bad — the case pure UA/network checks miss.
+	switch {
+	case in.IPFraudScore >= 85:
+		add(wHighFraudIP, "high_fraud_ip")
+	case in.IPFraudScore >= 75:
+		add(wElevatedFraudIP, "elevated_fraud_ip")
 	}
 	if score > 100 {
 		score = 100

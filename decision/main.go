@@ -197,6 +197,9 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		AbnormalRate:  rate > 20, // >20 events/min from one visitor
 		BadJA3:        ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
 		BadJA4:        ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
+		IPBot:         intel.BotStatus,
+		RecentAbuse:   intel.RecentAbuse,
+		IPFraudScore:  intel.FraudScore,
 	})
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
@@ -339,6 +342,9 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 		AbnormalRate:  rate > 40,
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
+		IPBot:         intel.BotStatus,
+		RecentAbuse:   intel.RecentAbuse,
+		IPFraudScore:  intel.FraudScore,
 	})
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
@@ -554,15 +560,22 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	ja3 := firstHeader(r, "CF-JA3-Hash", "X-JA3-Hash", "X-JA3")
 	ja4 := firstHeader(r, "CF-JA4", "X-JA4-Hash", "X-JA4")
 	rate := h.st.RateIncr(ctx, "lrate:"+slug+":"+fp.IP, time.Minute)
+	// A redirect is a single ad click, so accuracy beats shaving a few ms:
+	// look the IP up live (cache-first, 24h) rather than only reading the cache,
+	// so the provider's fraud score / abuse history is present on the first hit.
+	linkIntel := h.lookupIP(ctx, fp.IP)
 	result := risk.Evaluate(risk.Input{
 		KnownBot:      fp.IsBot,
 		Automation:    fp.IsHeadless,
-		Datacenter:    h.st.InSet(ctx, "ipintel:datacenter", fp.IP),
-		Proxy:         h.st.InSet(ctx, "ipintel:proxy", fp.IP),
+		Datacenter:    linkIntel.Datacenter,
+		Proxy:         linkIntel.Proxy || linkIntel.VPN,
 		NoFingerprint: false,
 		AbnormalRate:  rate > 40,
 		BadJA3:        ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
 		BadJA4:        ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
+		IPBot:         linkIntel.BotStatus,
+		RecentAbuse:   linkIntel.RecentAbuse,
+		IPFraudScore:  linkIntel.FraudScore,
 	})
 
 	// A link filters more eagerly than a page: known-bot UAs, automation tools,
@@ -622,10 +635,6 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// hard 403 so the visitor sees the same decoy or 404 as any other bot and
 	// isn't told what gave them away. "Send them through too" is not a sensible
 	// outcome for someone who explicitly asked to block these, so fall back to a 404.
-	linkIntel := h.knownIntel(ctx, fp.IP)
-	if link.BlockVPN {
-		linkIntel = h.lookupIP(ctx, fp.IP) // live: this link asked us to be sure
-	}
 	if link.BlockVPN && linkIntel.flagged() {
 		isBot = true
 		switch link.BotAction {
@@ -790,6 +799,9 @@ type ipIntel struct {
 	ASN        string `json:"asn,omitempty"`
 	ConnType   string `json:"conn_type,omitempty"` // Residential | Corporate | Mobile | Data Center | ...
 	Mobile     bool   `json:"mobile,omitempty"`
+	FraudScore int    `json:"fraud_score,omitempty"` // provider fraud score 0..100
+	RecentAbuse bool  `json:"recent_abuse,omitempty"`
+	BotStatus  bool   `json:"bot_status,omitempty"`
 }
 
 func (i ipIntel) flagged() bool { return i.Proxy || i.VPN || i.Datacenter }
@@ -853,6 +865,9 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		ConnectionType string `json:"connection_type"`
 		ISP            string `json:"ISP"`
 		ASN            int    `json:"ASN"`
+		FraudScore     int    `json:"fraud_score"`
+		RecentAbuse    bool   `json:"recent_abuse"`
+		BotStatus      bool   `json:"bot_status"`
 	}
 	if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&d) != nil || !d.Success {
 		return out
@@ -860,6 +875,7 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	out = ipIntel{
 		Proxy: d.Proxy, VPN: d.VPN || d.Tor, Datacenter: d.ConnectionType == "Data Center",
 		ISP: d.ISP, ConnType: d.ConnectionType, Mobile: d.Mobile,
+		FraudScore: d.FraudScore, RecentAbuse: d.RecentAbuse, BotStatus: d.BotStatus,
 	}
 	if d.ASN > 0 {
 		out.ASN = strconv.Itoa(d.ASN)
