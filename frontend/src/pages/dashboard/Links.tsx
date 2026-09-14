@@ -86,8 +86,8 @@ const CHALLENGE_STYLES: { value: ChallengeStyle; label: string; desc: string }[]
     desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages." },
 ];
 
-function PrivateDomainPanel({ priv, canManage, orgId, onChanged }: {
-  priv: PrivateDomains; canManage: boolean; orgId: number; onChanged: () => void;
+function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }: {
+  priv: PrivateDomains; canManage: boolean; orgId: number; onChanged: () => void; perDomainCap: number;
 }) {
   const owned = priv.owned.length;
   const [busy, setBusy] = useState(false);
@@ -120,8 +120,8 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }: {
         <>
           <div className="text-sm font-bold">Your private {owned === 1 ? "domain" : "domains"}</div>
           <p className="mt-1 text-sm text-fg-muted">
-            Yours alone — nobody else can create links on {owned === 1 ? "it" : "them"}. Each one
-            gives you a full set of redirects on your plan.
+            Yours alone — nobody else can create links on {owned === 1 ? "it" : "them"}.
+            {perDomainCap > 0 ? ` Each one lets you create up to ${perDomainCap} more redirects, on top of the shared domain.` : " Each one gives you a full set of redirects on your plan."}
           </p>
           <div className="mt-3 space-y-2">
             {priv.owned.map((d) => {
@@ -161,8 +161,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }: {
             <div className="text-sm font-bold">Private domain</div>
             <p className="mt-1 text-sm text-fg-muted">
               Shared domains work well, but you're on them alongside other customers. A private
-              domain is used by you and nobody else — and gives you a full set of redirects on your
-              plan.{" "}
+              domain is used by you and nobody else{perDomainCap > 0 ? ` — and adds ${perDomainCap} more redirects on top of your shared domain` : " — and gives you a full set of redirects on your plan"}.{" "}
               {priv.available > 0
                 ? <><b>{priv.available}</b> available right now.</>
                 : <>None in stock at the moment — ask and we'll source one.</>}
@@ -418,8 +417,14 @@ export default function Links() {
                 {used} of {cap || "∞"} used
               </span>
             )}
+            {linkEnabled && perDomainCap > 0 && domainCount > 1 && (
+              <span className="text-xs text-fg-dim">({perDomainCap} per domain)</span>
+            )}
           </div>
-          <p className="mt-1 text-sm text-fg-muted">Redirect links with built-in bot filtering &amp; click analytics.</p>
+          <p className="mt-1 text-sm text-fg-muted">
+            Redirect links with built-in bot filtering &amp; click analytics.
+            {perDomainCap > 0 && <> You can create up to <b>{perDomainCap}</b> on each domain — the shared one and every private domain you own.</>}
+          </p>
         </div>
         {canManage && serviceUp && (
           <div className="flex flex-col items-end gap-1">
@@ -437,7 +442,7 @@ export default function Links() {
       </div>
 
       {linkEnabled && current && <PrivateDomainPanel priv={priv} canManage={canManage}
-        orgId={current.id} onChanged={load} />}
+        orgId={current.id} onChanged={load} perDomainCap={perDomainCap} />}
 
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>

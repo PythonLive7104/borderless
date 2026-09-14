@@ -93,7 +93,7 @@ const CHALLENGE_STYLES = [
     desc: "Drag a handle across to the end. Nothing to read, so it travels well across languages."
   }
 ];
-function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
+function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }) {
   const owned = priv.owned.length;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -131,7 +131,8 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
     /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
       "Yours alone — nobody else can create links on ",
       owned === 1 ? "it" : "them",
-      ". Each one gives you a full set of redirects on your plan."
+      ".",
+      perDomainCap > 0 ? ` Each one lets you create up to ${perDomainCap} more redirects, on top of the shared domain.` : " Each one gives you a full set of redirects on your plan."
     ] }),
     /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-2", children: priv.owned.map((d) => {
       const lapsed = d.private_until ? new Date(d.private_until) < /* @__PURE__ */ new Date() : false;
@@ -152,7 +153,9 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
     /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
       /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "Private domain" }),
       /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
-        "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else — and gives you a full set of redirects on your plan.",
+        "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else",
+        perDomainCap > 0 ? ` — and adds ${perDomainCap} more redirects on top of your shared domain` : " — and gives you a full set of redirects on your plan",
+        ".",
         " ",
         priv.available > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsx("b", { children: priv.available }),
@@ -395,9 +398,21 @@ function Links() {
             " of ",
             cap || "∞",
             " used"
+          ] }),
+          linkEnabled && perDomainCap > 0 && domainCount > 1 && /* @__PURE__ */ jsxs("span", { className: "text-xs text-fg-dim", children: [
+            "(",
+            perDomainCap,
+            " per domain)"
           ] })
         ] }),
-        /* @__PURE__ */ jsx("p", { className: "mt-1 text-sm text-fg-muted", children: "Redirect links with built-in bot filtering & click analytics." })
+        /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+          "Redirect links with built-in bot filtering & click analytics.",
+          perDomainCap > 0 && /* @__PURE__ */ jsxs(Fragment, { children: [
+            " You can create up to ",
+            /* @__PURE__ */ jsx("b", { children: perDomainCap }),
+            " on each domain — the shared one and every private domain you own."
+          ] })
+        ] })
       ] }),
       canManage && serviceUp && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
         /* @__PURE__ */ jsx(
@@ -425,7 +440,8 @@ function Links() {
         priv,
         canManage,
         orgId: current.id,
-        onChanged: load
+        onChanged: load,
+        perDomainCap
       }
     ),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !serviceUp ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center", children: [
