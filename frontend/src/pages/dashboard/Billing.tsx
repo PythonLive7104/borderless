@@ -145,7 +145,7 @@ export default function Billing() {
   // created, so the plan row alone doesn't mean they bought it. Only an active,
   // in-window subscription counts as "current".
   const onPaidPlan = sub.status === "active" && !sub.access?.locked;
-  const isCurrentSlug = onPaidPlan ? sub.plan.slug : "";
+  const isCurrentPlan = (p: Plan) => onPaidPlan && p.slug === sub.plan.slug && interval === sub.interval;
   const daysLeft = sub.access?.days_left ?? null;
 
   return (
@@ -191,7 +191,7 @@ export default function Billing() {
       </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
         {plans.map((p) => {
-          const isCurrent = p.slug === isCurrentSlug;
+          const isCurrent = isCurrentPlan(p);
           const feats = PLAN_FEATURES[p.slug] || [];
           return (
             <div key={p.id} className={`card relative flex flex-col p-6 ${isCurrent ? "ring-2 ring-brand" : "shadow-soft"}`}>
@@ -240,11 +240,11 @@ export default function Billing() {
       </div>
 
       {/* Plan-switch / renew confirmation */}
-      <Modal open={!!target} onClose={() => !busy && setTarget(null)} title={target && target.slug === isCurrentSlug ? `Renew ${target.name}` : "Choose a plan"}>
+      <Modal open={!!target} onClose={() => !busy && setTarget(null)} title={target && isCurrentPlan(target) ? `Renew ${target.name}` : "Choose a plan"}>
         {target && sub && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">
-              {target.slug === isCurrentSlug ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
+              {isCurrentPlan(target) ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
               {" "}({redirectsOf(target) || "∞"} redirects, {websitesOf(target) || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">

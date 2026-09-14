@@ -149,7 +149,7 @@ function Billing() {
   }
   if (loading || !sub) return /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-20", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
   const onPaidPlan = sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
-  const isCurrentSlug = onPaidPlan ? sub.plan.slug : "";
+  const isCurrentPlan = (p) => onPaidPlan && p.slug === sub.plan.slug && interval === sub.interval;
   const daysLeft = ((_b = sub.access) == null ? void 0 : _b.days_left) ?? null;
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsxs(PageNote, { id: "billing", children: [
@@ -192,7 +192,7 @@ function Billing() {
     ] }),
     /* @__PURE__ */ jsx("div", { className: "mt-8 flex justify-center", children: /* @__PURE__ */ jsx(IntervalToggle, { value: interval, onChange: setBillingInterval, savings: "Save up to 46%" }) }),
     /* @__PURE__ */ jsx("div", { className: "mt-6 grid gap-5 lg:grid-cols-3", children: plans.map((p) => {
-      const isCurrent = p.slug === isCurrentSlug;
+      const isCurrent = isCurrentPlan(p);
       const feats = PLAN_FEATURES[p.slug] || [];
       return /* @__PURE__ */ jsxs("div", { className: `card relative flex flex-col p-6 ${isCurrent ? "ring-2 ring-brand" : "shadow-soft"}`, children: [
         isCurrent && /* @__PURE__ */ jsx("span", { className: "absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-fg px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-bg", children: "Current plan" }),
@@ -244,9 +244,9 @@ function Billing() {
         ] }) : /* @__PURE__ */ jsx("div", { className: "mt-5 text-center text-xs text-fg-dim", children: "Ask an admin to change plans" })
       ] }, p.id);
     }) }),
-    /* @__PURE__ */ jsx(Modal, { open: !!target, onClose: () => !busy && setTarget(null), title: target && target.slug === isCurrentSlug ? `Renew ${target.name}` : "Choose a plan", children: target && sub && /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsx(Modal, { open: !!target, onClose: () => !busy && setTarget(null), title: target && isCurrentPlan(target) ? `Renew ${target.name}` : "Choose a plan", children: target && sub && /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
       /* @__PURE__ */ jsxs("p", { className: "text-sm text-fg-muted", children: [
-        target.slug === isCurrentSlug ? "Renew" : "Move to",
+        isCurrentPlan(target) ? "Renew" : "Move to",
         " the ",
         /* @__PURE__ */ jsx("b", { children: target.name }),
         " plan at ",

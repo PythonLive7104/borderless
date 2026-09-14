@@ -2046,7 +2046,7 @@ const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
 const ApiKeys = lazy(() => import("./assets/ApiKeys-hKgp-leM.js"));
 const Webhooks = lazy(() => import("./assets/Webhooks-Cd9_0nng.js"));
-const Billing = lazy(() => import("./assets/Billing-CehBmgcp.js"));
+const Billing = lazy(() => import("./assets/Billing-MjH-A4m0.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-CxZbScxD.js"));
 const Team = lazy(() => import("./assets/Team-BRQ3BDZX.js"));
 const Settings = lazy(() => import("./assets/Settings-DHJ8kh4S.js"));
