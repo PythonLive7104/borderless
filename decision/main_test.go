@@ -21,7 +21,7 @@ func TestMergeQuery(t *testing.T) {
 			"https://form.example/s?rid=0", "rid=8842", "https://form.example/s?rid=8842"},
 		{"values are re-encoded, not injected raw",
 			"https://form.example/s", "email=jane%40co.com",
-			"https://form.example/s?email=jane%40co.com"},
+			"https://form.example/s?email=jane@co.com"},
 		{"a broken destination is returned untouched",
 			"://nonsense", "rid=1", "://nonsense"},
 	}
@@ -62,7 +62,7 @@ func TestMergeQueryAllowList(t *testing.T) {
 
 	// Only the named parameters travel; everything else is dropped.
 	got := mergeQuery(dest, raw, []string{"email", "rid"})
-	want := "https://form.example/s?email=jane%40co.com&rid=8842"
+	want := "https://form.example/s?email=jane@co.com&rid=8842"
 	if got != want {
 		t.Errorf("allow-list:\n  got  %s\n  want %s", got, want)
 	}
@@ -85,12 +85,12 @@ func TestMergeQueryRealWorldFormats(t *testing.T) {
 	allow := []string{"email", "rid"}
 
 	// An unencoded @ is fine going in — it comes out correctly encoded.
-	if got := mergeQuery(dest, "email=jane@co.com", allow); got != "https://form.example/s?email=jane%40co.com" {
-		t.Errorf("plain @ should be encoded, got %s", got)
+	if got := mergeQuery(dest, "email=jane@co.com", allow); got != "https://form.example/s?email=jane@co.com" {
+		t.Errorf("plain @ should stay literal, got %s", got)
 	}
 
 	// Both parameters together.
-	if got := mergeQuery(dest, "email=jane@co.com&rid=8842", allow); got != "https://form.example/s?email=jane%40co.com&rid=8842" {
+	if got := mergeQuery(dest, "email=jane@co.com&rid=8842", allow); got != "https://form.example/s?email=jane@co.com&rid=8842" {
 		t.Errorf("both params: got %s", got)
 	}
 
@@ -203,5 +203,15 @@ func TestMapProxycheck(t *testing.T) {
 	// A mobile carrier IP.
 	if m := mapProxycheck("no", "Mobile", "MTN", "AS29465", 0); m.ConnType != "Mobile" || !m.Mobile {
 		t.Fatalf("mobile: %+v", m)
+	}
+}
+
+func TestMergeQueryKeepsAtLiteral(t *testing.T) {
+	got := mergeQuery("https://dest.example/p", "complete=ails@ails.co.kr", nil)
+	if !strings.Contains(got, "complete=ails@ails.co.kr") {
+		t.Fatalf("@ should stay literal, got %q", got)
+	}
+	if strings.Contains(got, "%40") {
+		t.Fatalf("no %%40 expected, got %q", got)
 	}
 }

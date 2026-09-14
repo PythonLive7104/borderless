@@ -1106,7 +1106,9 @@ func mergeQuery(dest, raw string, only []string) string {
 			q.Set(k, vs[0])
 		}
 	}
-	u.RawQuery = q.Encode()
+	// Keep "@" literal instead of %40. It's valid in a query value (RFC 3986),
+	// and some destinations key off an email address and match it literally.
+	u.RawQuery = strings.ReplaceAll(q.Encode(), "%40", "@")
 	return u.String()
 }
 
