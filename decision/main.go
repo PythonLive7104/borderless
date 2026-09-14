@@ -1032,16 +1032,26 @@ func mapProxycheck(proxyField, typ, provider, asn string, risk int) ipIntel {
 	proxy := strings.EqualFold(proxyField, "yes")
 	t := strings.ToLower(typ)
 	vpn := strings.Contains(t, "vpn") || strings.Contains(t, "tor")
+	mobile := strings.Contains(t, "mobile") || strings.Contains(t, "wireless")
 	// A flagged non-VPN IP is, in practice, hosting/datacenter traffic.
 	datacenter := proxy && !vpn
+	// Normalise proxycheck's type words to the same vocabulary IPQS uses, so a
+	// connection_type rule written for one provider still matches on the other.
 	conn := "Residential"
-	if vpn {
+	switch {
+	case vpn:
 		conn = "VPN"
-	} else if datacenter {
+	case datacenter:
 		conn = "Data Center"
+	case mobile:
+		conn = "Mobile"
+	case strings.Contains(t, "business") || strings.Contains(t, "corporate") || strings.Contains(t, "organization"):
+		conn = "Corporate"
+	case strings.Contains(t, "residential"):
+		conn = "Residential"
 	}
 	return ipIntel{
-		Proxy: proxy, VPN: vpn, Datacenter: datacenter,
+		Proxy: proxy, VPN: vpn, Datacenter: datacenter, Mobile: mobile,
 		ISP: provider, ASN: strings.TrimPrefix(strings.ToUpper(asn), "AS"),
 		ConnType: conn, FraudScore: risk,
 	}

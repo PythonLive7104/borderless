@@ -196,4 +196,12 @@ func TestMapProxycheck(t *testing.T) {
 	if clean.Proxy || clean.VPN || clean.Datacenter || clean.ConnType != "Residential" {
 		t.Fatalf("clean: %+v", clean)
 	}
+	// A business IP is not "Residential".
+	if b := mapProxycheck("no", "Business", "Google", "AS15169", 0); b.ConnType != "Corporate" {
+		t.Fatalf("business should map to Corporate: %+v", b)
+	}
+	// A mobile carrier IP.
+	if m := mapProxycheck("no", "Mobile", "MTN", "AS29465", 0); m.ConnType != "Mobile" || !m.Mobile {
+		t.Fatalf("mobile: %+v", m)
+	}
 }
