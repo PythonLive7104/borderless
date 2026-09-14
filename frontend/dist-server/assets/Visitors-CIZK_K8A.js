@@ -41,7 +41,27 @@ function IpRuleToggle({ value, busy, onChange }) {
   );
 }
 const PAGE_SIZE = 25;
-const riskTone = (r) => r == null ? "text-fg-dim" : r >= 85 ? "text-red-600" : r >= 70 ? "text-orange-600" : r >= 40 ? "text-amber-600" : "text-emerald-600";
+function flag(cc) {
+  if (!cc || cc.length !== 2 || !/^[a-zA-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 127462 + c.charCodeAt(0) - 65));
+}
+function riskMeta(r) {
+  if (r == null) return { label: "—", cls: "bg-bg-mute text-fg-dim" };
+  if (r >= 85) return { label: "Fraud", cls: "bg-danger/10 text-red-600" };
+  if (r >= 70) return { label: "Bot", cls: "bg-orange-500/10 text-orange-600" };
+  if (r >= 40) return { label: "Suspicious", cls: "bg-warning/10 text-amber-700" };
+  return { label: "Clean", cls: "bg-success/10 text-emerald-700" };
+}
+const DEVICE_ICON = { mobile: "📱", desktop: "🖥️", tablet: "📟" };
+function timeAgo(iso) {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 6e4);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
 function Visitors() {
   const { current } = useWorkspace();
   const [rows, setRows] = useState([]);
@@ -141,30 +161,41 @@ function Visitors() {
       /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-5 overflow-hidden", children: /* @__PURE__ */ jsx("div", { className: "overflow-x-auto", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
         /* @__PURE__ */ jsx("thead", { className: "border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim", children: /* @__PURE__ */ jsxs("tr", { children: [
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Visitor" }),
-          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "IP" }),
-          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Country" }),
-          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Device" }),
-          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Browser / OS" }),
-          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Events" }),
-          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Max risk" }),
+          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Location" }),
+          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Client" }),
+          /* @__PURE__ */ jsx("th", { className: "px-4 py-3 text-right", children: "Events" }),
+          /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Risk" }),
           /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "Last seen" }),
           canManage && /* @__PURE__ */ jsx("th", { className: "px-4 py-3", children: "IP rule" })
         ] }) }),
         /* @__PURE__ */ jsx("tbody", { className: "divide-y divide-line", children: rows.map((v) => {
           var _a;
           return /* @__PURE__ */ jsxs("tr", { className: "hover:bg-bg-soft", children: [
-            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsx(Link, { to: `/dashboard/visitors/${v.id}`, className: "font-mono font-semibold hover:text-brand", children: v.visitor_id.slice(0, 14) }) }),
-            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 font-mono text-xs", children: v.ip || "—" }),
-            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.country || "—" }),
-            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 capitalize", children: v.device || "—" }),
-            /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 text-fg-muted", children: [
-              v.browser,
-              " · ",
-              v.os
+            /* @__PURE__ */ jsxs("td", { className: "px-4 py-3", children: [
+              /* @__PURE__ */ jsx(Link, { to: `/dashboard/visitors/${v.id}`, className: "block max-w-[200px] truncate font-mono text-[13px] font-semibold text-brand hover:underline", title: v.ip || v.visitor_id, children: v.ip || "unknown IP" }),
+              /* @__PURE__ */ jsx("span", { className: "font-mono text-[11px] text-fg-dim", children: v.visitor_id.slice(0, 12) })
             ] }),
-            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: v.events }),
-            /* @__PURE__ */ jsx("td", { className: `px-4 py-3 font-bold ${riskTone(v.max_risk)}`, children: v.max_risk ?? "—" }),
-            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 text-fg-muted", children: new Date(v.last_seen).toLocaleString() }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 whitespace-nowrap", children: v.country ? /* @__PURE__ */ jsxs("span", { children: [
+              flag(v.country),
+              " ",
+              v.country
+            ] }) : /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "—" }) }),
+            /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 whitespace-nowrap text-fg-muted", children: [
+              /* @__PURE__ */ jsx("span", { className: "mr-1", children: DEVICE_ICON[v.device] || "•" }),
+              v.browser || "Other",
+              " · ",
+              v.os || "Other"
+            ] }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 text-right tabular-nums", children: v.events }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: (() => {
+              const m = riskMeta(v.max_risk);
+              return /* @__PURE__ */ jsxs("span", { className: `inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${m.cls}`, children: [
+                v.max_risk ?? "—",
+                /* @__PURE__ */ jsx("span", { className: "opacity-70", children: "·" }),
+                m.label
+              ] });
+            })() }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-3 whitespace-nowrap text-fg-muted", title: new Date(v.last_seen).toLocaleString(), children: timeAgo(v.last_seen) }),
             canManage && /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: !v.ip ? /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "—" }) : /* @__PURE__ */ jsxs("span", { className: "flex items-center gap-2", children: [
               /* @__PURE__ */ jsx(
                 IpRuleToggle,

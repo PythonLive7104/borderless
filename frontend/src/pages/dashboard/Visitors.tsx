@@ -11,8 +11,32 @@ import Pager from "../../components/ui/Pager";
 
 const PAGE_SIZE = 25;
 
-const riskTone = (r: number | null) =>
-  r == null ? "text-fg-dim" : r >= 85 ? "text-red-600" : r >= 70 ? "text-orange-600" : r >= 40 ? "text-amber-600" : "text-emerald-600";
+// ISO-2 country code -> flag emoji, so the list is scannable at a glance.
+function flag(cc?: string): string {
+  if (!cc || cc.length !== 2 || !/^[a-zA-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+
+// A risk score means little as a bare number to most users; the label does.
+function riskMeta(r: number | null): { label: string; cls: string } {
+  if (r == null) return { label: "—", cls: "bg-bg-mute text-fg-dim" };
+  if (r >= 85) return { label: "Fraud", cls: "bg-danger/10 text-red-600" };
+  if (r >= 70) return { label: "Bot", cls: "bg-orange-500/10 text-orange-600" };
+  if (r >= 40) return { label: "Suspicious", cls: "bg-warning/10 text-amber-700" };
+  return { label: "Clean", cls: "bg-success/10 text-emerald-700" };
+}
+
+const DEVICE_ICON: Record<string, string> = { mobile: "📱", desktop: "🖥️", tablet: "📟" };
+
+function timeAgo(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
 
 export default function Visitors() {
   const { current } = useWorkspace();
@@ -89,19 +113,41 @@ export default function Visitors() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
-                <tr><th className="px-4 py-3">Visitor</th><th className="px-4 py-3">IP</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">Device</th><th className="px-4 py-3">Browser / OS</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Max risk</th><th className="px-4 py-3">Last seen</th>{canManage && <th className="px-4 py-3">IP rule</th>}</tr>
+                <tr>
+                  <th className="px-4 py-3">Visitor</th>
+                  <th className="px-4 py-3">Location</th>
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3 text-right">Events</th>
+                  <th className="px-4 py-3">Risk</th>
+                  <th className="px-4 py-3">Last seen</th>
+                  {canManage && <th className="px-4 py-3">IP rule</th>}
+                </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.map((v) => (
                   <tr key={v.id} className="hover:bg-bg-soft">
-                    <td className="px-4 py-3"><Link to={`/dashboard/visitors/${v.id}`} className="font-mono font-semibold hover:text-brand">{v.visitor_id.slice(0, 14)}</Link></td>
-                    <td className="px-4 py-3 font-mono text-xs">{v.ip || "—"}</td>
-                    <td className="px-4 py-3">{v.country || "—"}</td>
-                    <td className="px-4 py-3 capitalize">{v.device || "—"}</td>
-                    <td className="px-4 py-3 text-fg-muted">{v.browser} · {v.os}</td>
-                    <td className="px-4 py-3">{v.events}</td>
-                    <td className={`px-4 py-3 font-bold ${riskTone(v.max_risk)}`}>{v.max_risk ?? "—"}</td>
-                    <td className="px-4 py-3 text-fg-muted">{new Date(v.last_seen).toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <Link to={`/dashboard/visitors/${v.id}`} className="block max-w-[200px] truncate font-mono text-[13px] font-semibold text-brand hover:underline" title={v.ip || v.visitor_id}>
+                        {v.ip || "unknown IP"}
+                      </Link>
+                      <span className="font-mono text-[11px] text-fg-dim">{v.visitor_id.slice(0, 12)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {v.country ? <span>{flag(v.country)} {v.country}</span> : <span className="text-fg-dim">—</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-fg-muted">
+                      <span className="mr-1">{DEVICE_ICON[v.device] || "•"}</span>
+                      {v.browser || "Other"} · {v.os || "Other"}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{v.events}</td>
+                    <td className="px-4 py-3">
+                      {(() => { const m = riskMeta(v.max_risk); return (
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${m.cls}`}>
+                          {v.max_risk ?? "—"}<span className="opacity-70">·</span>{m.label}
+                        </span>
+                      ); })()}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-fg-muted" title={new Date(v.last_seen).toLocaleString()}>{timeAgo(v.last_seen)}</td>
                     {canManage && (
                       <td className="px-4 py-3">
                         {!v.ip ? <span className="text-fg-dim">—</span> : (
