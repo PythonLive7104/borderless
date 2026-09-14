@@ -1210,18 +1210,21 @@ function CryptoIcons() {
 }
 const BASE = [
   "Smart redirects with bot detection on every click",
-  "Full anti-bot engine included",
-  "Smart short links on shared & private domains",
-  "IP allow / deny rules",
-  "Domain health + ownership checks"
+  "Full anti-bot engine (Shield + Traffic Rules)",
+  "Deep filters: country, device, OS, connection type, ISP/ASN",
+  "VPN / proxy / datacenter blocking + live IP reputation",
+  "TLS fingerprinting (JA3 & JA4) + silent deep browser check",
+  "Filtering funnel & campaign analytics",
+  "IP allow / deny rules"
 ];
 const PLUS_ADD = [
-  "More redirects & domains",
+  "Higher redirect & antibot-site limits",
   "Priority support"
 ];
 const PRO_ADD = [
-  "Highest redirect & domain limits",
-  "Bring your own domain (run redirects on your brand)",
+  "Highest redirect & antibot-site limits",
+  "Bring your own domain — run redirects on your brand",
+  "Private domains available",
   "Dedicated support"
 ];
 const PLANS = [
@@ -2046,7 +2049,7 @@ const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
 const ApiKeys = lazy(() => import("./assets/ApiKeys-hKgp-leM.js"));
 const Webhooks = lazy(() => import("./assets/Webhooks-Cd9_0nng.js"));
-const Billing = lazy(() => import("./assets/Billing-MjH-A4m0.js"));
+const Billing = lazy(() => import("./assets/Billing-B8tYjFY9.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-CxZbScxD.js"));
 const Team = lazy(() => import("./assets/Team-BRQ3BDZX.js"));
 const Settings = lazy(() => import("./assets/Settings-DHJ8kh4S.js"));

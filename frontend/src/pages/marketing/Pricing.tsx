@@ -20,18 +20,21 @@ type Plan = {
 
 const BASE: string[] = [
   "Smart redirects with bot detection on every click",
-  "Full anti-bot engine included",
-  "Smart short links on shared & private domains",
+  "Full anti-bot engine (Shield + Traffic Rules)",
+  "Deep filters: country, device, OS, connection type, ISP/ASN",
+  "VPN / proxy / datacenter blocking + live IP reputation",
+  "TLS fingerprinting (JA3 & JA4) + silent deep browser check",
+  "Filtering funnel & campaign analytics",
   "IP allow / deny rules",
-  "Domain health + ownership checks",
 ];
 const PLUS_ADD: string[] = [
-  "More redirects & domains",
+  "Higher redirect & antibot-site limits",
   "Priority support",
 ];
 const PRO_ADD: string[] = [
-  "Highest redirect & domain limits",
-  "Bring your own domain (run redirects on your brand)",
+  "Highest redirect & antibot-site limits",
+  "Bring your own domain — run redirects on your brand",
+  "Private domains available",
   "Dedicated support",
 ];
 

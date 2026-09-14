@@ -18,21 +18,24 @@ type Feat = { text: string; muted?: boolean };
 const PLAN_FEATURES: Record<string, Feat[]> = {
   basic: [
     { text: "Smart redirects with bot detection on every click" },
-    { text: "Full anti-bot engine included" },
-    { text: "Smart shortlinks + custom domain redirects" },
-    { text: "IP allow / deny rules" },
-    { text: "Domain health + ownership checks" },
+    { text: "Full anti-bot engine (Shield + Traffic Rules)" },
+    { text: "Deep filters: country, device, OS, connection type, ISP/ASN" },
+    { text: "VPN / proxy / datacenter blocking + IP reputation" },
+    { text: "Human check + IP allow / deny rules" },
+    { text: "Filtering funnel & campaign analytics" },
   ],
   plus: [
-    { text: "Smart redirects with bot detection on every click" },
-    { text: "Full anti-bot engine included" },
     { text: "Everything in Basic", muted: true },
+    { text: "Higher redirect & antibot-site limits" },
+    { text: "TLS fingerprinting (JA3 & JA4)" },
+    { text: "Silent deep browser check" },
     { text: "Priority support" },
   ],
   pro: [
-    { text: "Smart redirects with bot detection on every click" },
-    { text: "Full anti-bot engine included" },
     { text: "Everything in Plus", muted: true },
+    { text: "Highest redirect & antibot-site limits" },
+    { text: "Bring your own domain — run redirects on your brand" },
+    { text: "Private domains available" },
     { text: "Dedicated support" },
   ],
 };
