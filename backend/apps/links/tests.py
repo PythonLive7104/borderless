@@ -771,25 +771,36 @@ class PrivateDomainRentalTest(TestCase):
         from apps.links.purchases import mark_paid
         return mark_paid(self.P.objects.create(organization=self.org, amount=5))
 
+    def _renew(self, domain):
+        from apps.links.purchases import mark_paid
+        return mark_paid(self.P.objects.create(organization=self.org, amount=5, renew_domain=domain))
+
     def test_paying_rents_it_for_30_days(self):
         d = self._pay()
         self.assertAlmostEqual((d.private_until - timezone.now()).days, 29, delta=1)
 
-    def test_a_second_payment_renews_rather_than_taking_another_domain(self):
-        self._pay()
-        spare = ShortDomain.objects.create(host="korv2.cc", active=True,
-                                           verified_at=timezone.now(), is_shared=False)
+    def test_a_second_plain_payment_takes_another_domain(self):
+        first = self._pay()
+        ShortDomain.objects.create(host="korv2.cc", active=True,
+                                   verified_at=timezone.now(), is_shared=False)
+        second = self._pay()
+        self.assertNotEqual(first.id, second.id)       # a workspace can own several
+        self.assertEqual(ShortDomain.private_for(self.org.id).count(), 2)
+
+    def test_a_targeted_payment_renews_the_named_domain(self):
         d = self._pay()
-        self.assertEqual(d.host, "pavo.cc")
-        self.assertAlmostEqual((d.private_until - timezone.now()).days, 59, delta=1)
-        spare.refresh_from_db()
-        self.assertIsNone(spare.organization)          # untouched
+        ShortDomain.objects.create(host="korv2.cc", active=True,
+                                   verified_at=timezone.now(), is_shared=False)
+        r = self._renew(d)
+        self.assertEqual(r.host, "pavo.cc")
+        self.assertAlmostEqual((r.private_until - timezone.now()).days, 59, delta=1)
+        self.assertEqual(ShortDomain.private_for(self.org.id).count(), 1)  # no new domain taken
 
     def test_renewing_after_a_lapse_starts_from_today_not_the_old_date(self):
         d = self._pay()
         d.private_until = timezone.now() - timedelta(days=10)
         d.save()
-        d = self._pay()
+        d = self._renew(d)
         self.assertGreater(d.private_until, timezone.now() + timedelta(days=29))
 
     def test_a_lapsed_rental_is_only_reminded_during_the_grace_period(self):
@@ -1356,3 +1367,79 @@ class DeepCheckTest(TestCase):
         link = ShortLink.objects.create(organization=self.org, domain=_domain(),
                                         slug="dp2", destination_url="https://e.example")
         self.assertFalse(json.loads(_payload(link))["deep_check"])
+
+
+class PerDomainCapTest(TestCase):
+    """The redirect cap applies per domain, so each private domain adds a full
+    plan-sized allowance."""
+
+    def setUp(self):
+        from django.utils import timezone
+        from apps.billing.models import Plan, Subscription
+        self.org = _workspace("cap@example.com")
+        plan = Plan.objects.create(slug="capplan", name="Cap", price=10, monthly_events=1000,
+                                   max_redirects=2, sort=9)
+        Subscription.objects.update_or_create(
+            organization=self.org,
+            defaults={"plan": plan, "status": "active", "interval": "weekly",
+                      "period_end": timezone.now() + __import__("datetime").timedelta(days=3)})
+        self.a = _domain(host="sh.cc", is_shared=True, is_default=False)
+        self.b = ShortDomain.objects.create(host="priv.cc", organization=self.org,
+                                            is_shared=False, active=True,
+                                            verified_at=timezone.now())
+        from rest_framework.test import APIClient
+        from apps.organizations.models import OrganizationMember
+        self.user = OrganizationMember.objects.get(organization=self.org, role="owner").user
+        self.c = APIClient(); self.c.force_authenticate(user=self.user)
+
+    def _make(self, domain, slug):
+        return self.c.post("/api/links/", {
+            "organization": self.org.id, "destination_url": "https://e.example",
+            "slug": slug, "domain": domain.id, "bot_action": "decoy",
+        }, format="json")
+
+    def test_cap_is_counted_per_domain(self):
+        self.assertEqual(self._make(self.a, "a1").status_code, 201)
+        self.assertEqual(self._make(self.a, "a2").status_code, 201)
+        # third on the SAME domain is refused (cap 2)...
+        self.assertEqual(self._make(self.a, "a3").status_code, 403)
+        # ...but the private domain has its own fresh allowance.
+        self.assertEqual(self._make(self.b, "b1").status_code, 201)
+        self.assertEqual(self._make(self.b, "b2").status_code, 201)
+        self.assertEqual(self._make(self.b, "b3").status_code, 403)
+
+
+class MultiPrivateDomainTest(TestCase):
+    """A workspace can own several private domains; a plain purchase buys a new
+    one, a targeted purchase renews a specific one."""
+
+    def setUp(self):
+        from django.utils import timezone
+        self.org = _workspace("multi@example.com")
+        # two in stock
+        for h in ("p1.cc", "p2.cc"):
+            ShortDomain.objects.create(host=h, is_shared=False, active=True,
+                                       verified_at=timezone.now())
+
+    def _buy(self, renew=None):
+        from apps.links.models import PrivateDomainPurchase
+        from apps.links.purchases import mark_paid
+        p = PrivateDomainPurchase.objects.create(organization=self.org, amount=5,
+                                                 renew_domain=renew)
+        return mark_paid(p)
+
+    def test_two_purchases_give_two_distinct_domains(self):
+        d1 = self._buy()
+        d2 = self._buy()
+        self.assertIsNotNone(d1); self.assertIsNotNone(d2)
+        self.assertNotEqual(d1.id, d2.id)
+        self.assertEqual(ShortDomain.private_for(self.org.id).count(), 2)
+
+    def test_targeted_purchase_renews_that_domain(self):
+        d1 = self._buy()
+        before = d1.private_until
+        renewed = self._buy(renew=d1)
+        self.assertEqual(renewed.id, d1.id)
+        self.assertGreater(renewed.private_until, before)
+        # still only the domains we assigned; renewal didn't consume stock
+        self.assertEqual(ShortDomain.private_for(self.org.id).count(), 1)

@@ -212,8 +212,9 @@ export const linkApi = {
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
   remove: (id: number) => http.del(`/links/${id}/`),
-  buyPrivateDomain: (orgId: number) =>
-    http.post<{ checkout_url?: string; activated?: boolean }>("/links/private-domain/checkout/", { organization: orgId }),
+  buyPrivateDomain: (orgId: number, renewDomain?: number) =>
+    http.post<{ checkout_url?: string; activated?: boolean }>("/links/private-domain/checkout/",
+      renewDomain ? { organization: orgId, renew_domain: renewDomain } : { organization: orgId }),
   verifyPrivateDomain: (orgId: number) =>
     http.post<{ paid: boolean; host: string; awaiting_stock: boolean }>("/links/private-domain/verify/", { organization: orgId }),
 };

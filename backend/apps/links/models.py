@@ -341,6 +341,10 @@ class PrivateDomainPurchase(models.Model):
     bachs_session_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
     domain = models.ForeignKey(ShortDomain, on_delete=models.SET_NULL, null=True, blank=True,
                                related_name="purchases")
+    # Set when this purchase renews a SPECIFIC domain the org already owns.
+    # Null means "buy a new one" — so a workspace can own several private domains.
+    renew_domain = models.ForeignKey(ShortDomain, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name="renewals")
     note = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)

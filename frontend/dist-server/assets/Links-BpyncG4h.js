@@ -94,16 +94,15 @@ const CHALLENGE_STYLES = [
   }
 ];
 function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
-  var _a, _b;
   const owned = priv.owned.length;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const { confirm, notify } = useDialog();
-  async function buy() {
-    var _a2;
+  async function buy(renewId) {
+    var _a;
     if (!await confirm({
-      title: `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
-      message: "A short domain used by you and nobody else, so another customer's traffic can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
+      title: renewId ? `Renew — $${PRIVATE_DOMAIN_PRICE}/month` : `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
+      message: renewId ? "Extend this private domain by another 30 days." : "A short domain used by you and nobody else, so another customer's traffic can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
       confirmLabel: "Continue to payment",
       cancelLabel: "Not now",
       tone: "brand"
@@ -111,36 +110,49 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
     setBusy(true);
     setMsg("");
     try {
-      const r = await linkApi.buyPrivateDomain(orgId);
+      const r = await linkApi.buyPrivateDomain(orgId, renewId);
       if (r.checkout_url) {
         window.location.href = r.checkout_url;
         return;
       }
-      notify("Private domain added.");
+      notify(renewId ? "Renewed." : "Private domain added.");
       onChanged();
     } catch (e) {
-      setMsg(((_a2 = e == null ? void 0 : e.data) == null ? void 0 : _a2.detail) || "Could not start the purchase.");
+      setMsg(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not start the purchase.");
     } finally {
       setBusy(false);
     }
   }
-  return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-5 flex flex-wrap items-center justify-between gap-3 p-5", children: [
+  return /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-5 p-5", children: owned > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsxs("div", { className: "text-sm font-bold", children: [
+      "Your private ",
+      owned === 1 ? "domain" : "domains"
+    ] }),
+    /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+      "Yours alone — nobody else can create links on ",
+      owned === 1 ? "it" : "them",
+      ". Each one gives you a full set of redirects on your plan."
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-2", children: priv.owned.map((d) => {
+      const lapsed = d.private_until ? new Date(d.private_until) < /* @__PURE__ */ new Date() : false;
+      return /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2", children: [
+        /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+          /* @__PURE__ */ jsx("div", { className: "font-mono text-sm font-semibold", children: d.host }),
+          /* @__PURE__ */ jsx("div", { className: `text-xs ${lapsed ? "text-red-600" : "text-fg-dim"}`, children: d.private_until ? lapsed ? "Lapsed — renew to keep it" : `Renews ${new Date(d.private_until).toLocaleDateString()}` : "Active" })
+        ] }),
+        canManage && /* @__PURE__ */ jsx(Button, { onClick: () => buy(d.id), variant: "outline", disabled: busy, children: busy ? "…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo` })
+      ] }, d.id);
+    }) }),
+    canManage && /* @__PURE__ */ jsxs("div", { className: "mt-3 flex flex-col items-start gap-1", children: [
+      /* @__PURE__ */ jsx(Button, { onClick: () => buy(), disabled: busy, children: busy ? "Starting…" : `Get another private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
+      priv.available === 0 && /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "None in stock right now — ask and we'll source one." }),
+      msg && /* @__PURE__ */ jsx("span", { className: "text-xs text-red-600", children: msg })
+    ] })
+  ] }) : /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
     /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: owned > 0 ? `Your private ${owned === 1 ? "domain" : "domains"}` : "Private domain" }),
-      owned > 0 ? /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
-        priv.owned.map((d) => d.host).join(", "),
-        " — yours alone. Nobody else can create links on ",
-        owned === 1 ? "it" : "them",
-        ", so another customer's traffic can never affect",
-        owned === 1 ? " its" : " their",
-        " reputation.",
-        ((_a = priv.owned[0]) == null ? void 0 : _a.private_until) && /* @__PURE__ */ jsxs(Fragment, { children: [
-          " Renews ",
-          /* @__PURE__ */ jsx("b", { children: new Date(priv.owned[0].private_until).toLocaleDateString() }),
-          "."
-        ] })
-      ] }) : /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
-        "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else.",
+      /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "Private domain" }),
+      /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+        "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else — and gives you a full set of redirects on your plan.",
         " ",
         priv.available > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsx("b", { children: priv.available }),
@@ -148,16 +160,11 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }) {
         ] }) : /* @__PURE__ */ jsx(Fragment, { children: "None in stock at the moment — ask and we'll source one." })
       ] })
     ] }),
-    owned > 0 && ((_b = priv.owned[0]) == null ? void 0 : _b.private_until) && new Date(priv.owned[0].private_until) < /* @__PURE__ */ new Date() && /* @__PURE__ */ jsxs("div", { className: "w-full rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm", children: [
-      "⚠️ This rental has lapsed. Your links still work for a short grace period, then the domain is released. ",
-      canManage && /* @__PURE__ */ jsx("button", { onClick: buy, className: "font-semibold text-brand hover:underline", children: "Renew now" })
-    ] }),
-    canManage && owned > 0 && /* @__PURE__ */ jsx(Button, { onClick: buy, variant: "outline", disabled: busy, children: busy ? "Starting…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo` }),
-    canManage && owned === 0 && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
-      /* @__PURE__ */ jsx(Button, { onClick: buy, disabled: busy, className: busy ? "" : "cta-glow", children: busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
+    canManage && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+      /* @__PURE__ */ jsx(Button, { onClick: () => buy(), disabled: busy, className: busy ? "" : "cta-glow", children: busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
       msg && /* @__PURE__ */ jsx("span", { className: "max-w-xs text-right text-xs text-red-600", children: msg })
     ] })
-  ] });
+  ] }) });
 }
 function LockedBanner({ planName, canManage }) {
   return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-brand/5 p-5", children: [
@@ -200,7 +207,9 @@ function Links() {
   const serviceUp = linkBase !== "";
   const linkEnabled = serviceUp && !!sub && sub.status === "active" && !((_a = sub.access) == null ? void 0 : _a.locked);
   const used = rows.length;
-  const cap = (sub == null ? void 0 : sub.interval) === "monthly" && (sub == null ? void 0 : sub.plan.max_redirects_monthly) ? sub.plan.max_redirects_monthly : (sub == null ? void 0 : sub.plan.max_redirects) ?? 0;
+  const perDomainCap = (sub == null ? void 0 : sub.interval) === "monthly" && (sub == null ? void 0 : sub.plan.max_redirects_monthly) ? sub.plan.max_redirects_monthly : (sub == null ? void 0 : sub.plan.max_redirects) ?? 0;
+  const domainCount = Math.max(1, domains.length);
+  const cap = perDomainCap ? perDomainCap * domainCount : 0;
   const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id) => {
     var _a2;

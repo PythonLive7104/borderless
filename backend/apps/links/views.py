@@ -69,11 +69,16 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         if not link_shortener_enabled(org.id):
             raise PermissionDenied(
                 "Redirects are a paid feature. Start a plan on the Billing page to create them.")
+        # The cap is PER DOMAIN, not per workspace: each domain the workspace can
+        # use — the shared pool and every private domain it owns — gets its own
+        # plan-sized allowance. So buying more private domains buys more capacity.
         limit = redirect_limit(org.id)
-        if limit and ShortLink.objects.filter(organization_id=org.id).count() >= limit:
+        domain = serializer.validated_data.get("domain")
+        if limit and domain and ShortLink.objects.filter(
+                organization_id=org.id, domain=domain).count() >= limit:
             raise PermissionDenied(
-                f"You've reached your plan's redirect limit ({limit}). "
-                "Upgrade your plan on the Billing page for more redirects.")
+                f"You've reached your plan's redirect limit ({limit}) for this domain. "
+                "Use another domain, add a private domain, or upgrade your plan.")
         link = serializer.save()
         scan_and_flag(link)   # threat scan; auto-disables if the destination is unsafe
         publish_link(link)
@@ -191,11 +196,21 @@ class PrivateDomainCheckoutView(views.APIView):
         if not link_shortener_enabled(org_id):
             return Response({"detail": "A private domain is an add-on to a paid plan. "
                                        "Start a plan first."}, status=403)
-        # Owning one is fine — that payment is a renewal, handled in mark_paid().
+
+        # Optional: renew a specific domain the workspace already owns. Without
+        # it, the purchase buys a NEW domain — a workspace may own several.
+        from .models import ShortDomain
+        renew_domain = None
+        renew_id = request.data.get("renew_domain")
+        if renew_id:
+            renew_domain = ShortDomain.private_for(org_id).filter(pk=renew_id).first()
+            if not renew_domain:
+                return Response({"detail": "That domain isn't one of yours to renew."}, status=400)
 
         price = int(getattr(settings, "PRIVATE_DOMAIN_PRICE", 25))
         purchase = PrivateDomainPurchase.objects.create(
-            organization_id=org_id, user=request.user, amount=price)
+            organization_id=org_id, user=request.user, amount=price,
+            renew_domain=renew_domain)
 
         product_id = getattr(settings, "BACHS_PRODUCT_PRIVATE_DOMAIN", "")
         if not bachs.is_enabled() or not product_id:
@@ -216,7 +231,8 @@ class PrivateDomainCheckoutView(views.APIView):
             email=request.user.email,
             return_url=f"{front}/dashboard/links?purchase=success",
             cancel_url=f"{front}/dashboard/links?purchase=cancelled",
-            metadata={"organization_id": str(org_id), "kind": "private_domain",
+            metadata={"organization_id": str(org_id),
+                      "kind": "private_domain_renew" if renew_domain else "private_domain",
                       "purchase_id": str(purchase.id)},
         )
         if err:

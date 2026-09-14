@@ -94,67 +94,88 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged }: {
   const [msg, setMsg] = useState("");
   const { confirm, notify } = useDialog();
 
-  async function buy() {
+  async function buy(renewId?: number) {
     if (!(await confirm({
-      title: `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
-      message: "A short domain used by you and nobody else, so another customer's traffic "
-             + "can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
+      title: renewId ? `Renew — $${PRIVATE_DOMAIN_PRICE}/month` : `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
+      message: renewId
+        ? "Extend this private domain by another 30 days."
+        : "A short domain used by you and nobody else, so another customer's traffic "
+          + "can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
       confirmLabel: "Continue to payment",
       cancelLabel: "Not now",
       tone: "brand",
     }))) return;
     setBusy(true); setMsg("");
     try {
-      const r = await linkApi.buyPrivateDomain(orgId);
+      const r = await linkApi.buyPrivateDomain(orgId, renewId);
       if (r.checkout_url) { window.location.href = r.checkout_url; return; }
-      notify("Private domain added."); onChanged();
+      notify(renewId ? "Renewed." : "Private domain added."); onChanged();
     } catch (e: any) {
       setMsg(e?.data?.detail || "Could not start the purchase.");
     } finally { setBusy(false); }
   }
   return (
-    <div className="card shadow-soft mt-5 flex flex-wrap items-center justify-between gap-3 p-5">
-      <div className="min-w-0">
-        <div className="text-sm font-bold">
-          {owned > 0 ? `Your private ${owned === 1 ? "domain" : "domains"}` : "Private domain"}
-        </div>
-        {owned > 0 ? (
+    <div className="card shadow-soft mt-5 p-5">
+      {owned > 0 ? (
+        <>
+          <div className="text-sm font-bold">Your private {owned === 1 ? "domain" : "domains"}</div>
           <p className="mt-1 text-sm text-fg-muted">
-            {priv.owned.map((d) => d.host).join(", ")} — yours alone. Nobody else can create links
-            on {owned === 1 ? "it" : "them"}, so another customer's traffic can never affect
-            {owned === 1 ? " its" : " their"} reputation.
-            {priv.owned[0]?.private_until && (
-              <> Renews <b>{new Date(priv.owned[0].private_until).toLocaleDateString()}</b>.</>
-            )}
+            Yours alone — nobody else can create links on {owned === 1 ? "it" : "them"}. Each one
+            gives you a full set of redirects on your plan.
           </p>
-        ) : (
-          <p className="mt-1 text-sm text-fg-muted">
-            Shared domains work well, but you're on them alongside other customers. A private domain
-            is used by you and nobody else.{" "}
-            {priv.available > 0
-              ? <><b>{priv.available}</b> available right now.</>
-              : <>None in stock at the moment — ask and we'll source one.</>}
-          </p>
-        )}
-      </div>
-      {owned > 0 && priv.owned[0]?.private_until &&
-        new Date(priv.owned[0].private_until) < new Date() && (
-        <div className="w-full rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
-          ⚠️ This rental has lapsed. Your links still work for a short grace period, then the
-          domain is released. {canManage && <button onClick={buy} className="font-semibold text-brand hover:underline">Renew now</button>}
-        </div>
-      )}
-      {canManage && owned > 0 && (
-        <Button onClick={buy} variant="outline" disabled={busy}>
-          {busy ? "Starting…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo`}
-        </Button>
-      )}
-      {canManage && owned === 0 && (
-        <div className="flex flex-col items-end gap-1">
-          <Button onClick={buy} disabled={busy} className={busy ? "" : "cta-glow"}>
-            {busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
-          </Button>
-          {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
+          <div className="mt-3 space-y-2">
+            {priv.owned.map((d) => {
+              const lapsed = d.private_until ? new Date(d.private_until) < new Date() : false;
+              return (
+                <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="font-mono text-sm font-semibold">{d.host}</div>
+                    <div className={`text-xs ${lapsed ? "text-red-600" : "text-fg-dim"}`}>
+                      {d.private_until
+                        ? (lapsed ? "Lapsed — renew to keep it" : `Renews ${new Date(d.private_until).toLocaleDateString()}`)
+                        : "Active"}
+                    </div>
+                  </div>
+                  {canManage && (
+                    <Button onClick={() => buy(d.id)} variant="outline" disabled={busy}>
+                      {busy ? "…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo`}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {canManage && (
+            <div className="mt-3 flex flex-col items-start gap-1">
+              <Button onClick={() => buy()} disabled={busy}>
+                {busy ? "Starting…" : `Get another private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
+              </Button>
+              {priv.available === 0 && <span className="text-xs text-fg-dim">None in stock right now — ask and we'll source one.</span>}
+              {msg && <span className="text-xs text-red-600">{msg}</span>}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-bold">Private domain</div>
+            <p className="mt-1 text-sm text-fg-muted">
+              Shared domains work well, but you're on them alongside other customers. A private
+              domain is used by you and nobody else — and gives you a full set of redirects on your
+              plan.{" "}
+              {priv.available > 0
+                ? <><b>{priv.available}</b> available right now.</>
+                : <>None in stock at the moment — ask and we'll source one.</>}
+            </p>
+          </div>
+          {canManage && (
+            <div className="flex flex-col items-end gap-1">
+              <Button onClick={() => buy()} disabled={busy} className={busy ? "" : "cta-glow"}>
+                {busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
+              </Button>
+              {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -219,10 +240,16 @@ export default function Links() {
   // Usage against the plan's cap. Mirrors redirect_limit() on the server, which
   // is what actually refuses the create — 0 means the tier has no allowance.
   const used = rows.length;
-  // Cap for the interval this workspace is actually billed on, not the weekly one.
-  const cap = (sub?.interval === "monthly" && sub?.plan.max_redirects_monthly)
+  // Per-domain cap for the interval this workspace is billed on. The server
+  // enforces it PER DOMAIN, so total capacity grows with each domain the
+  // workspace can use (the shared one + every private domain owned).
+  const perDomainCap = (sub?.interval === "monthly" && sub?.plan.max_redirects_monthly)
     ? sub.plan.max_redirects_monthly
     : (sub?.plan.max_redirects ?? 0);
+  const domainCount = Math.max(1, domains.length);
+  const cap = perDomainCap ? perDomainCap * domainCount : 0;
+  // "At cap" only when every usable domain is full — the create button stays
+  // usable as long as at least one domain has room; the server has the final say.
   const atCap = linkEnabled && cap > 0 && used >= cap;
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
   // Served by the API (SHORTLINK_BASE) so a brand-new workspace with no links

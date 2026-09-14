@@ -56,8 +56,10 @@ def renew(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     early never loses time, and renewing after a lapse doesn't back-date into
     an already-expired window.
     """
-    domain = ShortDomain.private_for(purchase.organization_id).first()
-    if not domain:
+    # Renew the specific domain this purchase targets; fall back to the first
+    # owned one for older purchases that predate targeted renewals.
+    domain = purchase.renew_domain or ShortDomain.private_for(purchase.organization_id).first()
+    if not domain or domain.organization_id != purchase.organization_id:
         return None
     base = max(domain.private_until or timezone.now(), timezone.now())
     domain.private_until = base + timedelta(days=PERIOD_DAYS)
@@ -73,8 +75,9 @@ def mark_paid(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     """Record the payment, then fulfil if stock allows."""
     if purchase.status == PrivateDomainPurchase.Status.FULFILLED:
         return purchase.domain
-    # Already has one? This payment is a renewal, not a second domain.
-    if ShortDomain.private_for(purchase.organization_id).exists():
+    # A purchase that names a domain is a renewal of that one; otherwise it buys
+    # a fresh domain from stock — so a workspace can own several at once.
+    if purchase.renew_domain_id:
         purchase.status = PrivateDomainPurchase.Status.PAID
         purchase.paid_at = timezone.now()
         purchase.save(update_fields=["status", "paid_at"])
