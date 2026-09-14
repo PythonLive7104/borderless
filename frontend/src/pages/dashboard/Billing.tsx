@@ -208,7 +208,7 @@ export default function Billing() {
               {/* redirects / domains caps */}
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <Spec icon={<ILink width={13} />} label="Redirects" value={redirectsOf(p)} />
-                <Spec icon={<IGlobe width={13} />} label="Domains" value={websitesOf(p)} />
+                <Spec icon={<IGlobe width={13} />} label="Antibot sites" value={websitesOf(p)} />
               </div>
 
               {/* features */}

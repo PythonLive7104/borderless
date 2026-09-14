@@ -73,7 +73,7 @@ const INCLUDED = [
 
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies — BTC, ETH, USDT, USDC and TON. Crypto keeps billing private and borderless."],
-  ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
+  ["What are redirects and antibot sites?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Antibot sites' are the websites you protect with the tracking snippet. Each tier includes a set number of both. (These are NOT private short domains — a private domain is an optional paid add-on.)"],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
 ];
@@ -183,7 +183,7 @@ export default function Pricing() {
               <div className="mt-6 flex-1" />
               <div className="border-t border-line pt-5 text-sm">
                 <div className="flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{monthly ? p.redirectsMonthly : p.redirects}</span></div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Domains</span><span className="font-semibold">{monthly ? p.domainsMonthly : p.domains}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Antibot sites</span><span className="font-semibold">{monthly ? p.domainsMonthly : p.domains}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>
               <Button to="/signup" variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {p.cta}</Button>

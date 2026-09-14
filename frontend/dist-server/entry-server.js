@@ -1282,7 +1282,7 @@ const INCLUDED = [
 ];
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies — BTC, ETH, USDT, USDC and TON. Crypto keeps billing private and borderless."],
-  ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
+  ["What are redirects and antibot sites?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Antibot sites' are the websites you protect with the tracking snippet. Each tier includes a set number of both. (These are NOT private short domains — a private domain is an optional paid add-on.)"],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."]
 ];
@@ -1365,7 +1365,7 @@ function Pricing() {
                 /* @__PURE__ */ jsx("span", { className: "font-semibold", children: monthly ? p.redirectsMonthly : p.redirects })
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
-                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Domains" }),
+                /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Antibot sites" }),
                 /* @__PURE__ */ jsx("span", { className: "font-semibold", children: monthly ? p.domainsMonthly : p.domains })
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "mt-1 flex justify-between", children: [
@@ -2041,7 +2041,7 @@ const Conversions = lazy(() => import("./assets/Conversions-DVXgMIW6.js"));
 const DashIntegrations = lazy(() => import("./assets/Integrations-BgJX3oDQ.js"));
 const ApiKeys = lazy(() => import("./assets/ApiKeys-hKgp-leM.js"));
 const Webhooks = lazy(() => import("./assets/Webhooks-Cd9_0nng.js"));
-const Billing = lazy(() => import("./assets/Billing-DLGsKG8K.js"));
+const Billing = lazy(() => import("./assets/Billing-CehBmgcp.js"));
 const UsagePage = lazy(() => import("./assets/UsagePage-CxZbScxD.js"));
 const Team = lazy(() => import("./assets/Team-BRQ3BDZX.js"));
 const Settings = lazy(() => import("./assets/Settings-DHJ8kh4S.js"));

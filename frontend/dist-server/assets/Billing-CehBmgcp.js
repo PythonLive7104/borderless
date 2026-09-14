@@ -213,7 +213,7 @@ function Billing() {
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "mt-4 grid grid-cols-2 gap-3", children: [
           /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(ILink, { width: 13 }), label: "Redirects", value: redirectsOf(p) }),
-          /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(IGlobe, { width: 13 }), label: "Domains", value: websitesOf(p) })
+          /* @__PURE__ */ jsx(Spec, { icon: /* @__PURE__ */ jsx(IGlobe, { width: 13 }), label: "Antibot sites", value: websitesOf(p) })
         ] }),
         /* @__PURE__ */ jsx("ul", { className: "mt-4 flex-1 space-y-2 text-sm", children: feats.map((f) => /* @__PURE__ */ jsxs("li", { className: `flex gap-2 ${f.muted ? "text-fg-dim" : "text-fg-muted"}`, children: [
           f.muted ? /* @__PURE__ */ jsx(CheckHollow, {}) : /* @__PURE__ */ jsx(CheckFull, {}),
