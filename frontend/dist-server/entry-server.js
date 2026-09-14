@@ -147,6 +147,10 @@ const linkApi = {
     "/links/private-domain/checkout/",
     renewDomain ? { organization: orgId, renew_domain: renewDomain } : { organization: orgId }
   ),
+  customDomains: (orgId) => http.get(`/links/domains/?organization=${orgId}`),
+  addCustomDomain: (orgId, host) => http.post("/links/domains/", { organization: orgId, host }),
+  verifyCustomDomain: (id) => http.post(`/links/domains/${id}/verify/`, {}),
+  removeCustomDomain: (id) => http.del(`/links/domains/${id}/`),
   verifyPrivateDomain: (orgId) => http.post("/links/private-domain/verify/", { organization: orgId })
 };
 const campaignApi = {
@@ -2031,7 +2035,7 @@ const Campaigns = lazy(() => import("./assets/Campaigns-Q6xl3bae.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-C4TtOePW.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-Bl5INGJf.js"));
 const Shield = lazy(() => import("./assets/Shield-DyK0fF8q.js"));
-const Links = lazy(() => import("./assets/Links-Bt6Yrs0o.js"));
+const Links = lazy(() => import("./assets/Links-DVqjgUaL.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-BVeod6fO.js"));
 const Visitors = lazy(() => import("./assets/Visitors-CXCEcu0C.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-D5GLziLZ.js"));

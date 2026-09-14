@@ -3,13 +3,140 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
 import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
-import { d as useDialog, c as useWorkspace, z as linkApi, B as Button, y as websiteApi, e as billingApi } from "../entry-server.js";
+import { d as useDialog, B as Button, z as linkApi, c as useWorkspace, y as websiteApi, e as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";
 import { F as Field } from "./Field-Cq1XQP8x.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
+function CustomDomainPanel({ orgId, canManage, onChanged }) {
+  const { confirm, notify } = useDialog();
+  const [domains, setDomains] = useState([]);
+  const [host, setHost] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function load() {
+    try {
+      setDomains((await linkApi.customDomains(orgId)).domains);
+    } catch {
+    }
+  }
+  useEffect(() => {
+    if (canManage) load();
+  }, [orgId, canManage]);
+  async function add() {
+    var _a;
+    setErr("");
+    setBusy(true);
+    try {
+      await linkApi.addCustomDomain(orgId, host.trim());
+      setHost("");
+      load();
+    } catch (e) {
+      setErr(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not add that domain.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verify(d) {
+    var _a, _b;
+    setBusy(true);
+    try {
+      const r = await linkApi.verifyCustomDomain(d.id);
+      notify(r.message, r.verified ? "success" : "danger");
+      load();
+      onChanged();
+    } catch (e) {
+      notify(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.message) || ((_b = e == null ? void 0 : e.data) == null ? void 0 : _b.detail) || "Verification failed.", "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(d) {
+    var _a;
+    if (!await confirm({ title: `Remove ${d.host}?`, tone: "danger", confirmLabel: "Remove" })) return;
+    try {
+      await linkApi.removeCustomDomain(d.id);
+      load();
+      onChanged();
+    } catch (e) {
+      notify(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not remove it.", "danger");
+    }
+  }
+  if (!canManage) return null;
+  return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-5 p-5", children: [
+    /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "Use your own domain" }),
+    /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+      "Prefer your own brand? Point a domain you own (like ",
+      /* @__PURE__ */ jsx("span", { className: "font-mono", children: "go.yourbrand.com" }),
+      ") at us and run redirects on it. Its reputation is entirely yours — free, no monthly rental."
+    ] }),
+    domains.length > 0 && /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-3", children: domains.map((d) => /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx("span", { className: "font-mono text-sm font-semibold", children: d.host }),
+          d.verified ? /* @__PURE__ */ jsx("span", { className: "rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700", children: "✓ Verified" }) : /* @__PURE__ */ jsx("span", { className: "rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-amber-700", children: "Awaiting DNS" })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 text-sm", children: [
+          !d.verified && /* @__PURE__ */ jsx("button", { onClick: () => verify(d), disabled: busy, className: "font-semibold text-brand hover:underline", children: "Verify" }),
+          /* @__PURE__ */ jsx("button", { onClick: () => remove(d), className: "text-red-500 hover:underline", children: "Remove" })
+        ] })
+      ] }),
+      !d.verified && /* @__PURE__ */ jsxs("div", { className: "mt-3 space-y-2 rounded-lg bg-bg-soft p-3 text-xs", children: [
+        /* @__PURE__ */ jsx("div", { className: "font-semibold text-fg", children: "Add these two DNS records at your domain provider:" }),
+        /* @__PURE__ */ jsx(DnsRow, { label: "1. TXT record (proves it's yours)", name: d.verify.txt_name, value: d.verify.txt_value }),
+        /* @__PURE__ */ jsx(DnsRow, { label: "2. CNAME (points the domain at us)", name: d.host, value: d.verify.cname_target }),
+        /* @__PURE__ */ jsxs("div", { className: "text-fg-dim", children: [
+          "DNS can take a few minutes. Once it's live, click ",
+          /* @__PURE__ */ jsx("b", { children: "Verify" }),
+          ". HTTPS is set up for you automatically."
+        ] })
+      ] })
+    ] }, d.id)) }),
+    /* @__PURE__ */ jsxs("div", { className: "mt-4 flex flex-wrap items-center gap-2", children: [
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          value: host,
+          onChange: (e) => setHost(e.target.value),
+          placeholder: "go.yourbrand.com",
+          className: "min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        }
+      ),
+      /* @__PURE__ */ jsx(Button, { onClick: add, disabled: busy || !host.trim(), variant: "outline", children: busy ? "…" : "Add domain" })
+    ] }),
+    err && /* @__PURE__ */ jsx("div", { className: "mt-2 text-xs text-red-600", children: err })
+  ] });
+}
+function DnsRow({ label, name, value }) {
+  const [copied, setCopied] = useState("");
+  const copy = (t, which) => {
+    var _a;
+    (_a = navigator.clipboard) == null ? void 0 : _a.writeText(t);
+    setCopied(which);
+    setTimeout(() => setCopied(""), 1200);
+  };
+  return /* @__PURE__ */ jsxs("div", { children: [
+    /* @__PURE__ */ jsx("div", { className: "text-fg-muted", children: label }),
+    /* @__PURE__ */ jsxs("div", { className: "mt-1 grid gap-1 sm:grid-cols-2", children: [
+      /* @__PURE__ */ jsxs("button", { onClick: () => copy(name, "n"), className: "truncate rounded bg-white px-2 py-1 text-left font-mono hover:ring-1 hover:ring-brand/30", title: name, children: [
+        /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Name:" }),
+        " ",
+        name,
+        " ",
+        copied === "n" && /* @__PURE__ */ jsx("span", { className: "text-emerald-600", children: "✓" })
+      ] }),
+      /* @__PURE__ */ jsxs("button", { onClick: () => copy(value, "v"), className: "truncate rounded bg-white px-2 py-1 text-left font-mono hover:ring-1 hover:ring-brand/30", title: value, children: [
+        /* @__PURE__ */ jsx("span", { className: "text-fg-dim", children: "Value:" }),
+        " ",
+        value,
+        " ",
+        copied === "v" && /* @__PURE__ */ jsx("span", { className: "text-emerald-600", children: "✓" })
+      ] })
+    ] })
+  ] });
+}
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const randSlug = (len = 10) => {
   let s = "";
@@ -444,6 +571,7 @@ function Links() {
         perDomainCap
       }
     ),
+    linkEnabled && current && /* @__PURE__ */ jsx(CustomDomainPanel, { orgId: current.id, canManage, onChanged: load }),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !serviceUp ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl", children: "⏸️" }),
       /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirects are paused" }),

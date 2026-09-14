@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import HelpVideo from "../../components/dashboard/HelpVideo";
+import CustomDomainPanel from "../../components/dashboard/CustomDomainPanel";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { linkApi, websiteApi, billingApi, type ChallengeStyle, type PrivateDomains, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
@@ -443,6 +444,7 @@ export default function Links() {
 
       {linkEnabled && current && <PrivateDomainPanel priv={priv} canManage={canManage}
         orgId={current.id} onChanged={load} perDomainCap={perDomainCap} />}
+      {linkEnabled && current && <CustomDomainPanel orgId={current.id} canManage={canManage} onChanged={load} />}
 
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>

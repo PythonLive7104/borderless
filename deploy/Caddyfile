@@ -1,0 +1,43 @@
+# Front door for BRING-YOUR-OWN-DOMAIN (custom customer domains).
+#
+# Why Caddy: customer domains are arbitrary and unknown ahead of time, so their
+# TLS certificates must be issued on demand. Caddy fetches a Let's Encrypt cert
+# the first time a new hostname is requested — but ONLY for hostnames our backend
+# approves, via the on-demand "ask" endpoint. That stops anyone pointing a random
+# domain at us and making us fetch certs for it.
+#
+# Topology (recommended): Caddy is the edge on :443. It hands our own domains
+# straight to the existing nginx `web` container, and serves customer domains by
+# proxying their redirect slugs to the decision engine.
+#
+#   internet :443 ── Caddy ──┬── our domains (trynobot.com, trynb.cc, …) ─▶ web:80
+#                            └── customer domains (verified BYOD) ─────────▶ decision:8080
+#
+# IMPORTANT: this replaces nginx as the thing bound to :443, so validate it on a
+# staging host first. Set CADDY_ACME_EMAIL in the environment.
+
+{
+	email {$CADDY_ACME_EMAIL}
+	on_demand_tls {
+		# Caddy asks before issuing a cert; 200 = allowed, anything else = refused.
+		ask http://backend:8000/api/v1/tls-allowed
+	}
+}
+
+# --- our own domains: pass through to the existing nginx stack unchanged -------
+# List every domain we already run so Caddy uses its normal (non-on-demand) cert
+# path for them. Behind Cloudflare these are usually proxied anyway.
+{$OUR_DOMAINS} {
+	reverse_proxy web:80
+}
+
+# --- customer domains: on-demand TLS, redirects served by the engine ----------
+# The catch-all site matches any other hostname; on_demand_tls + the ask endpoint
+# ensure a cert is only fetched for a verified customer domain.
+https:// {
+	tls {
+		on_demand
+	}
+	# A redirect click is just /<slug> — the engine scores it and routes.
+	reverse_proxy decision:8080
+}

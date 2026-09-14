@@ -280,3 +280,129 @@ class PrivateDomainVerifyView(views.APIView):
         domain = mark_paid(pending)
         return Response({"paid": True, "host": domain.host if domain else "",
                          "awaiting_stock": domain is None})
+
+
+def _reserved_hosts() -> set:
+    """Our own domains — a customer must never be able to claim these."""
+    out = set()
+    for key in ("DOMAIN", "SHORT_DOMAIN", "SHORT_DOMAINS", "SHORT_DOMAINS_PRIVATE"):
+        for h in str(getattr(settings, key, "") or "").split(","):
+            h = h.strip().lower()
+            if h:
+                out.add(h)
+    return out
+
+
+class CustomDomainView(views.APIView):
+    """Bring-your-own-domain management.
+
+    GET  ?organization=  -> list this workspace's custom domains + status.
+    POST {organization, host} -> add one; returns the DNS records to set.
+    """
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
+
+    def _manager(self, org_id):
+        m = OrganizationMember.objects.filter(organization_id=org_id, user=self.request.user).first()
+        return m and m.can_manage
+
+    def get(self, request):
+        org_id = request.query_params.get("organization")
+        if not self._manager(org_id):
+            raise PermissionDenied("Only Owners and Admins can manage domains.")
+        return Response({"domains": [self._row(d) for d in
+                                     ShortDomain.byod_for(org_id).order_by("host")]})
+
+    def post(self, request):
+        from apps.billing.models import link_shortener_enabled
+        from .customdomains import new_token, valid_host, txt_name
+
+        org_id = request.data.get("organization")
+        if not self._manager(org_id):
+            raise PermissionDenied("Only Owners and Admins can add a domain.")
+        if not link_shortener_enabled(org_id):
+            return Response({"detail": "Custom domains need an active plan."}, status=403)
+
+        host = str(request.data.get("host", "")).strip().lower()
+        # tolerate a pasted URL
+        host = host.replace("https://", "").replace("http://", "").split("/")[0]
+        if not valid_host(host):
+            return Response({"detail": "That doesn't look like a valid domain (e.g. go.yourbrand.com)."}, status=400)
+        if host in _reserved_hosts():
+            return Response({"detail": "That domain isn't available."}, status=400)
+        if ShortDomain.objects.filter(host=host).exists():
+            return Response({"detail": "That domain is already in use."}, status=409)
+
+        d = ShortDomain.objects.create(
+            host=host, organization_id=org_id, byod=True, is_shared=False,
+            active=True, verify_token=new_token())
+        return Response(self._row(d), status=201)
+
+    def _row(self, d):
+        from .customdomains import txt_name
+        front = str(getattr(settings, "DOMAIN", "") or "").strip()
+        return {
+            "id": d.id, "host": d.host, "verified": bool(d.verified_at),
+            "verify": {
+                "txt_name": txt_name(d.host),
+                "txt_value": d.verify_token,
+                "cname_target": front or "redirects.trynobot.com",
+            },
+        }
+
+
+class CustomDomainVerifyView(views.APIView):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
+
+    def post(self, request, pk):
+        from .customdomains import verify_txt
+        d = ShortDomain.objects.filter(pk=pk, byod=True).first()
+        if not d:
+            return Response({"detail": "Domain not found."}, status=404)
+        m = OrganizationMember.objects.filter(organization_id=d.organization_id,
+                                              user=request.user).first()
+        if not m or not m.can_manage:
+            raise PermissionDenied("Only Owners and Admins can verify a domain.")
+        if d.verified_at:
+            return Response({"verified": True, "message": "Already verified."})
+        if not verify_txt(d.host, d.verify_token):
+            return Response({"verified": False,
+                             "message": "We couldn't find the TXT record yet. DNS can take a few "
+                                        "minutes — double-check the record and try again."}, status=400)
+        from django.utils import timezone
+        d.verified_at = timezone.now()
+        d.save(update_fields=["verified_at"])
+        return Response({"verified": True,
+                         "message": "Verified! You can now use this domain for redirects. "
+                                    "HTTPS is set up automatically the first time it's visited."})
+
+
+class CustomDomainDeleteView(views.APIView):
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
+
+    def delete(self, request, pk):
+        d = ShortDomain.objects.filter(pk=pk, byod=True).first()
+        if not d:
+            return Response(status=204)
+        m = OrganizationMember.objects.filter(organization_id=d.organization_id,
+                                              user=request.user).first()
+        if not m or not m.can_manage:
+            raise PermissionDenied("Only Owners and Admins can remove a domain.")
+        if ShortLink.objects.filter(domain=d).exists():
+            return Response({"detail": "Remove the redirects on this domain first."}, status=409)
+        d.delete()
+        return Response(status=204)
+
+
+class TLSAllowedView(views.APIView):
+    """Public 'ask' endpoint for the on-demand-TLS front door (Caddy): only
+    issue a certificate for a domain we actually recognise as a verified,
+    active customer domain. Anything else is refused, so we never fetch certs
+    for random hostnames pointed at us."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        host = str(request.query_params.get("domain", "")).strip().lower()
+        ok = bool(host) and ShortDomain.objects.filter(
+            host=host, byod=True, active=True, verified_at__isnull=False).exists()
+        return Response(status=200 if ok else 404)

@@ -58,6 +58,10 @@ class ShortDomain(models.Model):
     active = models.BooleanField(default=True,
                                  help_text="Uncheck to retire a domain; its links stop resolving.")
     is_default = models.BooleanField(default=False, help_text="Pre-selected when creating a redirect.")
+    # A domain the CUSTOMER owns and pointed at us (bring-your-own-domain),
+    # as opposed to shared pool or rented private stock. Verified by DNS.
+    byod = models.BooleanField(default=False)
+    verify_token = models.CharField(max_length=64, blank=True, default="")
     verified_at = models.DateTimeField(null=True, blank=True,
                                        help_text="Our own domains are verified on creation.")
     sort = models.IntegerField(default=0)
@@ -96,8 +100,14 @@ class ShortDomain(models.Model):
 
     @classmethod
     def private_for(cls, organization_id):
-        return cls.objects.filter(active=True, is_shared=False,
+        # Rented private domains (not the customer's own BYOD domains).
+        return cls.objects.filter(active=True, is_shared=False, byod=False,
                                   organization_id=organization_id)
+
+    @classmethod
+    def byod_for(cls, organization_id):
+        """Customer-owned domains this workspace added (verified or pending)."""
+        return cls.objects.filter(byod=True, organization_id=organization_id)
 
     @classmethod
     def default_for(cls, organization_id):

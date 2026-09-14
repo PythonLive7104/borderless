@@ -136,3 +136,34 @@ the VirusTotal free-tier quota; raise `--limit` (and `--sleep`) as volume grows.
 - The traffic stream consumer runs in `worker`; scheduled jobs are host cron
   (above), not Celery.
 - Real TLS/JA3 needs a TLS-terminating proxy (Cloudflare or an nginx JA3 build).
+
+## Bring-your-own-domain (custom customer domains)
+
+Customers can serve redirects on a domain they own (e.g. `go.brand.com`) instead
+of a shared or rented one. The dashboard flow (add → verify by DNS → use) is
+built in; the only operator step is the TLS front door, because arbitrary
+customer domains need certificates issued on the fly.
+
+**How a customer sets one up (in the app):**
+1. Redirection → "Use your own domain" → add `go.brand.com`.
+2. Add the two DNS records shown: a TXT (`_trynobot.go.brand.com`) that proves
+   ownership, and a CNAME/A pointing the domain at this server.
+3. Click Verify. Once the TXT resolves, the domain becomes usable and appears in
+   the redirect domain picker. Its reputation is entirely theirs.
+
+**Operator step — the on-demand-TLS edge (once):**
+Arbitrary hostnames can't have pre-issued certs, so put **Caddy** in front on
+:443 (see `deploy/Caddyfile`). Caddy issues a Let's Encrypt cert the first time a
+customer domain is visited, but only for hostnames the backend approves via
+`GET /api/v1/tls-allowed?domain=<host>` (200 = a verified customer domain).
+
+  - Set `CADDY_ACME_EMAIL` and `OUR_DOMAINS` (space-separated: your own domains).
+  - Caddy proxies your own domains to the existing `web` (nginx) and customer
+    domains' slugs to `decision:8080`.
+  - This makes Caddy the thing bound to :443 instead of nginx — **validate on a
+    staging host first**; a mistake here affects every domain.
+  - Customer domains must resolve to this server for the ACME HTTP challenge to
+    succeed (that's the CNAME/A record above).
+
+The `/api/v1/tls-allowed` gate is the safety valve: we never fetch a certificate
+for a domain we don't recognise as a verified customer domain.

@@ -1443,3 +1443,85 @@ class MultiPrivateDomainTest(TestCase):
         self.assertGreater(renewed.private_until, before)
         # still only the domains we assigned; renewal didn't consume stock
         self.assertEqual(ShortDomain.private_for(self.org.id).count(), 1)
+
+
+class CustomDomainTest(TestCase):
+    """Bring-your-own-domain: add, DNS-verify, and only then usable/serve TLS."""
+
+    def setUp(self):
+        from django.utils import timezone
+        from apps.billing.models import Plan, Subscription
+        from rest_framework.test import APIClient
+        from apps.organizations.models import OrganizationMember
+        self.org = _workspace("byod@example.com")
+        plan = Plan.objects.create(slug="byodplan", name="P", price=10, monthly_events=1000,
+                                   max_redirects=5, sort=8)
+        Subscription.objects.update_or_create(
+            organization=self.org,
+            defaults={"plan": plan, "status": "active", "interval": "weekly",
+                      "period_end": timezone.now() + __import__("datetime").timedelta(days=3)})
+        self.user = OrganizationMember.objects.get(organization=self.org, role="owner").user
+        self.c = APIClient(); self.c.force_authenticate(user=self.user)
+
+    def _add(self, host):
+        return self.c.post("/api/links/domains/", {"organization": self.org.id, "host": host}, format="json")
+
+    def test_add_returns_dns_records(self):
+        r = self._add("go.mybrand.com")
+        self.assertEqual(r.status_code, 201, r.content)
+        body = r.json()
+        self.assertEqual(body["host"], "go.mybrand.com")
+        self.assertFalse(body["verified"])
+        self.assertEqual(body["verify"]["txt_name"], "_trynobot.go.mybrand.com")
+        self.assertTrue(body["verify"]["txt_value"].startswith("tnb-verify-"))
+
+    def test_invalid_and_reserved_hosts_rejected(self):
+        self.assertEqual(self._add("not a domain").status_code, 400)
+        self.assertEqual(self._add("http://x").status_code, 400)
+        from django.test import override_settings
+        with override_settings(SHORT_DOMAIN="trynb.cc"):
+            self.assertEqual(self._add("trynb.cc").status_code, 400)
+
+    def test_duplicate_domain_rejected(self):
+        self.assertEqual(self._add("dup.brand.com").status_code, 201)
+        self.assertEqual(self._add("dup.brand.com").status_code, 409)
+
+    def test_verify_flow_and_tls_gate(self):
+        from unittest.mock import patch
+        did = self._add("go.brand.com").json()["id"]
+        # not verified yet -> TLS ask refuses
+        pub = APIClient()
+        self.assertEqual(pub.get("/api/v1/tls-allowed/?domain=go.brand.com").status_code, 404)
+        # DNS not there yet
+        with patch("apps.links.customdomains.verify_txt", return_value=False):
+            self.assertEqual(self.c.post(f"/api/links/domains/{did}/verify/", {}, format="json").status_code, 400)
+        # owner sets the TXT -> verifies
+        with patch("apps.links.customdomains.verify_txt", return_value=True):
+            r = self.c.post(f"/api/links/domains/{did}/verify/", {}, format="json")
+            self.assertEqual(r.status_code, 200)
+            self.assertTrue(r.json()["verified"])
+        # now TLS ask allows it, and it's usable for the workspace
+        self.assertEqual(pub.get("/api/v1/tls-allowed/?domain=go.brand.com").status_code, 200)
+        self.assertTrue(ShortDomain.for_org(self.org.id).filter(host="go.brand.com").exists())
+
+    def test_tls_gate_unknown_host(self):
+        self.assertEqual(APIClient().get("/api/v1/tls-allowed/?domain=random.example").status_code, 404)
+
+    def test_cannot_remove_domain_with_links(self):
+        from unittest.mock import patch
+        did = self._add("keep.brand.com").json()["id"]
+        with patch("apps.links.customdomains.verify_txt", return_value=True):
+            self.c.post(f"/api/links/domains/{did}/verify/", {}, format="json")
+        d = ShortDomain.objects.get(pk=did)
+        ShortLink.objects.create(organization=self.org, domain=d, slug="k1",
+                                 destination_url="https://e.example")
+        self.assertEqual(self.c.delete(f"/api/links/domains/{did}/").status_code, 409)
+
+
+class ValidHostTest(TestCase):
+    def test_accepts_and_rejects(self):
+        from apps.links.customdomains import valid_host
+        for good in ("go.brand.com", "links.example.co.uk", "a.b.io"):
+            self.assertTrue(valid_host(good), good)
+        for bad in ("", "brand", "http://x.com", "a..b.com", "x .com", "-bad.com", "no_dot"):
+            self.assertFalse(valid_host(bad), bad)

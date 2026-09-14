@@ -181,6 +181,8 @@ export const websiteApi = {
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
 export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; is_shared: boolean; private_until: string | null; }
 export interface PrivateDomains { owned: ShortDomain[]; available: number; }
+export interface CustomDomain { id: number; host: string; verified: boolean;
+  verify: { txt_name: string; txt_value: string; cname_target: string }; }
 export type ChallengeStyle = "hold" | "checkbox" | "slide";
 export interface ShortLink {
   domain: number | null;
@@ -215,6 +217,13 @@ export const linkApi = {
   buyPrivateDomain: (orgId: number, renewDomain?: number) =>
     http.post<{ checkout_url?: string; activated?: boolean }>("/links/private-domain/checkout/",
       renewDomain ? { organization: orgId, renew_domain: renewDomain } : { organization: orgId }),
+  customDomains: (orgId: number) =>
+    http.get<{ domains: CustomDomain[] }>(`/links/domains/?organization=${orgId}`),
+  addCustomDomain: (orgId: number, host: string) =>
+    http.post<CustomDomain>("/links/domains/", { organization: orgId, host }),
+  verifyCustomDomain: (id: number) =>
+    http.post<{ verified: boolean; message: string }>(`/links/domains/${id}/verify/`, {}),
+  removeCustomDomain: (id: number) => http.del(`/links/domains/${id}/`),
   verifyPrivateDomain: (orgId: number) =>
     http.post<{ paid: boolean; host: string; awaiting_stock: boolean }>("/links/private-domain/verify/", { organization: orgId }),
 };
