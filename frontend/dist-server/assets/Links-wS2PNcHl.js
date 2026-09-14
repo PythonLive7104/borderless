@@ -2,7 +2,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { P as PageNote } from "./PageNote-9zZCxTLa.js";
-import { H as HelpVideo } from "./HelpVideo-C4NguLet.js";
+import { H as HelpVideo } from "./HelpVideo-5RiXv0gQ.js";
 import { d as useDialog, B as Button, z as linkApi, c as useWorkspace, y as websiteApi, e as billingApi } from "../entry-server.js";
 import { u as useLivePoll } from "./useLivePoll-JHywBTNY.js";
 import { M as Modal } from "./Modal-CCIcMfR1.js";

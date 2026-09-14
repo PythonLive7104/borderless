@@ -120,4 +120,29 @@
       box-shadow: 0 8px 22px -10px rgba(37, 99, 235, .6);
     }
   }
+
+  /* Loud red pulse for the "watch first" video play button — deliberately
+     hard to miss (users were scrolling past the subtle blue one). Combines a
+     growing glow ring, a steady red halo, and a gentle scale. */
+  .pulse-red {
+    animation: pulse-red 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse-red {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, .7),
+                  0 0 16px 3px rgba(220, 38, 38, .55);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 0 16px rgba(220, 38, 38, 0),
+                  0 0 30px 10px rgba(220, 38, 38, .8);
+      transform: scale(1.08);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-red {
+      animation: none;
+      box-shadow: 0 0 22px 6px rgba(220, 38, 38, .6);
+    }
+  }
 }

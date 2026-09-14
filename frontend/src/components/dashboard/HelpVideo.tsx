@@ -25,9 +25,9 @@ export default function HelpVideo({
           onClick={() => setOpen(true)}
           className="group flex w-full items-center gap-4 rounded-xl border border-brand/30 bg-brand/5 p-5 text-left transition hover:border-brand/60 hover:bg-brand/10 sm:gap-5 sm:p-6"
         >
-          {/* cta-glow pulses the ring and stills itself under
-              prefers-reduced-motion — see index.css. */}
-          <span className="cta-glow grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand text-white transition group-hover:scale-105 sm:h-16 sm:w-16">
+          {/* pulse-red: loud red glow so the "watch first" button can't be
+              missed; stills itself under prefers-reduced-motion (see index.css). */}
+          <span className="pulse-red grid h-14 w-14 shrink-0 place-items-center rounded-full bg-red-600 text-white transition group-hover:scale-105 sm:h-16 sm:w-16">
             <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[2px] sm:h-7 sm:w-7" fill="currentColor" aria-hidden="true">
               <path d="M8 5v14l11-7z" />
             </svg>
