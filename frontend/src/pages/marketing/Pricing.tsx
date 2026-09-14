@@ -55,6 +55,22 @@ const PLANS: Plan[] = [
   },
 ];
 
+const INCLUDED = [
+  "Real-time bot & fraud scoring (0-100) with the exact reasons",
+  "Branded redirect links that screen every click",
+  "Deep filters: connection type, ISP/ASN, device, OS, browser, language, country",
+  "TLS fingerprinting (JA3 & JA4)",
+  "Live IP reputation: proxy/VPN, datacenter and recent-abuse checks",
+  "One-click block for datacenter & hosting traffic",
+  "Silent \"checking your browser\" deep check for headless bots",
+  "Human check (press-and-hold, tick-a-box or slide)",
+  "Cross-surface bot memory — caught once, flagged everywhere",
+  "Filtering funnel & per-campaign analytics with CSV export",
+  "Server-side Shield (PHP, Django, nginx, Cloudflare, Node)",
+  "Google Safe Browsing monitoring for your sites",
+  "Private domains available as an add-on",
+];
+
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies — BTC, ETH, USDT, USDC and TON. Crypto keeps billing private and borderless."],
   ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
@@ -177,6 +193,19 @@ export default function Pricing() {
         <p className="mt-8 text-center text-sm text-fg-dim">
           All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD, payable in cryptocurrency.
         </p>
+      </Section>
+
+      <Section className="bg-bg-soft rounded-none">
+        <SectionHead eyebrow="Included" title="Every plan comes with the full toolkit"
+          sub="Detection, filtering and protection aren't split across tiers — you get all of it. Plans differ only by volume, retention and limits." />
+        <div className="mx-auto mt-10 grid max-w-4xl gap-x-8 gap-y-3 sm:grid-cols-2">
+          {INCLUDED.map((f) => (
+            <div key={f} className="flex items-start gap-2.5 text-sm">
+              <span className="mt-0.5 text-brand"><ICheck /></span>
+              <span className="text-fg-muted">{f}</span>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section className="bg-bg-soft rounded-none">

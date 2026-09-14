@@ -1008,14 +1008,20 @@ const ILock = (p) => /* @__PURE__ */ jsxs("svg", { ...s(p), children: [
 ] });
 const FEATURES = [
   { icon: IRadar, title: "Traffic Intelligence", desc: "See every visitor and session with rich device, network and geo signals in real time." },
-  { icon: IShield, title: "Fraud Detection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your budget." },
+  { icon: IShield, title: "Fraud Detection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your budget — and remember an IP once it's caught, everywhere." },
   { icon: IGauge, title: "Risk Scoring", desc: "Every click gets a transparent 0–100 score with the exact signals that drove it." },
   { icon: IChart, title: "Campaign Analytics", desc: "Break down quality, sources, geos and devices with fast, filterable reports." },
   { icon: ITarget, title: "Conversion Tracking", desc: "Attribute conversions and revenue back to campaigns and traffic quality." },
   { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
   { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
   { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
-  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." }
+  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or nothing at all." },
+  { icon: IFilter, title: "Deep Targeting Filters", desc: "Filter by connection type, ISP, ASN, device, OS, browser version, language and country — allow only the traffic you actually want." },
+  { icon: IKey, title: "TLS Fingerprinting", desc: "Identify automated clients by their JA3/JA4 TLS signature, not just their user-agent — bots can't hide behind a fresh IP." },
+  { icon: IShieldGold, title: "Live IP Reputation", desc: "Real-time fraud scoring, proxy/VPN and recent-abuse checks on every IP, so a clean-looking address that's already known bad still gets caught." },
+  { icon: ICheck, title: "Silent Browser Check", desc: 'A split-second, no-click "checking your browser" step that catches headless and automated browsers real people never use.' },
+  { icon: IFunnel, title: "Filtering Funnel", desc: "See exactly how much traffic was checked, how much reached your page, and why the rest was turned away." },
+  { icon: IGlobe, title: "Private Domains", desc: "Rent short domains used by you alone, so another customer's traffic can never affect your reputation." }
 ];
 const STEPS = [
   ["Connect your website", "Add a site and get a unique tracking ID in seconds."],
@@ -1259,6 +1265,21 @@ const PLANS = [
     ]
   }
 ];
+const INCLUDED = [
+  "Real-time bot & fraud scoring (0-100) with the exact reasons",
+  "Branded redirect links that screen every click",
+  "Deep filters: connection type, ISP/ASN, device, OS, browser, language, country",
+  "TLS fingerprinting (JA3 & JA4)",
+  "Live IP reputation: proxy/VPN, datacenter and recent-abuse checks",
+  "One-click block for datacenter & hosting traffic",
+  'Silent "checking your browser" deep check for headless bots',
+  "Human check (press-and-hold, tick-a-box or slide)",
+  "Cross-surface bot memory — caught once, flagged everywhere",
+  "Filtering funnel & per-campaign analytics with CSV export",
+  "Server-side Shield (PHP, Django, nginx, Cloudflare, Node)",
+  "Google Safe Browsing monitoring for your sites",
+  "Private domains available as an add-on"
+];
 const FAQ = [
   ["How do I pay?", "We accept major cryptocurrencies — BTC, ETH, USDT, USDC and TON. Crypto keeps billing private and borderless."],
   ["What are redirects and domains?", "'Redirects' are the smart redirect links you create — each click is bot-scored and routed. 'Domains' are the websites you protect. Each tier includes a set number of both."],
@@ -1362,6 +1383,20 @@ function Pricing() {
         p.name
       )) }),
       /* @__PURE__ */ jsx("p", { className: "mt-8 text-center text-sm text-fg-dim", children: "All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD, payable in cryptocurrency." })
+    ] }),
+    /* @__PURE__ */ jsxs(Section, { className: "bg-bg-soft rounded-none", children: [
+      /* @__PURE__ */ jsx(
+        SectionHead,
+        {
+          eyebrow: "Included",
+          title: "Every plan comes with the full toolkit",
+          sub: "Detection, filtering and protection aren't split across tiers — you get all of it. Plans differ only by volume, retention and limits."
+        }
+      ),
+      /* @__PURE__ */ jsx("div", { className: "mx-auto mt-10 grid max-w-4xl gap-x-8 gap-y-3 sm:grid-cols-2", children: INCLUDED.map((f) => /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-2.5 text-sm", children: [
+        /* @__PURE__ */ jsx("span", { className: "mt-0.5 text-brand", children: /* @__PURE__ */ jsx(ICheck, {}) }),
+        /* @__PURE__ */ jsx("span", { className: "text-fg-muted", children: f })
+      ] }, f)) })
     ] }),
     /* @__PURE__ */ jsxs(Section, { className: "bg-bg-soft rounded-none", children: [
       /* @__PURE__ */ jsx(SectionHead, { eyebrow: "FAQ", title: "Questions, answered" }),

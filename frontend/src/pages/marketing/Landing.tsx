@@ -6,18 +6,24 @@ import LogoStrip from "../../components/marketing/LogoStrip";
 import DashboardPreview from "../../components/marketing/DashboardPreview";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
 import { BRAND } from "../../lib/brand";
-import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock, ILink } from "../../components/ui/icons";
+import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock, ILink, IFilter, IKey, IShieldGold, ICheck, IFunnel, IGlobe } from "../../components/ui/icons";
 
 const FEATURES = [
   { icon: IRadar, title: "Traffic Intelligence", desc: "See every visitor and session with rich device, network and geo signals in real time." },
-  { icon: IShield, title: "Fraud Detection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your budget." },
+  { icon: IShield, title: "Fraud Detection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your budget — and remember an IP once it's caught, everywhere." },
   { icon: IGauge, title: "Risk Scoring", desc: "Every click gets a transparent 0–100 score with the exact signals that drove it." },
   { icon: IChart, title: "Campaign Analytics", desc: "Break down quality, sources, geos and devices with fast, filterable reports." },
   { icon: ITarget, title: "Conversion Tracking", desc: "Attribute conversions and revenue back to campaigns and traffic quality." },
   { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
   { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
   { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
-  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or your site's own Traffic Rules." },
+  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or nothing at all." },
+  { icon: IFilter, title: "Deep Targeting Filters", desc: "Filter by connection type, ISP, ASN, device, OS, browser version, language and country — allow only the traffic you actually want." },
+  { icon: IKey, title: "TLS Fingerprinting", desc: "Identify automated clients by their JA3/JA4 TLS signature, not just their user-agent — bots can't hide behind a fresh IP." },
+  { icon: IShieldGold, title: "Live IP Reputation", desc: "Real-time fraud scoring, proxy/VPN and recent-abuse checks on every IP, so a clean-looking address that's already known bad still gets caught." },
+  { icon: ICheck, title: "Silent Browser Check", desc: "A split-second, no-click \"checking your browser\" step that catches headless and automated browsers real people never use." },
+  { icon: IFunnel, title: "Filtering Funnel", desc: "See exactly how much traffic was checked, how much reached your page, and why the rest was turned away." },
+  { icon: IGlobe, title: "Private Domains", desc: "Rent short domains used by you alone, so another customer's traffic can never affect your reputation." },
 ];
 
 const STEPS = [
