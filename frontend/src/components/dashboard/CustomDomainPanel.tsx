@@ -8,8 +8,8 @@ import Button from "../ui/Button";
  * redirects on it. Kept deliberately step-by-step because the DNS part trips up
  * non-technical users — add, copy two records, verify.
  */
-export default function CustomDomainPanel({ orgId, canManage, onChanged }: {
-  orgId: number; canManage: boolean; onChanged: () => void;
+export default function CustomDomainPanel({ orgId, canManage, onChanged, isPro }: {
+  orgId: number; canManage: boolean; onChanged: () => void; isPro: boolean;
 }) {
   const { confirm, notify } = useDialog();
   const [domains, setDomains] = useState<CustomDomain[]>([]);
@@ -20,7 +20,7 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged }: {
   async function load() {
     try { setDomains((await linkApi.customDomains(orgId)).domains); } catch { /* ignore */ }
   }
-  useEffect(() => { if (canManage) load(); /* eslint-disable-next-line */ }, [orgId, canManage]);
+  useEffect(() => { if (canManage && isPro) load(); /* eslint-disable-next-line */ }, [orgId, canManage, isPro]);
 
   async function add() {
     setErr(""); setBusy(true);
@@ -54,10 +54,16 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged }: {
       <div className="text-sm font-bold">Use your own domain</div>
       <p className="mt-1 text-sm text-fg-muted">
         Prefer your own brand? Point a domain you own (like <span className="font-mono">go.yourbrand.com</span>)
-        at us and run redirects on it. Its reputation is entirely yours — free, no monthly rental.
+        at us and run redirects on it. Its reputation is entirely yours — no monthly rental.
       </p>
+      {!isPro && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/30 bg-brand/5 p-3">
+          <span className="text-sm text-fg-muted">Using your own domain is a <b>Pro</b> feature.</span>
+          <a href="/dashboard/billing" className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-600">Upgrade to Pro</a>
+        </div>
+      )}
 
-      {domains.length > 0 && (
+      {isPro && domains.length > 0 && (
         <div className="mt-3 space-y-3">
           {domains.map((d) => (
             <div key={d.id} className="rounded-xl border border-line p-3">
@@ -86,14 +92,14 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged }: {
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      {isPro && <div className="mt-4 flex flex-wrap items-center gap-2">
         <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="go.yourbrand.com"
           className="min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
         <Button onClick={add} disabled={busy || !host.trim()} variant="outline">
           {busy ? "…" : "Add domain"}
         </Button>
-      </div>
-      {err && <div className="mt-2 text-xs text-red-600">{err}</div>}
+      </div>}
+      {isPro && err && <div className="mt-2 text-xs text-red-600">{err}</div>}
     </div>
   );
 }

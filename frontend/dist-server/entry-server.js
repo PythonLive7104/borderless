@@ -1211,7 +1211,7 @@ function CryptoIcons() {
 const BASE = [
   "Smart redirects with bot detection on every click",
   "Full anti-bot engine included",
-  "Smart shortlinks + custom domain redirects",
+  "Smart short links on shared & private domains",
   "IP allow / deny rules",
   "Domain health + ownership checks"
 ];
@@ -1221,6 +1221,7 @@ const PLUS_ADD = [
 ];
 const PRO_ADD = [
   "Highest redirect & domain limits",
+  "Bring your own domain (run redirects on your brand)",
   "Dedicated support"
 ];
 const PLANS = [
@@ -2035,7 +2036,7 @@ const Campaigns = lazy(() => import("./assets/Campaigns-Q6xl3bae.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-C4TtOePW.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-Bl5INGJf.js"));
 const Shield = lazy(() => import("./assets/Shield-DyK0fF8q.js"));
-const Links = lazy(() => import("./assets/Links-DVqjgUaL.js"));
+const Links = lazy(() => import("./assets/Links-B3sr0J5a.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-BVeod6fO.js"));
 const Visitors = lazy(() => import("./assets/Visitors-CXCEcu0C.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-D5GLziLZ.js"));

@@ -313,14 +313,15 @@ class CustomDomainView(views.APIView):
                                      ShortDomain.byod_for(org_id).order_by("host")]})
 
     def post(self, request):
-        from apps.billing.models import link_shortener_enabled
+        from apps.billing.models import is_pro
         from .customdomains import new_token, valid_host, txt_name
 
         org_id = request.data.get("organization")
         if not self._manager(org_id):
             raise PermissionDenied("Only Owners and Admins can add a domain.")
-        if not link_shortener_enabled(org_id):
-            return Response({"detail": "Custom domains need an active plan."}, status=403)
+        if not is_pro(org_id):
+            return Response({"detail": "Using your own domain is a Pro-plan feature. "
+                                       "Upgrade to Pro on the Billing page to add one."}, status=403)
 
         host = str(request.data.get("host", "")).strip().lower()
         # tolerate a pasted URL

@@ -21,7 +21,7 @@ type Plan = {
 const BASE: string[] = [
   "Smart redirects with bot detection on every click",
   "Full anti-bot engine included",
-  "Smart shortlinks + custom domain redirects",
+  "Smart short links on shared & private domains",
   "IP allow / deny rules",
   "Domain health + ownership checks",
 ];
@@ -31,6 +31,7 @@ const PLUS_ADD: string[] = [
 ];
 const PRO_ADD: string[] = [
   "Highest redirect & domain limits",
+  "Bring your own domain (run redirects on your brand)",
   "Dedicated support",
 ];
 

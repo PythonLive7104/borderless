@@ -1454,11 +1454,11 @@ class CustomDomainTest(TestCase):
         from rest_framework.test import APIClient
         from apps.organizations.models import OrganizationMember
         self.org = _workspace("byod@example.com")
-        plan = Plan.objects.create(slug="byodplan", name="P", price=10, monthly_events=1000,
-                                   max_redirects=5, sort=8)
+        pro = Plan.objects.filter(slug="pro").first() or Plan.objects.create(
+            slug="pro", name="Pro", price=70, monthly_events=1000000, max_redirects=10, sort=3)
         Subscription.objects.update_or_create(
             organization=self.org,
-            defaults={"plan": plan, "status": "active", "interval": "weekly",
+            defaults={"plan": pro, "status": "active", "interval": "weekly",
                       "period_end": timezone.now() + __import__("datetime").timedelta(days=3)})
         self.user = OrganizationMember.objects.get(organization=self.org, role="owner").user
         self.c = APIClient(); self.c.force_authenticate(user=self.user)
@@ -1516,6 +1516,13 @@ class CustomDomainTest(TestCase):
         ShortLink.objects.create(organization=self.org, domain=d, slug="k1",
                                  destination_url="https://e.example")
         self.assertEqual(self.c.delete(f"/api/links/domains/{did}/").status_code, 409)
+
+    def test_non_pro_plan_cannot_add(self):
+        from apps.billing.models import Plan, Subscription
+        basic = Plan.objects.filter(slug="basic").first() or Plan.objects.create(
+            slug="basic", name="Basic", price=25, monthly_events=100000, max_redirects=2, sort=1)
+        Subscription.objects.filter(organization=self.org).update(plan=basic)
+        self.assertEqual(self._add("go.basic.com").status_code, 403)
 
 
 class ValidHostTest(TestCase):

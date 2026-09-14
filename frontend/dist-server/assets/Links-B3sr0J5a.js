@@ -10,7 +10,7 @@ import { F as Field } from "./Field-Cq1XQP8x.js";
 import { N as NoData } from "./NoData-fWp_o2IY.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
-function CustomDomainPanel({ orgId, canManage, onChanged }) {
+function CustomDomainPanel({ orgId, canManage, onChanged, isPro }) {
   const { confirm, notify } = useDialog();
   const [domains, setDomains] = useState([]);
   const [host, setHost] = useState("");
@@ -23,8 +23,8 @@ function CustomDomainPanel({ orgId, canManage, onChanged }) {
     }
   }
   useEffect(() => {
-    if (canManage) load();
-  }, [orgId, canManage]);
+    if (canManage && isPro) load();
+  }, [orgId, canManage, isPro]);
   async function add() {
     var _a;
     setErr("");
@@ -70,9 +70,17 @@ function CustomDomainPanel({ orgId, canManage, onChanged }) {
     /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
       "Prefer your own brand? Point a domain you own (like ",
       /* @__PURE__ */ jsx("span", { className: "font-mono", children: "go.yourbrand.com" }),
-      ") at us and run redirects on it. Its reputation is entirely yours — free, no monthly rental."
+      ") at us and run redirects on it. Its reputation is entirely yours — no monthly rental."
     ] }),
-    domains.length > 0 && /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-3", children: domains.map((d) => /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3", children: [
+    !isPro && /* @__PURE__ */ jsxs("div", { className: "mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/30 bg-brand/5 p-3", children: [
+      /* @__PURE__ */ jsxs("span", { className: "text-sm text-fg-muted", children: [
+        "Using your own domain is a ",
+        /* @__PURE__ */ jsx("b", { children: "Pro" }),
+        " feature."
+      ] }),
+      /* @__PURE__ */ jsx("a", { href: "/dashboard/billing", className: "rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-600", children: "Upgrade to Pro" })
+    ] }),
+    isPro && domains.length > 0 && /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-3", children: domains.map((d) => /* @__PURE__ */ jsxs("div", { className: "rounded-xl border border-line p-3", children: [
       /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
           /* @__PURE__ */ jsx("span", { className: "font-mono text-sm font-semibold", children: d.host }),
@@ -94,7 +102,7 @@ function CustomDomainPanel({ orgId, canManage, onChanged }) {
         ] })
       ] })
     ] }, d.id)) }),
-    /* @__PURE__ */ jsxs("div", { className: "mt-4 flex flex-wrap items-center gap-2", children: [
+    isPro && /* @__PURE__ */ jsxs("div", { className: "mt-4 flex flex-wrap items-center gap-2", children: [
       /* @__PURE__ */ jsx(
         "input",
         {
@@ -106,7 +114,7 @@ function CustomDomainPanel({ orgId, canManage, onChanged }) {
       ),
       /* @__PURE__ */ jsx(Button, { onClick: add, disabled: busy || !host.trim(), variant: "outline", children: busy ? "…" : "Add domain" })
     ] }),
-    err && /* @__PURE__ */ jsx("div", { className: "mt-2 text-xs text-red-600", children: err })
+    isPro && err && /* @__PURE__ */ jsx("div", { className: "mt-2 text-xs text-red-600", children: err })
   ] });
 }
 function DnsRow({ label, name, value }) {
@@ -571,7 +579,15 @@ function Links() {
         perDomainCap
       }
     ),
-    linkEnabled && current && /* @__PURE__ */ jsx(CustomDomainPanel, { orgId: current.id, canManage, onChanged: load }),
+    linkEnabled && current && /* @__PURE__ */ jsx(
+      CustomDomainPanel,
+      {
+        orgId: current.id,
+        canManage,
+        onChanged: load,
+        isPro: (sub == null ? void 0 : sub.plan.slug) === "pro" && (sub == null ? void 0 : sub.status) === "active"
+      }
+    ),
     loading ? /* @__PURE__ */ jsx("div", { className: "grid place-items-center py-16", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) }) : !serviceUp ? /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 border-warning/40 bg-warning/5 p-8 text-center", children: [
       /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-warning/10 text-2xl", children: "⏸️" }),
       /* @__PURE__ */ jsx("h2", { className: "mt-3 text-lg font-bold", children: "Redirects are paused" }),

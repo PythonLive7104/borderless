@@ -444,7 +444,8 @@ export default function Links() {
 
       {linkEnabled && current && <PrivateDomainPanel priv={priv} canManage={canManage}
         orgId={current.id} onChanged={load} perDomainCap={perDomainCap} />}
-      {linkEnabled && current && <CustomDomainPanel orgId={current.id} canManage={canManage} onChanged={load} />}
+      {linkEnabled && current && <CustomDomainPanel orgId={current.id} canManage={canManage} onChanged={load}
+        isPro={sub?.plan.slug === "pro" && sub?.status === "active"} />}
 
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>

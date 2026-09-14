@@ -200,6 +200,13 @@ def link_shortener_enabled(organization_id) -> bool:
     return _paid_active(sub)
 
 
+def is_pro(organization_id) -> bool:
+    """True when the workspace is on an ACTIVE Pro plan (weekly or monthly).
+    Gates Pro-only add-ons like bring-your-own-domain."""
+    sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
+    return bool(_paid_active(sub) and sub.plan and sub.plan.slug == "pro")
+
+
 def redirect_limit(organization_id) -> int:
     """How many short links (redirects) this org may have: 0 while unpaid, else
     the plan's cap. (No tier is unlimited in the weekly model.)"""
