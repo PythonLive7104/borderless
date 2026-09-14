@@ -176,3 +176,24 @@ func TestDeepCheckPageRenders(t *testing.T) {
 		t.Fatalf("embedded token should validate; got %q", tok)
 	}
 }
+
+func TestMapProxycheck(t *testing.T) {
+	// A datacenter/hosting proxy (non-VPN) -> flagged as datacenter.
+	dc := mapProxycheck("yes", "Compromised Server", "Amazon", "AS16509", 66)
+	if !dc.Proxy || dc.VPN || !dc.Datacenter {
+		t.Fatalf("hosting proxy: %+v", dc)
+	}
+	if dc.ConnType != "Data Center" || dc.ISP != "Amazon" || dc.ASN != "16509" || dc.FraudScore != 66 {
+		t.Fatalf("hosting fields: %+v", dc)
+	}
+	// A VPN -> VPN true, not datacenter.
+	v := mapProxycheck("yes", "VPN", "NordVPN", "AS0", 80)
+	if !v.VPN || v.Datacenter || v.ConnType != "VPN" {
+		t.Fatalf("vpn: %+v", v)
+	}
+	// A clean residential IP -> nothing flagged.
+	clean := mapProxycheck("no", "Residential", "Comcast", "AS7922", 0)
+	if clean.Proxy || clean.VPN || clean.Datacenter || clean.ConnType != "Residential" {
+		t.Fatalf("clean: %+v", clean)
+	}
+}

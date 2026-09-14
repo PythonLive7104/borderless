@@ -914,14 +914,45 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		}
 		return out
 	}
+	// Dispatch to whichever IP-intelligence provider is configured. Both map
+	// into the same ipIntel shape, so the rest of the engine is provider-blind.
+	var res ipIntel
+	var ok bool
+	switch strings.ToLower(env("IP_INTEL_PROVIDER", "")) {
+	case "ipqualityscore":
+		res, ok = fetchIPQS(ip)
+	case "proxycheck":
+		res, ok = fetchProxycheck(ip)
+	default:
+		return out // no provider configured
+	}
+	if !ok {
+		return out // fail open: a bad/slow lookup never holds a visitor up
+	}
+	out = res
+	// Share the answer with Django's cache and sets, same keys and shape.
+	if b, err := json.Marshal(out); err == nil {
+		h.st.SetEx(ctx, key, string(b), 24*time.Hour)
+	}
+	if out.Datacenter {
+		h.st.SAdd(ctx, "ipintel:datacenter", ip)
+	}
+	if out.Proxy || out.VPN {
+		h.st.SAdd(ctx, "ipintel:proxy", ip)
+	}
+	return out
+}
+
+// fetchIPQS queries IPQualityScore. ok=false on any error or unsuccessful body.
+func fetchIPQS(ip string) (ipIntel, bool) {
 	apiKey := env("IPQUALITYSCORE_KEY", "")
-	if apiKey == "" || !strings.EqualFold(env("IP_INTEL_PROVIDER", ""), "ipqualityscore") {
-		return out
+	if apiKey == "" {
+		return ipIntel{}, false
 	}
 	resp, err := intelClient.Get("https://ipqualityscore.com/api/json/ip/" +
 		url.PathEscape(apiKey) + "/" + url.PathEscape(ip))
 	if err != nil {
-		return out // fail open: never hold a visitor up over a slow lookup
+		return ipIntel{}, false
 	}
 	defer resp.Body.Close()
 	var d struct {
@@ -938,9 +969,9 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		BotStatus      bool   `json:"bot_status"`
 	}
 	if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&d) != nil || !d.Success {
-		return out
+		return ipIntel{}, false
 	}
-	out = ipIntel{
+	out := ipIntel{
 		Proxy: d.Proxy, VPN: d.VPN || d.Tor, Datacenter: d.ConnectionType == "Data Center",
 		ISP: d.ISP, ConnType: d.ConnectionType, Mobile: d.Mobile,
 		FraudScore: d.FraudScore, RecentAbuse: d.RecentAbuse, BotStatus: d.BotStatus,
@@ -948,17 +979,72 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	if d.ASN > 0 {
 		out.ASN = strconv.Itoa(d.ASN)
 	}
-	// Share the answer with Django's cache and sets, same keys and shape.
-	if b, err := json.Marshal(out); err == nil {
-		h.st.SetEx(ctx, key, string(b), 24*time.Hour)
+	return out, true
+}
+
+// fetchProxycheck queries proxycheck.io (generous free tier) and maps its
+// answer onto the same signals. It reports proxy/VPN and a risk score directly;
+// datacenter/hosting is inferred (a non-VPN proxy is almost always hosting),
+// and connection_type is normalised to the same words IPQS uses so existing
+// rules keep working.
+func fetchProxycheck(ip string) (ipIntel, bool) {
+	apiKey := env("PROXYCHECK_KEY", "")
+	if apiKey == "" {
+		return ipIntel{}, false
 	}
-	if out.Datacenter {
-		h.st.SAdd(ctx, "ipintel:datacenter", ip)
+	resp, err := intelClient.Get("https://proxycheck.io/v2/" + url.PathEscape(ip) +
+		"?key=" + url.QueryEscape(apiKey) + "&vpn=3&asn=1&risk=1")
+	if err != nil {
+		return ipIntel{}, false
 	}
-	if out.Proxy || out.VPN {
-		h.st.SAdd(ctx, "ipintel:proxy", ip)
+	defer resp.Body.Close()
+	var raw map[string]json.RawMessage
+	if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&raw) != nil {
+		return ipIntel{}, false
 	}
-	return out
+	var status string
+	if s, okS := raw["status"]; okS {
+		_ = json.Unmarshal(s, &status)
+	}
+	if status != "ok" {
+		return ipIntel{}, false
+	}
+	rec, okR := raw[ip]
+	if !okR {
+		return ipIntel{}, false
+	}
+	var d struct {
+		Proxy    string `json:"proxy"`
+		Type     string `json:"type"`
+		Provider string `json:"provider"`
+		ASN      string `json:"asn"`
+		Risk     int    `json:"risk"`
+	}
+	if json.Unmarshal(rec, &d) != nil {
+		return ipIntel{}, false
+	}
+	return mapProxycheck(d.Proxy, d.Type, d.Provider, d.ASN, d.Risk), true
+}
+
+// mapProxycheck normalises a proxycheck.io record onto our provider-blind
+// signals. Pure, so the mapping is unit-tested without any network.
+func mapProxycheck(proxyField, typ, provider, asn string, risk int) ipIntel {
+	proxy := strings.EqualFold(proxyField, "yes")
+	t := strings.ToLower(typ)
+	vpn := strings.Contains(t, "vpn") || strings.Contains(t, "tor")
+	// A flagged non-VPN IP is, in practice, hosting/datacenter traffic.
+	datacenter := proxy && !vpn
+	conn := "Residential"
+	if vpn {
+		conn = "VPN"
+	} else if datacenter {
+		conn = "Data Center"
+	}
+	return ipIntel{
+		Proxy: proxy, VPN: vpn, Datacenter: datacenter,
+		ISP: provider, ASN: strings.TrimPrefix(strings.ToUpper(asn), "AS"),
+		ConnType: conn, FraudScore: risk,
+	}
 }
 
 // knownIntel reports what we already know about an IP without going to the
