@@ -3,6 +3,7 @@ import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import { Section, SectionHead } from "../ui/Section";
 import { ICheck, IArrow } from "../ui/icons";
+import { useCta } from "../../lib/useCta";
 
 type Block = { icon: ComponentType<SVGProps<SVGSVGElement>>; title: string; desc: string };
 
@@ -11,6 +12,7 @@ export default function FeaturePage({
 }: {
   eyebrow: string; title: string; sub: string; blocks: Block[]; bullets?: string[]; ctaTitle?: string;
 }) {
+  const cta = useCta();
   return (
     <>
       <section className="hero-band relative overflow-hidden">
@@ -20,7 +22,7 @@ export default function FeaturePage({
           <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">{title}</h1>
           <p className="mx-auto mt-4 max-w-2xl text-slate-300">{sub}</p>
           <div className="mt-8 flex justify-center gap-3">
-            <Button to="/signup" size="lg">Start Free <IArrow width={18} /></Button>
+            <Button to={cta.signupHref} size="lg">{cta.label("Start Free")} <IArrow width={18} /></Button>
             <Button to="/pricing" variant="light" size="lg">View pricing</Button>
           </div>
         </div>
@@ -58,7 +60,7 @@ export default function FeaturePage({
           <div className="relative">
             <h2 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{ctaTitle}</h2>
             <div className="mt-8 flex justify-center gap-3">
-              <Button to="/signup" size="lg">Get started free <IArrow width={18} /></Button>
+              <Button to={cta.signupHref} size="lg">{cta.label("Get started free")} <IArrow width={18} /></Button>
             </div>
           </div>
         </div>

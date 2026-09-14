@@ -781,6 +781,17 @@ function useSeo(title, description) {
     link.href = window.location.origin + window.location.pathname;
   }, [title, description]);
 }
+function useCta() {
+  const { user } = useAuth();
+  const authed = !!user;
+  return {
+    authed,
+    signupHref: authed ? "/dashboard" : "/signup",
+    pricingHref: authed ? "/dashboard/billing" : "/signup",
+    // Swap a signup-y label for a dashboard one when already logged in.
+    label: (loggedOut) => authed ? "Go to dashboard" : loggedOut
+  };
+}
 function useReveal() {
   useEffect(() => {
     const els = Array.from(document.querySelectorAll(".reveal:not(.is-in)"));
@@ -1085,6 +1096,7 @@ const SLIDES = [
   }
 ];
 function Landing() {
+  const cta = useCta();
   useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot.");
   useReveal();
   return /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -1094,8 +1106,9 @@ function Landing() {
         /* @__PURE__ */ jsxs("div", { children: [
           /* @__PURE__ */ jsx(HeroCarousel, { slides: SLIDES }),
           /* @__PURE__ */ jsxs("div", { className: "mt-8 flex flex-wrap gap-3", children: [
-            /* @__PURE__ */ jsxs(Button, { to: "/signup", size: "lg", children: [
-              "Start Free ",
+            /* @__PURE__ */ jsxs(Button, { to: cta.signupHref, size: "lg", children: [
+              cta.label("Start Free"),
+              " ",
               /* @__PURE__ */ jsx(IArrow, { width: 18 })
             ] }),
             /* @__PURE__ */ jsx(Button, { href: "#demo", variant: "light", size: "lg", children: "View Demo" })
@@ -1151,8 +1164,9 @@ function Landing() {
         /* @__PURE__ */ jsx("h2", { className: "mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl", children: "Start understanding your traffic today." }),
         /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-xl text-slate-300", children: "Join marketers and agencies protecting their budgets with real-time traffic intelligence." }),
         /* @__PURE__ */ jsxs("div", { className: "mt-8 flex justify-center gap-3", children: [
-          /* @__PURE__ */ jsxs(Button, { to: "/signup", size: "lg", children: [
-            "Create an account ",
+          /* @__PURE__ */ jsxs(Button, { to: cta.signupHref, size: "lg", children: [
+            cta.label("Create an account"),
+            " ",
             /* @__PURE__ */ jsx(IArrow, { width: 18 })
           ] }),
           /* @__PURE__ */ jsx(Button, { to: "/pricing", variant: "light", size: "lg", children: "View pricing" })
@@ -1315,6 +1329,7 @@ function PlusDivider() {
   ] });
 }
 function Pricing() {
+  const cta = useCta();
   useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay with cryptocurrency.");
   const [interval, setInterval2] = useState("weekly");
   const monthly = interval === "monthly";
@@ -1381,10 +1396,10 @@ function Pricing() {
                 /* @__PURE__ */ jsx("span", { className: "font-semibold capitalize", children: interval })
               ] })
             ] }),
-            /* @__PURE__ */ jsxs(Button, { to: "/signup", variant: p.highlight ? "primary" : "outline", className: "mt-5 w-full", children: [
+            /* @__PURE__ */ jsxs(Button, { to: cta.pricingHref, variant: p.highlight ? "primary" : "outline", className: "mt-5 w-full", children: [
               /* @__PURE__ */ jsx(Cart, {}),
               " ",
-              p.cta
+              cta.authed ? "Manage plan" : p.cta
             ] })
           ]
         },
@@ -1428,6 +1443,7 @@ const findTone = {
   bad: { ring: "text-red-600", icon: "M18 6L6 18M6 6l12 12" }
 };
 function BotCheck() {
+  const cta = useCta();
   useSeo("Free bot exposure check", "Scan any website in 10 seconds and see how exposed it is to bots — free, no signup.");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1510,7 +1526,7 @@ function BotCheck() {
         /* @__PURE__ */ jsx("h3", { className: "text-xl font-bold", children: "Close these gaps with TryNoBot" }),
         /* @__PURE__ */ jsx("p", { className: "mx-auto mt-2 max-w-md text-sm text-white/70", children: "TryNoBot scores every visitor in real time, blocks bots and fraud, and shows you exactly what's hitting your site — free to start." }),
         /* @__PURE__ */ jsxs("div", { className: "mt-5 flex justify-center gap-2", children: [
-          /* @__PURE__ */ jsx(Button, { to: "/signup", size: "lg", children: "Start free" }),
+          /* @__PURE__ */ jsx(Button, { to: cta.signupHref, size: "lg", children: cta.label("Start free") }),
           /* @__PURE__ */ jsx(Button, { to: "/pricing", variant: "light", size: "lg", children: "View pricing" })
         ] })
       ] })
@@ -1526,6 +1542,7 @@ function FeaturePage({
   bullets,
   ctaTitle = "Ready to see it on your own traffic?"
 }) {
+  const cta = useCta();
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
@@ -1534,8 +1551,9 @@ function FeaturePage({
         /* @__PURE__ */ jsx("h1", { className: "mx-auto mt-5 max-w-3xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl", children: title }),
         /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-2xl text-slate-300", children: sub }),
         /* @__PURE__ */ jsxs("div", { className: "mt-8 flex justify-center gap-3", children: [
-          /* @__PURE__ */ jsxs(Button, { to: "/signup", size: "lg", children: [
-            "Start Free ",
+          /* @__PURE__ */ jsxs(Button, { to: cta.signupHref, size: "lg", children: [
+            cta.label("Start Free"),
+            " ",
             /* @__PURE__ */ jsx(IArrow, { width: 18 })
           ] }),
           /* @__PURE__ */ jsx(Button, { to: "/pricing", variant: "light", size: "lg", children: "View pricing" })
@@ -1558,8 +1576,9 @@ function FeaturePage({
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-60" }),
       /* @__PURE__ */ jsxs("div", { className: "relative", children: [
         /* @__PURE__ */ jsx("h2", { className: "mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl", children: ctaTitle }),
-        /* @__PURE__ */ jsx("div", { className: "mt-8 flex justify-center gap-3", children: /* @__PURE__ */ jsxs(Button, { to: "/signup", size: "lg", children: [
-          "Get started free ",
+        /* @__PURE__ */ jsx("div", { className: "mt-8 flex justify-center gap-3", children: /* @__PURE__ */ jsxs(Button, { to: cta.signupHref, size: "lg", children: [
+          cta.label("Get started free"),
+          " ",
           /* @__PURE__ */ jsx(IArrow, { width: 18 })
         ] }) })
       ] })
@@ -1683,6 +1702,7 @@ Authorization: Bearer tq_live_••••••••
   "currency": "USD"
 }`;
 function ApiPage() {
+  const cta = useCta();
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
@@ -1691,8 +1711,9 @@ function ApiPage() {
         /* @__PURE__ */ jsx("h1", { className: "mx-auto mt-5 max-w-3xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl", children: "A clean REST API for traffic & conversions" }),
         /* @__PURE__ */ jsx("p", { className: "mx-auto mt-4 max-w-2xl text-slate-300", children: "Manage everything programmatically. Authenticate with API keys, receive signed webhooks." }),
         /* @__PURE__ */ jsxs("div", { className: "mt-8 flex justify-center gap-3", children: [
-          /* @__PURE__ */ jsxs(Button, { to: "/signup", size: "lg", children: [
-            "Get API key ",
+          /* @__PURE__ */ jsxs(Button, { to: cta.signupHref, size: "lg", children: [
+            cta.label("Get API key"),
+            " ",
             /* @__PURE__ */ jsx(IArrow, { width: 18 })
           ] }),
           /* @__PURE__ */ jsx(Button, { to: "/docs", variant: "light", size: "lg", children: "Read the docs" })

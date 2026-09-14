@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSeo } from "../../lib/seo";
+import { useCta } from "../../lib/useCta";
 import IntervalToggle from "../../components/ui/IntervalToggle";
 import type { BillingInterval } from "../../lib/api";
 import Button from "../../components/ui/Button";
@@ -110,6 +111,7 @@ function PlusDivider() {
 }
 
 export default function Pricing() {
+  const cta = useCta();
   useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay with cryptocurrency.");
   const [interval, setInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
@@ -190,7 +192,7 @@ export default function Pricing() {
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Antibot sites</span><span className="font-semibold">{monthly ? p.domainsMonthly : p.domains}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>
-              <Button to="/signup" variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {p.cta}</Button>
+              <Button to={cta.pricingHref} variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {cta.authed ? "Manage plan" : p.cta}</Button>
             </div>
           ))}
         </div>

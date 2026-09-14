@@ -1,4 +1,5 @@
 import { useSeo } from "../../lib/seo";
+import { useCta } from "../../lib/useCta";
 import { useReveal } from "../../lib/useReveal";
 import Button from "../../components/ui/Button";
 import { Section, SectionHead } from "../../components/ui/Section";
@@ -66,6 +67,7 @@ const SLIDES: Slide[] = [
 ];
 
 export default function Landing() {
+  const cta = useCta();
   useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot.");
   useReveal();
   return (
@@ -77,7 +79,7 @@ export default function Landing() {
           <div>
             <HeroCarousel slides={SLIDES} />
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button to="/signup" size="lg">Start Free <IArrow width={18} /></Button>
+              <Button to={cta.signupHref} size="lg">{cta.label("Start Free")} <IArrow width={18} /></Button>
               <Button href="#demo" variant="light" size="lg">View Demo</Button>
             </div>
             <p className="mt-4 text-sm text-slate-400">No credit card required · 7-day trial · Cancel anytime</p>
@@ -147,7 +149,7 @@ export default function Landing() {
               Join marketers and agencies protecting their budgets with real-time traffic intelligence.
             </p>
             <div className="mt-8 flex justify-center gap-3">
-              <Button to="/signup" size="lg">Create an account <IArrow width={18} /></Button>
+              <Button to={cta.signupHref} size="lg">{cta.label("Create an account")} <IArrow width={18} /></Button>
               <Button to="/pricing" variant="light" size="lg">View pricing</Button>
             </div>
           </div>

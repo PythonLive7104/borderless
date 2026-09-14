@@ -1,3 +1,4 @@
+import { useCta } from "../../lib/useCta";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
@@ -24,6 +25,7 @@ Authorization: Bearer tq_live_••••••••
 }`;
 
 export default function ApiPage() {
+  const cta = useCta();
   return (
     <>
       <section className="hero-band relative overflow-hidden">
@@ -37,7 +39,7 @@ export default function ApiPage() {
             Manage everything programmatically. Authenticate with API keys, receive signed webhooks.
           </p>
           <div className="mt-8 flex justify-center gap-3">
-            <Button to="/signup" size="lg">Get API key <IArrow width={18} /></Button>
+            <Button to={cta.signupHref} size="lg">{cta.label("Get API key")} <IArrow width={18} /></Button>
             <Button to="/docs" variant="light" size="lg">Read the docs</Button>
           </div>
         </div>
