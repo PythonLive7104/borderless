@@ -48,7 +48,12 @@ function withHead(html, title, desc, path) {
 // serves this as the fallback so those routes DON'T flash the pre-rendered
 // landing page before React boots — the shell is empty, so React paints the
 // real page (or its auth spinner) directly.
-fs.writeFileSync(path.join(dist, "_shell.html"), template);
+// noindex: nginx serves this shell for ANY unmatched URL (try_files ... /_shell.html),
+// so without it Google indexes every stray path as a 200 that duplicates the home page.
+fs.writeFileSync(
+  path.join(dist, "_shell.html"),
+  template.replace("</head>", '<meta name="robots" content="noindex">\n</head>'),
+);
 
 let ok = 0;
 for (const r of routes) {
