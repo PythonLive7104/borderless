@@ -70,6 +70,9 @@ services:
       dockerfile: deploy/Dockerfile.web
       args:
         VITE_TAWK_SRC: ${VITE_TAWK_SRC:-}
+        VITE_GA_ID: ${VITE_GA_ID:-}
+        VITE_GADS_ID: ${VITE_GADS_ID:-}
+        VITE_GADS_SIGNUP_LABEL: ${VITE_GADS_SIGNUP_LABEL:-}
     environment:
       DOMAIN: ${DOMAIN}
       SHORT_DOMAIN: ${SHORT_DOMAIN:-}    # primary short-link domain

@@ -17,6 +17,13 @@ COPY frontend/ ./
 # VITE_TAWK_SRC can be injected at build time; empty falls back to mailto.
 ARG VITE_TAWK_SRC=""
 ENV VITE_TAWK_SRC=$VITE_TAWK_SRC
+# Google tag / Ads conversion ids (all optional; empty = no analytics loaded).
+ARG VITE_GA_ID=""
+ENV VITE_GA_ID=$VITE_GA_ID
+ARG VITE_GADS_ID=""
+ENV VITE_GADS_ID=$VITE_GADS_ID
+ARG VITE_GADS_SIGNUP_LABEL=""
+ENV VITE_GADS_SIGNUP_LABEL=$VITE_GADS_SIGNUP_LABEL
 RUN npm run build
 
 FROM nginx:1.27-alpine

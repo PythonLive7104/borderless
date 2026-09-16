@@ -4,6 +4,7 @@ import AuthLayout from "../../components/auth/AuthLayout";
 import Field from "../../components/auth/Field";
 import Button from "../../components/ui/Button";
 import { useAuth } from "../../context/AuthContext";
+import { trackSignup } from "../../lib/analytics";
 
 export default function Signup() {
   const { register } = useAuth();
@@ -20,7 +21,7 @@ export default function Signup() {
     if (f.password.length < 8) return setErr("Password must be at least 8 characters.");
     if (!terms) return setErr("Please accept the terms to continue.");
     setBusy(true);
-    try { await register({ first_name: f.first_name, last_name: f.last_name, email: f.email, password: f.password }); nav("/dashboard"); }
+    try { await register({ first_name: f.first_name, last_name: f.last_name, email: f.email, password: f.password }); trackSignup(); nav("/dashboard"); }
     catch (e: any) {
       const d = e.data;
       setErr(d?.email?.[0] || d?.password?.[0] || e.message || "Could not create account.");
