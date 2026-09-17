@@ -355,6 +355,11 @@ class PrivateDomainPurchase(models.Model):
     # Null means "buy a new one" — so a workspace can own several private domains.
     renew_domain = models.ForeignKey(ShortDomain, on_delete=models.SET_NULL, null=True, blank=True,
                                      related_name="renewals")
+    # The domain the buyer picked at checkout. Honoured at fulfilment if it is
+    # still in stock; if someone else bought it first we fall back to any other
+    # rather than failing a sale that has already been paid for.
+    requested_domain = models.ForeignKey(ShortDomain, on_delete=models.SET_NULL, null=True,
+                                         blank=True, related_name="requested_by")
     note = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)

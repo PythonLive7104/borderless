@@ -20,7 +20,6 @@ const randSlug = (len = 10) => {
   return s;
 };
 const MAX_SLUG = 200;
-const PRIVATE_DOMAIN_PRICE = 5;
 
 // Written for people who don't think in "user agents" or "risk scores".
 const DEVICE_CHOICES: [string, string][] = [
@@ -93,24 +92,33 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
   const owned = priv.owned.length;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<number | null>(null);
   const { confirm, notify } = useDialog();
+  // Server-served, so the price on the button is always the one on the invoice.
+  const price = priv.price ?? 10;
+  const stock = priv.stock ?? [];
 
+  // Renewals target a domain they already own, so there is nothing to choose —
+  // they keep the same host. Only a NEW purchase opens the picker.
   async function buy(renewId?: number) {
+    if (!renewId) { setPicked(stock[0]?.id ?? null); setMsg(""); setPicking(true); return; }
     if (!(await confirm({
-      title: renewId ? `Renew — $${PRIVATE_DOMAIN_PRICE}/month` : `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
-      message: renewId
-        ? "Extend this private domain by another 30 days."
-        : "A short domain used by you and nobody else, so another customer's traffic "
-          + "can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
+      title: `Renew — $${price}/month`,
+      message: "Extend this private domain by another 30 days.",
       confirmLabel: "Continue to payment",
       cancelLabel: "Not now",
       tone: "brand",
     }))) return;
+    await start(renewId);
+  }
+
+  async function start(renewId?: number, domainId?: number) {
     setBusy(true); setMsg("");
     try {
-      const r = await linkApi.buyPrivateDomain(orgId, renewId);
+      const r = await linkApi.buyPrivateDomain(orgId, renewId, domainId);
       if (r.checkout_url) { window.location.href = r.checkout_url; return; }
-      notify(renewId ? "Renewed." : "Private domain added."); onChanged();
+      notify(renewId ? "Renewed." : "Private domain added."); setPicking(false); onChanged();
     } catch (e: any) {
       setMsg(e?.data?.detail || "Could not start the purchase.");
     } finally { setBusy(false); }
@@ -139,7 +147,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
                   </div>
                   {canManage && (
                     <Button onClick={() => buy(d.id)} variant="outline" disabled={busy}>
-                      {busy ? "…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo`}
+                      {busy ? "…" : `Renew · $${price}/mo`}
                     </Button>
                   )}
                 </div>
@@ -149,7 +157,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
           {canManage && (
             <div className="mt-3 flex flex-col items-start gap-1">
               <Button onClick={() => buy()} disabled={busy}>
-                {busy ? "Starting…" : `Get another private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
+                {busy ? "Starting…" : `Get another private domain · $${price}/mo`}
               </Button>
               {priv.available === 0 && <span className="text-xs text-fg-dim">None in stock right now — ask and we'll source one.</span>}
               {msg && <span className="text-xs text-red-600">{msg}</span>}
@@ -171,13 +179,67 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
           {canManage && (
             <div className="flex flex-col items-end gap-1">
               <Button onClick={() => buy()} disabled={busy} className={busy ? "" : "cta-glow"}>
-                {busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo`}
+                {busy ? "Starting…" : `Get a private domain · $${price}/mo`}
               </Button>
               {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
             </div>
           )}
         </div>
       )}
+
+      <Modal
+        open={picking}
+        onClose={() => setPicking(false)}
+        title={`Choose your private domain \u2014 $${price}/month`}
+      >
+        <p className="text-sm text-fg-muted">
+          Pick the one you want. It becomes yours alone for 30 days — nobody else can
+          publish links on it — and renews alongside your plan.
+        </p>
+
+        {stock.length === 0 ? (
+          <p className="mt-4 text-sm text-fg-muted">
+            None in stock right now. Ask us and we&apos;ll source one — you won&apos;t be charged until it&apos;s ready.
+          </p>
+        ) : (
+          <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+            {stock.map((d) => (
+              <label
+                key={d.id}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition ${
+                  picked === d.id ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="private-domain-pick"
+                  className="accent-brand"
+                  checked={picked === d.id}
+                  onChange={() => setPicked(d.id)}
+                />
+                <span className="min-w-0">
+                  <span className="block font-mono text-sm font-semibold">{d.host}</span>
+                  <span className="block text-xs text-fg-dim">{d.host.length} characters</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {msg && <p className="mt-3 text-xs text-red-600">{msg}</p>}
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={() => setPicking(false)} disabled={busy}>
+            Not now
+          </Button>
+          <Button
+            onClick={() => picked && start(undefined, picked)}
+            disabled={busy || picked === null}
+          >
+            {busy ? "Starting\u2026" : `Continue to payment \u00b7 $${price}`}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

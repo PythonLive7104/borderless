@@ -678,6 +678,34 @@ class PrivateDomainPurchaseTest(TestCase):
         self.assertEqual(self.stock.organization, self.org)
         self.assertFalse(self.stock.is_shared)
 
+    def test_the_buyer_gets_the_domain_they_picked(self):
+        # Picking is the whole point of choosing at checkout: alphabetical order
+        # would hand them pavo.cc, so a pick that survives proves it is honoured.
+        from apps.links.purchases import mark_paid
+        wanted = ShortDomain.objects.create(host="zeta.cc", active=True,
+                                            verified_at=timezone.now(), is_shared=False)
+        d = mark_paid(self.P.objects.create(organization=self.org, amount=25,
+                                            requested_domain=wanted))
+        self.assertEqual(d.host, "zeta.cc")
+        wanted.refresh_from_db()
+        self.assertEqual(wanted.organization, self.org)
+        self.stock.refresh_from_db()
+        self.assertIsNone(self.stock.organization)         # pavo.cc still unsold
+
+    def test_a_pick_sold_in_the_meantime_falls_back_instead_of_failing(self):
+        # They paid. If their choice went to someone else between checkout and
+        # fulfilment, hand them another rather than leaving them with nothing.
+        from apps.links.purchases import mark_paid
+        wanted = ShortDomain.objects.create(host="zeta.cc", active=True,
+                                            verified_at=timezone.now(), is_shared=False)
+        purchase = self.P.objects.create(organization=self.org, amount=25,
+                                         requested_domain=wanted)
+        mark_paid(self.P.objects.create(organization=self.other, amount=25,
+                                        requested_domain=wanted))   # rival takes it first
+        d = mark_paid(purchase)
+        self.assertEqual(d.host, "pavo.cc")
+        self.assertEqual(purchase.status, self.P.Status.FULFILLED)
+
     def test_the_buyer_gets_it_and_nobody_else_does(self):
         from apps.links.purchases import mark_paid
         mark_paid(self._purchase())

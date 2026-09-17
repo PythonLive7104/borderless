@@ -29,10 +29,16 @@ def assign_domain(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     if purchase.domain_id:
         return purchase.domain
 
-    domain = (ShortDomain.private_stock()
-              .select_for_update(skip_locked=True)
-              .order_by("sort", "host")
-              .first())
+    stock = ShortDomain.private_stock().select_for_update(skip_locked=True)
+    # Honour the buyer's pick when it is still unsold. Re-querying through
+    # private_stock (rather than trusting the FK) is what makes the choice safe:
+    # a domain sold between checkout and fulfilment simply isn't in stock, and
+    # the row lock means two buyers racing for the same one can't both win.
+    domain = None
+    if purchase.requested_domain_id:
+        domain = stock.filter(pk=purchase.requested_domain_id).first()
+    if domain is None:
+        domain = stock.order_by("sort", "host").first()
     if not domain:
         return None
 

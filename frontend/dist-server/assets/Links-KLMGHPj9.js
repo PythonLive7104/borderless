@@ -152,7 +152,6 @@ const randSlug = (len = 10) => {
   return s;
 };
 const MAX_SLUG = 200;
-const PRIVATE_DOMAIN_PRICE = 5;
 const DEVICE_CHOICES = [
   ["mobile", "Phones"],
   ["desktop", "Computers"],
@@ -232,25 +231,40 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap })
   const owned = priv.owned.length;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState(null);
   const { confirm, notify } = useDialog();
+  const price = priv.price ?? 10;
+  const stock = priv.stock ?? [];
   async function buy(renewId) {
     var _a;
+    if (!renewId) {
+      setPicked(((_a = stock[0]) == null ? void 0 : _a.id) ?? null);
+      setMsg("");
+      setPicking(true);
+      return;
+    }
     if (!await confirm({
-      title: renewId ? `Renew — $${PRIVATE_DOMAIN_PRICE}/month` : `Private domain — $${PRIVATE_DOMAIN_PRICE}/month`,
-      message: renewId ? "Extend this private domain by another 30 days." : "A short domain used by you and nobody else, so another customer's traffic can never affect its reputation. Billed for 30 days at a time, alongside your plan.",
+      title: `Renew — $${price}/month`,
+      message: "Extend this private domain by another 30 days.",
       confirmLabel: "Continue to payment",
       cancelLabel: "Not now",
       tone: "brand"
     })) return;
+    await start(renewId);
+  }
+  async function start(renewId, domainId) {
+    var _a;
     setBusy(true);
     setMsg("");
     try {
-      const r = await linkApi.buyPrivateDomain(orgId, renewId);
+      const r = await linkApi.buyPrivateDomain(orgId, renewId, domainId);
       if (r.checkout_url) {
         window.location.href = r.checkout_url;
         return;
       }
       notify(renewId ? "Renewed." : "Private domain added.");
+      setPicking(false);
       onChanged();
     } catch (e) {
       setMsg(((_a = e == null ? void 0 : e.data) == null ? void 0 : _a.detail) || "Could not start the purchase.");
@@ -258,51 +272,102 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap })
       setBusy(false);
     }
   }
-  return /* @__PURE__ */ jsx("div", { className: "card shadow-soft mt-5 p-5", children: owned > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
-    /* @__PURE__ */ jsxs("div", { className: "text-sm font-bold", children: [
-      "Your private ",
-      owned === 1 ? "domain" : "domains"
-    ] }),
-    /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
-      "Yours alone — nobody else can create links on ",
-      owned === 1 ? "it" : "them",
-      ".",
-      perDomainCap > 0 ? ` Each one lets you create up to ${perDomainCap} more redirects, on top of the shared domain.` : " Each one gives you a full set of redirects on your plan."
-    ] }),
-    /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-2", children: priv.owned.map((d) => {
-      const lapsed = d.private_until ? new Date(d.private_until) < /* @__PURE__ */ new Date() : false;
-      return /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2", children: [
-        /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
-          /* @__PURE__ */ jsx("div", { className: "font-mono text-sm font-semibold", children: d.host }),
-          /* @__PURE__ */ jsx("div", { className: `text-xs ${lapsed ? "text-red-600" : "text-fg-dim"}`, children: d.private_until ? lapsed ? "Lapsed — renew to keep it" : `Renews ${new Date(d.private_until).toLocaleDateString()}` : "Active" })
-        ] }),
-        canManage && /* @__PURE__ */ jsx(Button, { onClick: () => buy(d.id), variant: "outline", disabled: busy, children: busy ? "…" : `Renew · $${PRIVATE_DOMAIN_PRICE}/mo` })
-      ] }, d.id);
-    }) }),
-    canManage && /* @__PURE__ */ jsxs("div", { className: "mt-3 flex flex-col items-start gap-1", children: [
-      /* @__PURE__ */ jsx(Button, { onClick: () => buy(), disabled: busy, children: busy ? "Starting…" : `Get another private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
-      priv.available === 0 && /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "None in stock right now — ask and we'll source one." }),
-      msg && /* @__PURE__ */ jsx("span", { className: "text-xs text-red-600", children: msg })
-    ] })
-  ] }) : /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
-    /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "Private domain" }),
+  return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-5 p-5", children: [
+    owned > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { className: "text-sm font-bold", children: [
+        "Your private ",
+        owned === 1 ? "domain" : "domains"
+      ] }),
       /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
-        "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else",
-        perDomainCap > 0 ? ` — and adds ${perDomainCap} more redirects on top of your shared domain` : " — and gives you a full set of redirects on your plan",
+        "Yours alone — nobody else can create links on ",
+        owned === 1 ? "it" : "them",
         ".",
-        " ",
-        priv.available > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsx("b", { children: priv.available }),
-          " available right now."
-        ] }) : /* @__PURE__ */ jsx(Fragment, { children: "None in stock at the moment — ask and we'll source one." })
+        perDomainCap > 0 ? ` Each one lets you create up to ${perDomainCap} more redirects, on top of the shared domain.` : " Each one gives you a full set of redirects on your plan."
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-2", children: priv.owned.map((d) => {
+        const lapsed = d.private_until ? new Date(d.private_until) < /* @__PURE__ */ new Date() : false;
+        return /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2", children: [
+          /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-mono text-sm font-semibold", children: d.host }),
+            /* @__PURE__ */ jsx("div", { className: `text-xs ${lapsed ? "text-red-600" : "text-fg-dim"}`, children: d.private_until ? lapsed ? "Lapsed — renew to keep it" : `Renews ${new Date(d.private_until).toLocaleDateString()}` : "Active" })
+          ] }),
+          canManage && /* @__PURE__ */ jsx(Button, { onClick: () => buy(d.id), variant: "outline", disabled: busy, children: busy ? "…" : `Renew · $${price}/mo` })
+        ] }, d.id);
+      }) }),
+      canManage && /* @__PURE__ */ jsxs("div", { className: "mt-3 flex flex-col items-start gap-1", children: [
+        /* @__PURE__ */ jsx(Button, { onClick: () => buy(), disabled: busy, children: busy ? "Starting…" : `Get another private domain · $${price}/mo` }),
+        priv.available === 0 && /* @__PURE__ */ jsx("span", { className: "text-xs text-fg-dim", children: "None in stock right now — ask and we'll source one." }),
+        msg && /* @__PURE__ */ jsx("span", { className: "text-xs text-red-600", children: msg })
+      ] })
+    ] }) : /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center justify-between gap-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+        /* @__PURE__ */ jsx("div", { className: "text-sm font-bold", children: "Private domain" }),
+        /* @__PURE__ */ jsxs("p", { className: "mt-1 text-sm text-fg-muted", children: [
+          "Shared domains work well, but you're on them alongside other customers. A private domain is used by you and nobody else",
+          perDomainCap > 0 ? ` — and adds ${perDomainCap} more redirects on top of your shared domain` : " — and gives you a full set of redirects on your plan",
+          ".",
+          " ",
+          priv.available > 0 ? /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("b", { children: priv.available }),
+            " available right now."
+          ] }) : /* @__PURE__ */ jsx(Fragment, { children: "None in stock at the moment — ask and we'll source one." })
+        ] })
+      ] }),
+      canManage && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+        /* @__PURE__ */ jsx(Button, { onClick: () => buy(), disabled: busy, className: busy ? "" : "cta-glow", children: busy ? "Starting…" : `Get a private domain · $${price}/mo` }),
+        msg && /* @__PURE__ */ jsx("span", { className: "max-w-xs text-right text-xs text-red-600", children: msg })
       ] })
     ] }),
-    canManage && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
-      /* @__PURE__ */ jsx(Button, { onClick: () => buy(), disabled: busy, className: busy ? "" : "cta-glow", children: busy ? "Starting…" : `Get a private domain · $${PRIVATE_DOMAIN_PRICE}/mo` }),
-      msg && /* @__PURE__ */ jsx("span", { className: "max-w-xs text-right text-xs text-red-600", children: msg })
-    ] })
-  ] }) });
+    /* @__PURE__ */ jsxs(
+      Modal,
+      {
+        open: picking,
+        onClose: () => setPicking(false),
+        title: `Choose your private domain — $${price}/month`,
+        children: [
+          /* @__PURE__ */ jsx("p", { className: "text-sm text-fg-muted", children: "Pick the one you want. It becomes yours alone for 30 days — nobody else can publish links on it — and renews alongside your plan." }),
+          stock.length === 0 ? /* @__PURE__ */ jsx("p", { className: "mt-4 text-sm text-fg-muted", children: "None in stock right now. Ask us and we'll source one — you won't be charged until it's ready." }) : /* @__PURE__ */ jsx("div", { className: "mt-4 max-h-72 space-y-2 overflow-y-auto", children: stock.map((d) => /* @__PURE__ */ jsxs(
+            "label",
+            {
+              className: `flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition ${picked === d.id ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`,
+              children: [
+                /* @__PURE__ */ jsx(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "private-domain-pick",
+                    className: "accent-brand",
+                    checked: picked === d.id,
+                    onChange: () => setPicked(d.id)
+                  }
+                ),
+                /* @__PURE__ */ jsxs("span", { className: "min-w-0", children: [
+                  /* @__PURE__ */ jsx("span", { className: "block font-mono text-sm font-semibold", children: d.host }),
+                  /* @__PURE__ */ jsxs("span", { className: "block text-xs text-fg-dim", children: [
+                    d.host.length,
+                    " characters"
+                  ] })
+                ] })
+              ]
+            },
+            d.id
+          )) }),
+          msg && /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-red-600", children: msg }),
+          /* @__PURE__ */ jsxs("div", { className: "mt-5 flex flex-wrap justify-end gap-2", children: [
+            /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setPicking(false), disabled: busy, children: "Not now" }),
+            /* @__PURE__ */ jsx(
+              Button,
+              {
+                onClick: () => picked && start(void 0, picked),
+                disabled: busy || picked === null,
+                children: busy ? "Starting…" : `Continue to payment · $${price}`
+              }
+            )
+          ] })
+        ]
+      }
+    )
+  ] });
 }
 function LockedBanner({ planName, canManage }) {
   return /* @__PURE__ */ jsxs("div", { className: "card shadow-soft mt-6 flex flex-wrap items-center justify-between gap-3 border-brand/30 bg-brand/5 p-5", children: [

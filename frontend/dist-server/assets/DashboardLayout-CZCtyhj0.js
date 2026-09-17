@@ -162,7 +162,7 @@ const KB = [
   {
     q: "What is a private domain?",
     keywords: ["private", "domain", "exclusive", "own", "shared", "brand", "dedicated"],
-    a: "Shared short domains are used by all customers at once. A private domain is yours alone — nobody else's links sit on it, so another customer's behaviour can't affect your links. It's $5/month on top of your plan and needs an active subscription. Buy one from the Redirection page; when it lapses the domain returns to the pool."
+    a: "Shared short domains are used by all customers at once. A private domain is yours alone — nobody else's links sit on it, so another customer's behaviour can't affect your links. It's $10/month on top of your plan and needs an active subscription. Buy one from the Redirection page; when it lapses the domain returns to the pool."
   },
   {
     q: "Someone sent me a bad link — how do I report it?",

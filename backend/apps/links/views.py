@@ -43,10 +43,17 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         domains = ShortDomain.for_org(org) if org else ShortDomain.objects.none()
         response.data["domains"] = ShortDomainSerializer(domains, many=True).data
         # What this workspace owns privately, and how many are left to buy.
+        stock = ShortDomain.private_stock().order_by("sort", "host")
         response.data["private"] = {
             "owned": ShortDomainSerializer(
                 ShortDomain.private_for(org), many=True).data if org else [],
-            "available": ShortDomain.private_stock().count(),
+            "available": stock.count(),
+            # The buyer picks from these at checkout, so the list has to travel
+            # with the page — a count alone can't be rendered as a choice.
+            "stock": ShortDomainSerializer(stock, many=True).data,
+            # Served rather than hard-coded in the client, so the displayed price
+            # can never drift from the one the server records on the purchase.
+            "price": int(getattr(settings, "PRIVATE_DOMAIN_PRICE", 25)),
         }
         # Kept for the create-form preview: the default domain, or "" when the
         # service has no usable domain at all.
@@ -207,10 +214,21 @@ class PrivateDomainCheckoutView(views.APIView):
             if not renew_domain:
                 return Response({"detail": "That domain isn't one of yours to renew."}, status=400)
 
+        # Optional: the domain the buyer picked from stock. Validated here so a
+        # bad id fails before we take money; whether it is STILL free is decided
+        # at fulfilment, where the row lock lives.
+        requested_domain = None
+        requested_id = request.data.get("domain")
+        if requested_id and not renew_domain:
+            requested_domain = ShortDomain.private_stock().filter(pk=requested_id).first()
+            if not requested_domain:
+                return Response(
+                    {"detail": "That domain is no longer available. Pick another."}, status=400)
+
         price = int(getattr(settings, "PRIVATE_DOMAIN_PRICE", 25))
         purchase = PrivateDomainPurchase.objects.create(
             organization_id=org_id, user=request.user, amount=price,
-            renew_domain=renew_domain)
+            renew_domain=renew_domain, requested_domain=requested_domain)
 
         product_id = getattr(settings, "BACHS_PRODUCT_PRIVATE_DOMAIN", "")
         if not bachs.is_enabled() or not product_id:

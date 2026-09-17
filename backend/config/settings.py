@@ -224,7 +224,7 @@ BACHS_PRODUCTS = {
 # One-off purchase: exclusive use of a short domain. Leave the product id blank
 # until it exists in Bachs — checkout then refuses rather than handing one over
 # unpaid.
-PRIVATE_DOMAIN_PRICE = int(os.getenv("PRIVATE_DOMAIN_PRICE", "5"))  # per 30 days
+PRIVATE_DOMAIN_PRICE = int(os.getenv("PRIVATE_DOMAIN_PRICE", "10"))  # per 30 days
 BACHS_PRODUCT_PRIVATE_DOMAIN = os.getenv("BACHS_PRODUCT_PRIVATE_DOMAIN", "")
 
 BACHS_PRODUCTS_MONTHLY = {

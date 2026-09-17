@@ -143,9 +143,9 @@ const linkApi = {
   create: (p) => http.post("/links/", p),
   update: (id, p) => http.patch(`/links/${id}/`, p),
   remove: (id) => http.del(`/links/${id}/`),
-  buyPrivateDomain: (orgId, renewDomain) => http.post(
+  buyPrivateDomain: (orgId, renewDomain, domain) => http.post(
     "/links/private-domain/checkout/",
-    renewDomain ? { organization: orgId, renew_domain: renewDomain } : { organization: orgId }
+    renewDomain ? { organization: orgId, renew_domain: renewDomain } : domain ? { organization: orgId, domain } : { organization: orgId }
   ),
   customDomains: (orgId) => http.get(`/links/domains/?organization=${orgId}`),
   addCustomDomain: (orgId, host) => http.post("/links/domains/", { organization: orgId, host }),
@@ -2052,7 +2052,7 @@ const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"))
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
 const AcceptInvite = lazy(() => import("./assets/AcceptInvite-C6w8l0i-.js"));
-const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CtxzvdYQ.js"));
+const DashboardLayout = lazy(() => import("./assets/DashboardLayout-CZCtyhj0.js"));
 const Overview = lazy(() => import("./assets/Overview-C5hOC7bI.js"));
 const Websites = lazy(() => import("./assets/Websites-DwxwFvMr.js"));
 const WebsiteDetail = lazy(() => import("./assets/WebsiteDetail-BmvJNvZG.js"));
@@ -2060,7 +2060,7 @@ const Campaigns = lazy(() => import("./assets/Campaigns-Q6xl3bae.js"));
 const CampaignDetail = lazy(() => import("./assets/CampaignDetail-C4TtOePW.js"));
 const TrafficRules = lazy(() => import("./assets/TrafficRules-Agun5dq0.js"));
 const Shield = lazy(() => import("./assets/Shield-CTaC-rfA.js"));
-const Links = lazy(() => import("./assets/Links-wS2PNcHl.js"));
+const Links = lazy(() => import("./assets/Links-KLMGHPj9.js"));
 const BotScanner = lazy(() => import("./assets/BotScanner-BVeod6fO.js"));
 const Visitors = lazy(() => import("./assets/Visitors-CIZK_K8A.js"));
 const VisitorDetail = lazy(() => import("./assets/VisitorDetail-D5GLziLZ.js"));

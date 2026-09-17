@@ -180,7 +180,14 @@ export const websiteApi = {
 // ---- short links ----
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
 export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; is_shared: boolean; private_until: string | null; }
-export interface PrivateDomains { owned: ShortDomain[]; available: number; }
+export interface PrivateDomains {
+  owned: ShortDomain[];
+  available: number;
+  /** Unsold stock the buyer picks from at checkout. */
+  stock?: ShortDomain[];
+  /** USD per 30 days, served so the price shown can’t drift from the one charged. */
+  price?: number;
+}
 export interface CustomDomain { id: number; host: string; verified: boolean;
   verify: { txt_name: string; txt_value: string; cname_target: string }; }
 export type ChallengeStyle = "hold" | "checkbox" | "slide";
@@ -214,9 +221,13 @@ export const linkApi = {
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
   remove: (id: number) => http.del(`/links/${id}/`),
-  buyPrivateDomain: (orgId: number, renewDomain?: number) =>
+  buyPrivateDomain: (orgId: number, renewDomain?: number, domain?: number) =>
     http.post<{ checkout_url?: string; activated?: boolean }>("/links/private-domain/checkout/",
-      renewDomain ? { organization: orgId, renew_domain: renewDomain } : { organization: orgId }),
+      renewDomain
+        ? { organization: orgId, renew_domain: renewDomain }
+        : domain
+          ? { organization: orgId, domain }
+          : { organization: orgId }),
   customDomains: (orgId: number) =>
     http.get<{ domains: CustomDomain[] }>(`/links/domains/?organization=${orgId}`),
   addCustomDomain: (orgId: number, host: string) =>
