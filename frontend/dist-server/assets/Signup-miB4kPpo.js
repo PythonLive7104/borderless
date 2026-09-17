@@ -6,6 +6,18 @@ import { F as Field } from "./Field-Cq1XQP8x.js";
 import { u as useAuth, B as Button } from "../entry-server.js";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
+const __vite_import_meta_env__ = {};
+const env = __vite_import_meta_env__ || {};
+const GA_ID = env.VITE_GA_ID;
+const GADS_ID = env.VITE_GADS_ID;
+const GADS_SIGNUP_LABEL = env.VITE_GADS_SIGNUP_LABEL;
+function trackSignup() {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (GA_ID) window.gtag("event", "sign_up", { method: "email" });
+  if (GADS_ID && GADS_SIGNUP_LABEL) {
+    window.gtag("event", "conversion", { send_to: `${GADS_ID}/${GADS_SIGNUP_LABEL}` });
+  }
+}
 function Signup() {
   const { register } = useAuth();
   const nav = useNavigate();
@@ -24,6 +36,7 @@ function Signup() {
     setBusy(true);
     try {
       await register({ first_name: f.first_name, last_name: f.last_name, email: f.email, password: f.password });
+      trackSignup();
       nav("/dashboard");
     } catch (e2) {
       const d = e2.data;

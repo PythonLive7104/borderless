@@ -2047,7 +2047,7 @@ function ReportAbuse() {
   ] });
 }
 const Login = lazy(() => import("./assets/Login-DGRBypus.js"));
-const Signup = lazy(() => import("./assets/Signup-m0wuQFbP.js"));
+const Signup = lazy(() => import("./assets/Signup-miB4kPpo.js"));
 const ForgotPassword = lazy(() => import("./assets/ForgotPassword-D-Do0d3k.js"));
 const ResetPassword = lazy(() => import("./assets/ResetPassword-P5R-zEp1.js"));
 const VerifyEmail = lazy(() => import("./assets/VerifyEmail-DN4MurGh.js"));
