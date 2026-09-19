@@ -65,6 +65,26 @@ class ShortDomain(models.Model):
     verified_at = models.DateTimeField(null=True, blank=True,
                                        help_text="Our own domains are verified on creation.")
     sort = models.IntegerField(default=0)
+
+    # Domain health. A short domain can stop working for reasons that have
+    # nothing to do with our code: a registrar suspends it after an abuse
+    # complaint (DNS stops resolving), or a safety vendor blacklists it and
+    # browsers start interstitialling every link on it. Both are invisible from
+    # inside the app — the first anyone hears is a customer saying "my link is
+    # dead", with no way to tell WHICH domain they mean. Checked by
+    # `check_domain_health`; see that command for what each state means.
+    class Health(models.TextChoices):
+        UNKNOWN = "unknown", "Not checked yet"
+        OK = "ok", "Serving normally"
+        UNREACHABLE = "unreachable", "DNS or HTTPS failed — possibly suspended"
+        FLAGGED = "flagged", "Flagged by a safety scanner"
+
+    health = models.CharField(max_length=12, choices=Health.choices,
+                              default=Health.UNKNOWN, db_index=True)
+    health_detail = models.CharField(max_length=300, blank=True, default="",
+                                     help_text="What the last check saw.")
+    health_checked_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

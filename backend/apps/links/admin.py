@@ -7,9 +7,36 @@ from .sync import publish_link
 
 @admin.register(ShortDomain)
 class ShortDomainAdmin(admin.ModelAdmin):
-    list_display = ("host", "active", "is_shared", "organization", "is_default", "verified_at")
-    list_filter = ("active", "is_shared", "is_default")
-    actions = ("hold_as_private_stock", "return_to_shared_pool")
+    list_display = ("host", "health_badge", "active", "is_shared", "organization",
+                    "is_default", "health_checked_at")
+    # health first: "which domain is broken?" is the question this page gets
+    # opened to answer, and scanning a status column beats opening each row.
+    list_filter = ("health", "active", "is_shared", "is_default")
+    readonly_fields = ("health", "health_detail", "health_checked_at")
+    actions = ("hold_as_private_stock", "return_to_shared_pool", "check_health")
+
+    @admin.display(description="Health", ordering="health")
+    def health_badge(self, obj):
+        icon = {"ok": "✅", "flagged": "⚠️",
+                "unreachable": "❌", "unknown": "—"}.get(obj.health, "—")
+        return f"{icon} {obj.get_health_display()}" + (
+            f" — {obj.health_detail}" if obj.health_detail and obj.health != "ok" else "")
+
+    @admin.action(description="Check health now (DNS, HTTPS, blacklist)")
+    def check_health(self, request, queryset):
+        from django.core.management import call_command
+        from io import StringIO
+        out = StringIO()
+        for host in queryset.values_list("host", flat=True):
+            call_command("check_domain_health", host=host, stdout=out)
+        bad = queryset.model.objects.filter(
+            host__in=list(queryset.values_list("host", flat=True))
+        ).exclude(health="ok")
+        if bad:
+            self.message_user(request, "Unhealthy: " + ", ".join(
+                f"{d.host} ({d.get_health_display()})" for d in bad), level="ERROR")
+        else:
+            self.message_user(request, "All checked domains are serving normally.")
 
     @admin.action(description="Hold back as private stock (removes from the shared pool)")
     def hold_as_private_stock(self, request, queryset):
