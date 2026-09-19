@@ -62,6 +62,28 @@ class ShortLinkAdmin(admin.ModelAdmin):
     list_filter = ("active", "url_safe", "bot_action", "domain")
     search_fields = ("slug", "destination_url", "title", "organization__name")
     readonly_fields = ("clicks", "human_clicks", "bot_clicks", "url_scanned_at", "created_at")
+    actions = ("disable_and_withdraw",)
+
+    def save_model(self, request, obj, form, change):
+        """Push every admin edit to the engine.
+
+        The redirect is served from Redis, not the database, so a change saved
+        here is invisible to visitors until it is republished. Without this,
+        unticking Active on a malicious link looks like it worked — the row says
+        inactive — while the engine keeps redirecting every click.
+        """
+        super().save_model(request, obj, form, change)
+        publish_link(obj)       # withdraws it when inactive; see publish_link()
+
+    @admin.action(description="Disable and stop redirecting")
+    def disable_and_withdraw(self, request, queryset):
+        n = 0
+        for link in queryset:
+            link.active = False
+            link.save(update_fields=["active"])
+            publish_link(link)
+            n += 1
+        self.message_user(request, f"{n} link(s) disabled and withdrawn from the engine.")
 
 
 @admin.register(AbuseReport)
