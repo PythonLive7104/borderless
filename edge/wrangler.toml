@@ -1,0 +1,29 @@
+# TryNoBot edge redirector. Deploy with:  cd edge && npx wrangler deploy
+#
+# Prerequisites (one-time):
+#   1. npx wrangler kv namespace create SHORTLINKS
+#      -> copy the returned id into kv_namespaces below.
+#   2. npx wrangler secret put EDGE_CLICK_SECRET
+#      -> set the SAME value in the origin .env as EDGE_CLICK_SECRET.
+#   3. Point EDGE_ANALYTICS_URL at your origin's /v1/edge-click.
+#   4. Add a route per short domain (see [[routes]] below) — every domain in
+#      SHORT_DOMAIN / SHORT_DOMAINS / SHORT_DOMAINS_PRIVATE.
+name = "trynobot-edge"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+kv_namespaces = [
+  { binding = "SHORTLINKS", id = "PUT_YOUR_KV_NAMESPACE_ID_HERE" },
+]
+
+[vars]
+EDGE_ANALYTICS_URL = "https://trynobot.com/v1/edge-click"
+
+# One route per short domain. zone_name is the domain as it appears in Cloudflare.
+[[routes]]
+pattern = "trynb.cc/*"
+zone_name = "trynb.cc"
+
+# [[routes]]
+# pattern = "korv.cc/*"
+# zone_name = "korv.cc"
