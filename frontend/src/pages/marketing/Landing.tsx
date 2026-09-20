@@ -36,11 +36,15 @@ const STEPS = [
   ["Measure conversions", "Tie revenue back to the traffic that actually converts."],
 ];
 
+// What the product does, not how much of it we've done. Volume and "median
+// quality" numbers can't be substantiated on request — and an unsupported
+// performance claim is the kind of thing the ASA, FTC, ACCC and the Competition
+// Bureau act on, quite apart from what it does to a Google Ads review.
 const METRICS = [
-  ["120M+", "Visitors analyzed"],
-  ["3.4B", "Signals processed"],
-  ["<8ms", "Avg processing time"],
-  ["92.7%", "Median traffic quality"],
+  ["<10ms", "Decision latency"],
+  ["0–100", "Risk score per visit"],
+  ["JA3 + JA4", "TLS fingerprinting"],
+  ["4", "Verdicts: human, suspicious, bot, fraud"],
 ];
 
 const SLIDES: Slide[] = [

@@ -1,4 +1,7 @@
-// A polished mock of the product dashboard, shown in the hero.
+// A polished mock of the product dashboard, shown in the hero. The figures are
+// illustrative, and the badge below says so: an unlabelled screenshot of
+// invented numbers reads as a performance claim, which is the kind of thing
+// advertising regulators in our target markets expect to see substantiated.
 const bars = [38, 52, 44, 61, 55, 72, 66, 80, 74, 88, 83, 95];
 export default function DashboardPreview() {
   return (
@@ -9,6 +12,7 @@ export default function DashboardPreview() {
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">Live overview</div>
             <div className="text-sm font-bold">Traffic quality — last 24h</div>
+            <div className="text-[10px] font-medium text-fg-dim">Sample data</div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" /> Live

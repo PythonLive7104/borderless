@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import Logo from "./Logo";
 import { BRAND, FOOTER_COLS } from "../../lib/brand";
+import { companyLine } from "../../lib/company";
 
 export default function Footer() {
   return (
@@ -24,7 +25,12 @@ export default function Footer() {
       <div className="border-t border-line">
         <div className="container-page flex flex-col items-center justify-between gap-3 py-6 text-sm text-fg-dim sm:flex-row">
           <span>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</span>
-          <span>Built for performance marketers, media buyers & agencies.</span>
+          {/* Trading identity and registered address. Google Ads checks this
+              against the verified advertiser during landing-page review, and
+              it's what tells a UK/US buyer there's a real company behind the
+              site. Renders nothing until company.ts is filled in. */}
+          {companyLine() ? <span>{companyLine()}</span>
+            : <span>Built for performance marketers, media buyers & agencies.</span>}
         </div>
       </div>
     </footer>

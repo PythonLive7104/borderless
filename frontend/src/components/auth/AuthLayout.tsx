@@ -21,7 +21,7 @@ export default function AuthLayout({ title, subtitle, children, footer }: {
               Real-time traffic intelligence, fraud detection and campaign protection for serious media buyers.
             </p>
             <div className="mt-8 flex gap-6 text-slate-300">
-              {[["120M+", "visitors analyzed"], ["<8ms", "avg decision"], ["92.7%", "median quality"]].map(([v, k]) => (
+              {[["<10ms", "decision latency"], ["JA3 + JA4", "TLS fingerprinting"], ["0–100", "risk score"]].map(([v, k]) => (
                 <div key={k}><div className="text-2xl font-extrabold text-white">{v}</div><div className="text-xs">{k}</div></div>
               ))}
             </div>
