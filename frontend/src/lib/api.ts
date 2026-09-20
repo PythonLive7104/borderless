@@ -551,3 +551,16 @@ export const botCheckApi = {
   lead: (p: { email: string; url: string; grade?: string; exposure?: number }) =>
     http.post<{ ok: boolean; error?: string }>("/v1/bot-check/lead/", p, false),
 };
+
+export const contactApi = {
+  send: (p: { name: string; email: string; company?: string; message: string }) =>
+    http.post<{ ok: boolean; error?: string }>("/v1/contact/", p, false),
+};
+
+export interface SystemStatus {
+  overall: "operational" | "degraded" | "down";
+  components: { name: string; state: "operational" | "degraded" | "down" }[];
+}
+export const statusApi = {
+  get: () => http.get<SystemStatus>("/v1/status/"),
+};

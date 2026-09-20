@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "apps.intelligence",
     "apps.links",
     "apps.telegrambot",
+    "apps.support",
 ]
 
 MIDDLEWARE = [
@@ -201,6 +202,16 @@ else:
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@borderless.local")
 BRAND_NAME = os.getenv("BRAND_NAME", "TryNoBot")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Company identity. Commercial email must identify the sender and carry a postal
+# address in every one of our target markets (CAN-SPAM in the US, CASL in
+# Canada, the Spam Act 2003 in Australia, PECR in the UK), and Google Ads
+# advertiser verification checks the same details against the site. Keeping them
+# here means the email footers, the legal pages and the contact page can never
+# drift apart. Leave blank in dev; they are required before sending live mail.
+COMPANY_LEGAL_NAME = os.getenv("COMPANY_LEGAL_NAME", "")
+COMPANY_ADDRESS = os.getenv("COMPANY_ADDRESS", "")
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@trynobot.com")
 
 # Payments (Bachs — bachs.io). Set these to accept live payments; when blank,
 # plan changes activate instantly (dev stub). Environment is derived from the

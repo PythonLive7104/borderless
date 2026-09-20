@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.integrations.views import PublicConversionView
-from apps.intelligence.views import BotCheckView, BotCheckLeadView
+from apps.intelligence.views import BotCheckView, BotCheckLeadView, UnsubscribeView
 from apps.links.views import AbuseReportView, TLSAllowedView
 
 urlpatterns = [
@@ -22,7 +22,9 @@ urlpatterns = [
     path("api/v1/conversions/", PublicConversionView.as_view()),
     path("api/v1/bot-check/", BotCheckView.as_view()),
     path("api/v1/bot-check/lead/", BotCheckLeadView.as_view()),
+    path("api/v1/unsubscribe/", UnsubscribeView.as_view()),  # opt-out, reached from email
     path("api/v1/abuse/", AbuseReportView.as_view()),
     path("api/v1/tls-allowed/", TLSAllowedView.as_view()),  # on-demand TLS ask (Caddy)
     path("api/telegram/", include("apps.telegrambot.urls")),
+    path("api/v1/", include("apps.support.urls")),  # public contact form
 ]
