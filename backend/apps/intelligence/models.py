@@ -87,6 +87,10 @@ class BotCheckLead(models.Model):
     # When the 48h follow-up email was sent. Null = not yet; set once so the
     # cron sender is idempotent and never emails the same lead twice.
     followup_sent_at = models.DateTimeField(null=True, blank=True)
+    # When they opted out. Set once and never cleared: an unsubscribe has to
+    # outlive the lead record it came from, because re-mailing someone who opted
+    # out is the actual offence under CASL and the Spam Act, not the first send.
+    unsubscribed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

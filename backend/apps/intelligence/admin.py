@@ -21,7 +21,11 @@ from .models import BotCheckLead
 
 @admin.register(BotCheckLead)
 class BotCheckLeadAdmin(admin.ModelAdmin):
-    list_display = ("email", "url", "grade", "exposure", "converted", "created_at")
-    list_filter = ("grade", "converted", "created_at")
+    list_display = ("email", "url", "grade", "exposure", "converted", "opted_out", "created_at")
+    list_filter = ("grade", "converted", "unsubscribed_at", "created_at")
     search_fields = ("email", "url")
     readonly_fields = ("email", "url", "grade", "exposure", "ip", "created_at")
+
+    @admin.display(boolean=True, description="Opted out")
+    def opted_out(self, obj):
+        return obj.unsubscribed_at is not None

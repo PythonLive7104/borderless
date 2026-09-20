@@ -185,3 +185,81 @@ class BotCheckFollowupTest(_DjangoTestCase):
         self._lead(age_hours=49, converted=True)
         _call("send_botcheck_followups")
         self.assertEqual(len(_mail.outbox), 0)
+
+
+class UnsubscribeTest(TestCase):
+    """The opt-out is the part with legal teeth (CASL, Spam Act 2003,
+    CAN-SPAM): it has to work from a bare email click, survive a forged token,
+    and actually stop the next send."""
+
+    def _lead(self, email="prospect@example.com", **kw):
+        from apps.intelligence.models import BotCheckLead
+        return BotCheckLead.objects.create(email=email, url="acme.co", grade="D",
+                                           exposure=71, **kw)
+
+    def test_link_opts_the_lead_out(self):
+        from apps.intelligence.unsubscribe import make_token
+        lead = self._lead()
+        res = self.client.get("/api/v1/unsubscribe/", {"t": make_token(lead)})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"unsubscribed", res.content.lower())
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.unsubscribed_at)
+
+    def test_one_click_post_works(self):
+        """Gmail and Yahoo POST to List-Unsubscribe rather than following it."""
+        from apps.intelligence.unsubscribe import make_token
+        lead = self._lead()
+        res = self.client.post(f"/api/v1/unsubscribe/?t={make_token(lead)}")
+        self.assertEqual(res.status_code, 200)
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.unsubscribed_at)
+
+    def test_forged_token_changes_nothing(self):
+        lead = self._lead()
+        res = self.client.get("/api/v1/unsubscribe/", {"t": "not-a-real-token"})
+        self.assertEqual(res.status_code, 400)
+        lead.refresh_from_db()
+        self.assertIsNone(lead.unsubscribed_at)
+
+    def test_opt_out_covers_every_row_for_that_address(self):
+        """Scanning twice makes two leads. Opting out of one has to silence both."""
+        from apps.intelligence.unsubscribe import make_token
+        first, second = self._lead(), self._lead()
+        self.client.get("/api/v1/unsubscribe/", {"t": make_token(first)})
+        second.refresh_from_db()
+        self.assertIsNotNone(second.unsubscribed_at)
+
+    def test_followup_skips_opted_out_leads(self):
+        from datetime import timedelta
+        from io import StringIO
+        from django.core import mail
+        from django.core.management import call_command
+        from django.utils import timezone
+        from apps.intelligence.models import BotCheckLead
+
+        stale = timezone.now() - timedelta(hours=72)
+        opted_out = self._lead("gone@example.com", unsubscribed_at=timezone.now())
+        still_in = self._lead("here@example.com")
+        BotCheckLead.objects.update(created_at=stale)
+
+        call_command("send_botcheck_followups", stdout=StringIO(), stderr=StringIO())
+        recipients = [addr for m in mail.outbox for addr in m.to]
+        self.assertIn(still_in.email, recipients)
+        self.assertNotIn(opted_out.email, recipients)
+
+    def test_followup_carries_one_click_headers(self):
+        from datetime import timedelta
+        from io import StringIO
+        from django.core import mail
+        from django.core.management import call_command
+        from django.utils import timezone
+        from apps.intelligence.models import BotCheckLead
+
+        self._lead("here@example.com")
+        BotCheckLead.objects.update(created_at=timezone.now() - timedelta(hours=72))
+        call_command("send_botcheck_followups", stdout=StringIO(), stderr=StringIO())
+        self.assertEqual(len(mail.outbox), 1)
+        headers = mail.outbox[0].extra_headers
+        self.assertIn("List-Unsubscribe", headers)
+        self.assertEqual(headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click")

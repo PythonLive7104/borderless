@@ -8,6 +8,8 @@ renders across email clients; a plain-text alternative is always included.
 """
 from django.conf import settings
 
+from .unsubscribe import unsubscribe_url
+
 BRAND = "#2563eb"
 VIOLET = "#7c3aed"
 INK = "#0f172a"
@@ -16,6 +18,54 @@ MUTED = "#64748b"
 
 def _front() -> str:
     return getattr(settings, "FRONTEND_URL", "https://trynobot.com").rstrip("/")
+
+
+def _identity() -> str:
+    """Who is sending this, in one line. Empty parts are dropped rather than
+    printed blank, so a half-configured install produces no half-written
+    address — the deploy checklist catches it instead of the recipient."""
+    name = getattr(settings, "COMPANY_LEGAL_NAME", "") or getattr(settings, "BRAND_NAME", "TryNoBot")
+    address = getattr(settings, "COMPANY_ADDRESS", "")
+    return ", ".join(p for p in (name, address) if p)
+
+
+def compliance_footer(lead):
+    """Return (text, html) identifying the sender and offering the opt-out.
+
+    Commercial email in all four of our markets needs the same three things:
+    why the recipient is hearing from us, who we are including a postal
+    address, and a working way out. This is the one place that gets written.
+    """
+    out = unsubscribe_url(lead)
+    who = _identity()
+    text = (
+        f"\n---\n"
+        f"You're receiving this because you ran a free Bot Check on {lead.url} "
+        f"and asked us to email the report.\n"
+        f"{who}\n"
+        f"Unsubscribe: {out}\n"
+    )
+    html = (
+        f'<p style="margin:0;color:{MUTED};font-size:12px;line-height:1.6;">'
+        f"You're receiving this because you ran a free Bot Check on {lead.url} "
+        f"and asked us to email the report.<br>"
+        f'{who}<br>'
+        f'<a href="{out}" style="color:{MUTED};text-decoration:underline;">Unsubscribe</a>'
+        f'</p>'
+    )
+    return text, html
+
+
+def list_unsubscribe_headers(lead) -> dict:
+    """Headers that let Gmail and Yahoo show their own one-click opt-out.
+
+    Both now require these on bulk mail, and honouring the click on our side is
+    what keeps the sending domain out of the spam folder.
+    """
+    return {
+        "List-Unsubscribe": f"<{unsubscribe_url(lead)}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    }
 
 
 def _grade_line(grade: str) -> str:
@@ -38,6 +88,7 @@ def followup_email(lead):
     grade = (lead.grade or "?").upper()
     exposure = lead.exposure or 0
     subject = f"Still paying for bots on {url}?"
+    foot_text, foot_html = compliance_footer(lead)
 
     text = (
         f"Two days ago you scanned {url} with TryNoBot's free Bot Check.\n\n"
@@ -51,6 +102,7 @@ def followup_email(lead):
         f"you'd like a hand setting it up.\n\n"
         f"— TryNoBot\n"
         f"{front}\n"
+        f"{foot_text}"
     )
 
     html = f"""\
@@ -103,12 +155,9 @@ def followup_email(lead):
           </p>
         </td></tr>
 
-        <!-- footer -->
+        <!-- footer: sender identity + opt-out (CAN-SPAM / CASL / Spam Act) -->
         <tr><td style="padding:18px 28px;border-top:1px solid #e2e8f0;">
-          <p style="margin:0;color:{MUTED};font-size:12px;line-height:1.6;">
-            You're getting this because you ran a free Bot Check on {url}.
-            <a href="{front}" style="color:{BRAND};text-decoration:none;">trynobot.com</a>
-          </p>
+          {foot_html}
         </td></tr>
 
       </table>

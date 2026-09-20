@@ -2,7 +2,8 @@
 
 Idempotent: each lead is stamped once (followup_sent_at), so running this on a
 cron every hour only ever emails a given lead a single time. Skips leads that
-already converted — no point nudging a customer.
+already converted — no point nudging a customer — and anyone who has
+unsubscribed, matched by address so a second scan can't resurrect them.
 
 Cron (hourly):
   0 * * * * cd /opt/borderless && docker compose -f docker-compose.prod.yml \\
@@ -15,7 +16,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils import timezone
 
-from apps.intelligence.emails import followup_email
+from apps.intelligence.emails import followup_email, list_unsubscribe_headers
 from apps.intelligence.models import BotCheckLead
 
 
@@ -31,7 +32,11 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         cutoff = timezone.now() - timedelta(hours=opts["hours"])
         due = (BotCheckLead.objects
-               .filter(followup_sent_at__isnull=True, converted=False, created_at__lte=cutoff)
+               .filter(followup_sent_at__isnull=True, converted=False,
+                       unsubscribed_at__isnull=True, created_at__lte=cutoff)
+               .exclude(email__in=BotCheckLead.objects
+                        .filter(unsubscribed_at__isnull=False)
+                        .values("email"))
                .order_by("created_at"))
         sent = 0
         for lead in due:
@@ -39,7 +44,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"  would email {lead.email} ({lead.url}, grade {lead.grade or '?'})")
                 continue
             subject, text, html = followup_email(lead)
-            msg = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, [lead.email])
+            msg = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, [lead.email],
+                                         headers=list_unsubscribe_headers(lead))
             msg.attach_alternative(html, "text/html")
             try:
                 msg.send(fail_silently=False)

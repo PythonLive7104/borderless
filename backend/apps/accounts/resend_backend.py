@@ -43,6 +43,15 @@ class ResendBackend(BaseEmailBackend):
             "subject": msg.subject,
             "text": msg.body,
         }
+        # Custom headers — List-Unsubscribe above all, which Gmail and Yahoo
+        # require on bulk mail and render as their own one-click opt-out.
+        # Resend drops anything it sets itself, so From/To/Subject are skipped.
+        headers = {k: v for k, v in (getattr(msg, "extra_headers", None) or {}).items()
+                   if k.lower() not in ("from", "to", "cc", "bcc", "subject")}
+        if headers:
+            payload["headers"] = headers
+        if msg.reply_to:
+            payload["reply_to"] = list(msg.reply_to)
         if msg.cc:
             payload["cc"] = list(msg.cc)
         if msg.bcc:
