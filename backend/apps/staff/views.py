@@ -131,3 +131,63 @@ class AdminGrantPlanView(views.APIView):
         _activate(sub, plan)
         return Response({"detail": f"Granted {plan.name} to this workspace.",
                          "plan": plan.name, "status": sub.status})
+
+
+class AdminEmailPreviewView(views.APIView):
+    """Return the fully-wrapped HTML for a composed email so the admin can see
+    exactly what recipients will get, before sending anything."""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from apps.staff.mailer import render_email
+        subject = (request.data.get("subject") or "").strip()
+        body = request.data.get("body_html") or ""
+        html, text = render_email(subject, body)
+        return Response({"html": html, "text": text})
+
+
+class AdminEmailSendView(views.APIView):
+    """Send a composed email to a chosen audience. Modes:
+      test   -> just the requesting admin (always safe to try)
+      users  -> every registered user
+      leads  -> Bot Check leads who haven't converted
+      custom -> an explicit comma/space/newline-separated list
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from apps.staff.mailer import send_broadcast
+        subject = (request.data.get("subject") or "").strip()
+        body = request.data.get("body_html") or ""
+        mode = request.data.get("mode") or "test"
+        if not subject or not body.strip():
+            return Response({"detail": "Subject and body are required."}, status=400)
+
+        if mode == "test":
+            recipients = [request.user.email]
+        elif mode == "users":
+            recipients = list(User.objects.exclude(email="")
+                              .values_list("email", flat=True))
+        elif mode == "leads":
+            from apps.intelligence.models import BotCheckLead
+            recipients = list(BotCheckLead.objects.filter(converted=False)
+                              .values_list("email", flat=True).distinct())
+        elif mode == "custom":
+            import re as _re
+            raw = request.data.get("emails") or ""
+            recipients = [e for e in _re.split(r"[\s,;]+", raw) if e]
+        else:
+            return Response({"detail": "Unknown audience."}, status=400)
+
+        # De-duplicate while preserving order; guard against an empty audience.
+        seen, unique = set(), []
+        for e in recipients:
+            el = e.strip().lower()
+            if el and el not in seen:
+                seen.add(el)
+                unique.append(el)
+        if not unique:
+            return Response({"detail": "No recipients for that audience."}, status=400)
+
+        sent = send_broadcast(subject, body, unique)
+        return Response({"ok": True, "sent": sent, "recipients": len(unique)})

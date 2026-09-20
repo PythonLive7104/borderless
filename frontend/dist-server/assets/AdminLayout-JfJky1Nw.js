@@ -9,7 +9,8 @@ const LINKS = [
   { to: "/admin/users", label: "Users" },
   { to: "/admin/organizations", label: "Organizations" },
   { to: "/admin/subscriptions", label: "Subscriptions" },
-  { to: "/admin/fraud-alerts", label: "Fraud alerts" }
+  { to: "/admin/fraud-alerts", label: "Fraud alerts" },
+  { to: "/admin/email", label: "Email" }
 ];
 function AdminLayout() {
   const { user, logout } = useAuth();

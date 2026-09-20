@@ -7,6 +7,7 @@ const LINKS = [
   { to: "/admin/organizations", label: "Organizations" },
   { to: "/admin/subscriptions", label: "Subscriptions" },
   { to: "/admin/fraud-alerts", label: "Fraud alerts" },
+  { to: "/admin/email", label: "Email" },
 ];
 
 export default function AdminLayout() {

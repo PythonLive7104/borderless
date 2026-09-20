@@ -325,7 +325,9 @@ const adminApi = {
   organizations: () => http.get("/admin/organizations/"),
   subscriptions: () => http.get("/admin/subscriptions/"),
   fraudAlerts: () => http.get("/admin/fraud-alerts/"),
-  grantPlan: (organization, plan) => http.post("/admin/grant-plan/", { organization, plan })
+  grantPlan: (organization, plan) => http.post("/admin/grant-plan/", { organization, plan }),
+  emailPreview: (subject, body_html) => http.post("/admin/email/preview/", { subject, body_html }),
+  sendEmail: (p) => http.post("/admin/email/send/", p)
 };
 const botCheckApi = {
   run: (url) => http.post("/v1/bot-check/", { url }, false),
@@ -2180,12 +2182,13 @@ const UsagePage = lazy(() => import("./assets/UsagePage-CxZbScxD.js"));
 const Team = lazy(() => import("./assets/Team-BRQ3BDZX.js"));
 const Settings = lazy(() => import("./assets/Settings-DHJ8kh4S.js"));
 const Reports = lazy(() => import("./assets/Reports-Cpu1aWov.js"));
-const AdminLayout = lazy(() => import("./assets/AdminLayout-Dx7o6sg9.js"));
+const AdminLayout = lazy(() => import("./assets/AdminLayout-JfJky1Nw.js"));
 const AdminOverview = lazy(() => import("./assets/AdminOverview-D6-INi4v.js"));
 const AdminUsers = lazy(() => import("./assets/AdminUsers-DyEZ0hLp.js"));
 const AdminOrgs = lazy(() => import("./assets/AdminOrgs-DA_h-hs4.js"));
 const AdminSubscriptions = lazy(() => import("./assets/AdminSubscriptions-zEBvIumR.js"));
 const AdminFraudAlerts = lazy(() => import("./assets/AdminFraudAlerts-ByGive-3.js"));
+const AdminEmail = lazy(() => import("./assets/AdminEmail-CcUEFV2j.js"));
 const spinner = /* @__PURE__ */ jsx("div", { className: "grid min-h-screen place-items-center", children: /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" }) });
 function AppRoutes() {
   return /* @__PURE__ */ jsx(Suspense, { fallback: spinner, children: /* @__PURE__ */ jsxs(Routes, { children: [
@@ -2243,7 +2246,8 @@ function AppRoutes() {
       /* @__PURE__ */ jsx(Route, { path: "users", element: /* @__PURE__ */ jsx(AdminUsers, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "organizations", element: /* @__PURE__ */ jsx(AdminOrgs, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "subscriptions", element: /* @__PURE__ */ jsx(AdminSubscriptions, {}) }),
-      /* @__PURE__ */ jsx(Route, { path: "fraud-alerts", element: /* @__PURE__ */ jsx(AdminFraudAlerts, {}) })
+      /* @__PURE__ */ jsx(Route, { path: "fraud-alerts", element: /* @__PURE__ */ jsx(AdminFraudAlerts, {}) }),
+      /* @__PURE__ */ jsx(Route, { path: "email", element: /* @__PURE__ */ jsx(AdminEmail, {}) })
     ] }),
     /* @__PURE__ */ jsx(Route, { path: "*", element: /* @__PURE__ */ jsx(Landing, {}) })
   ] }) });

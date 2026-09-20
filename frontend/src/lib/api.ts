@@ -533,6 +533,10 @@ export const adminApi = {
   fraudAlerts: () => http.get<AdminFraudAlert[]>("/admin/fraud-alerts/"),
   grantPlan: (organization: number, plan: string) =>
     http.post<{ detail: string; plan: string; status: string }>("/admin/grant-plan/", { organization, plan }),
+  emailPreview: (subject: string, body_html: string) =>
+    http.post<{ html: string; text: string }>("/admin/email/preview/", { subject, body_html }),
+  sendEmail: (p: { subject: string; body_html: string; mode: string; emails?: string }) =>
+    http.post<{ ok: boolean; sent: number; recipients: number }>("/admin/email/send/", p),
 };
 
 
