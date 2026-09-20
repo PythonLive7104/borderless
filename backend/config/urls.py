@@ -6,7 +6,9 @@ from apps.intelligence.views import BotCheckView, BotCheckLeadView
 from apps.links.views import AbuseReportView, TLSAllowedView
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # Django admin lives off the default /admin path so the React dashboard
+    # admin can own /admin/* (and to keep the default path off bots' radar).
+    path("django-admin/", admin.site.urls),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/", include("apps.accounts.urls")),
