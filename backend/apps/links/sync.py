@@ -72,6 +72,13 @@ def publish_link(link):
         _r().set(f"shortlink:{link.host()}:{link.slug}", _payload(link))
     except Exception:
         pass
+    # Mirror to the Cloudflare edge (no-op unless CF creds are set). Separate
+    # try/except so an edge hiccup never affects the authoritative Redis publish.
+    try:
+        from .edge import sync_link_kv
+        sync_link_kv(link)
+    except Exception:
+        pass
 
 
 def unpublish_link(slug: str, host: str = ""):
@@ -86,6 +93,16 @@ def unpublish_link(slug: str, host: str = ""):
             for h in ShortDomain.objects.values_list("host", flat=True):
                 c.delete(f"shortlink:{h}:{slug}")
         c.delete(f"shortlink:{slug}")   # retire the old un-hosted key too
+    except Exception:
+        pass
+    try:
+        from .edge import delete_link_kv
+        if host:
+            delete_link_kv(host, slug)
+        else:
+            from .models import ShortDomain
+            for h in ShortDomain.objects.values_list("host", flat=True):
+                delete_link_kv(h, slug)
     except Exception:
         pass
 

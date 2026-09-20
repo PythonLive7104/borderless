@@ -108,6 +108,7 @@ func main() {
 	mux.HandleFunc("/v1/collect", h.collect)
 	mux.HandleFunc("/v1/decide", h.decide)
 	mux.HandleFunc("/v1/guard", h.guard)
+	mux.HandleFunc("/v1/edge-click", h.edgeClick)
 	mux.HandleFunc("/v1/challenge", h.challenge)
 	mux.HandleFunc("/v1/lcheck", h.lcheck)
 	mux.HandleFunc("/l/", h.shortlink) // legacy /l/<slug>
