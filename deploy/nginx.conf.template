@@ -59,9 +59,15 @@ server {
         add_header Cache-Control "public, immutable";
         include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
     }
-    # Marketing routes resolve to their own pre-rendered index.html (via $uri/).
+    # Marketing routes resolve to their own pre-rendered index.html, reached by
+    # naming index.html directly rather than via $uri/. The difference matters:
+    # $uri/ makes nginx 301 "/pricing" -> "/pricing/", but the sitemap and every
+    # canonical tag use the unslashed form — so Google was fetching a redirect
+    # for every page, landing on a URL whose canonical pointed back at that
+    # redirect, and indexing none of it. $uri/index.html serves the page at the
+    # canonical URL with a plain 200.
     # Everything else (dashboard/admin/auth — not pre-rendered) falls back to the
     # blank SPA shell, NOT the landing page, so a hard refresh doesn't flash the
     # landing markup before React routes to the real page.
-    location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/ /_shell.html; }
+    location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/index.html /_shell.html; }
 }
