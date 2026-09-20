@@ -84,6 +84,9 @@ class BotCheckLead(models.Model):
     # the email against a registered user — so the operator can measure the
     # funnel without a heavy analytics stack.
     converted = models.BooleanField(default=False)
+    # When the 48h follow-up email was sent. Null = not yet; set once so the
+    # cron sender is idempotent and never emails the same lead twice.
+    followup_sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

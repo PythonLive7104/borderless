@@ -133,3 +133,55 @@ class BotCheckLeadTest(_DjangoTestCase):
     def test_missing_url_is_rejected(self):
         r = self._post(email="buyer@shop.example", url="")
         self.assertEqual(r.status_code, 400)
+
+
+from datetime import timedelta as _td
+from django.utils import timezone as _tz
+from django.core.management import call_command as _call
+
+
+class BotCheckFollowupTest(_DjangoTestCase):
+    """The 48h follow-up must reach due leads exactly once, carry HTML, and
+    never chase a lead that already converted."""
+
+    def _lead(self, age_hours=None, **kw):
+        from apps.intelligence.models import BotCheckLead
+        f = dict(email="p@shop.example", url="https://shop.example", grade="D", exposure=72)
+        f.update(kw)
+        lead = BotCheckLead.objects.create(**f)
+        # created_at is auto_now_add; backdate it for age-based tests.
+        if age_hours is not None:
+            BotCheckLead.objects.filter(pk=lead.pk).update(
+                created_at=_tz.now() - _td(hours=age_hours))
+            lead.refresh_from_db()
+        return lead
+
+    def test_due_lead_gets_one_html_email_and_is_stamped(self):
+        lead = self._lead(age_hours=49)
+        _call("send_botcheck_followups")
+        self.assertEqual(len(_mail.outbox), 1)
+        m = _mail.outbox[0]
+        self.assertIn("shop.example", m.subject)
+        html = dict(m.alternatives)  # {content: mimetype} -> invert below
+        self.assertTrue(any(mt == "text/html" for _, mt in m.alternatives))
+        body_html = next(c for c, mt in m.alternatives if mt == "text/html")
+        self.assertIn("shop.example", body_html)
+        self.assertIn("/signup", body_html)
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.followup_sent_at)
+
+    def test_a_lead_younger_than_48h_is_not_emailed(self):
+        self._lead(age_hours=10)
+        _call("send_botcheck_followups")
+        self.assertEqual(len(_mail.outbox), 0)
+
+    def test_it_never_emails_the_same_lead_twice(self):
+        self._lead(age_hours=49)
+        _call("send_botcheck_followups")
+        _call("send_botcheck_followups")  # second run
+        self.assertEqual(len(_mail.outbox), 1)
+
+    def test_converted_leads_are_skipped(self):
+        self._lead(age_hours=49, converted=True)
+        _call("send_botcheck_followups")
+        self.assertEqual(len(_mail.outbox), 0)
