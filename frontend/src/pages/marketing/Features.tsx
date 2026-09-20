@@ -1,6 +1,6 @@
 import { useSeo } from "../../lib/seo";
 import FeaturePage from "../../components/marketing/FeaturePage";
-import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IServer, ILock, IUsers } from "../../components/ui/icons";
+import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IServer, ILock, IUsers, ICheck } from "../../components/ui/icons";
 export default function Features() {
   useSeo("Features", "Real-time scoring, JS + TLS/JA3 fingerprinting, traffic rules, IP allow/deny, A/B testing and more.");
   return <FeaturePage eyebrow="Features"
@@ -11,6 +11,7 @@ export default function Features() {
       { icon: IShield, title: "Bot & fraud detection", desc: "Datacenter IPs, proxies, VPNs, headless browsers and automation caught in real time." },
       { icon: IRadar, title: "Behavioral analysis", desc: "How a visitor moves, scrolls and types is scored live — script-driven and synthetic interaction is flagged, while genuine human behavior clears real people faster." },
       { icon: IUsers, title: "Shared threat intelligence", desc: "A bad IP or fingerprint caught on any site defends every site. Bot farms rotate IPs but reuse fingerprints — so the network catches them the moment they reappear." },
+      { icon: ICheck, title: "Ad-review reporting", desc: "Verified Google Ads, AdSense and Bing Ads review bots are identified and reported separately — shown the same page as real users, never a different one — so your click quality reflects actual people." },
       { icon: IGauge, title: "Explainable risk scores", desc: "A 0–100 score per visitor with the exact contributing signals — never a black box." },
       { icon: IBolt, title: "Traffic rules engine", desc: "Allow, review, block or tag traffic with a visual IF/THEN rule builder." },
       { icon: IServer, title: "Server-side shield", desc: "Block bots before your page loads — enforce rules at your server or edge with drop-in PHP, Django, nginx, Cloudflare or Node snippets." },

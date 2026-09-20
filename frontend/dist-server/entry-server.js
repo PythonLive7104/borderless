@@ -1085,6 +1085,15 @@ const SLIDES = [
     subtitle: "A fingerprint caught attacking any site on the network becomes known to all of them. Bot farms rotate IPs — but reuse the same fingerprint, and that's what gives them away, everywhere at once."
   },
   {
+    badge: "Ad-review transparency",
+    title: /* @__PURE__ */ jsxs(Fragment, { children: [
+      "See which clicks were",
+      /* @__PURE__ */ jsx("br", {}),
+      /* @__PURE__ */ jsx("span", { className: "text-gradient", children: "the ad platform reviewing." })
+    ] }),
+    subtitle: "We verify and label Google Ads, AdSense and Bing Ads review bots — and show them the same page real visitors see, never a different one. Your click quality reflects real people, not the platform's own automated checks."
+  },
+  {
     badge: "Fraud detection",
     title: /* @__PURE__ */ jsxs(Fragment, { children: [
       "Stop paying",
@@ -1618,6 +1627,7 @@ function Features() {
         { icon: IShield, title: "Bot & fraud detection", desc: "Datacenter IPs, proxies, VPNs, headless browsers and automation caught in real time." },
         { icon: IRadar, title: "Behavioral analysis", desc: "How a visitor moves, scrolls and types is scored live — script-driven and synthetic interaction is flagged, while genuine human behavior clears real people faster." },
         { icon: IUsers, title: "Shared threat intelligence", desc: "A bad IP or fingerprint caught on any site defends every site. Bot farms rotate IPs but reuse fingerprints — so the network catches them the moment they reappear." },
+        { icon: ICheck, title: "Ad-review reporting", desc: "Verified Google Ads, AdSense and Bing Ads review bots are identified and reported separately — shown the same page as real users, never a different one — so your click quality reflects actual people." },
         { icon: IGauge, title: "Explainable risk scores", desc: "A 0–100 score per visitor with the exact contributing signals — never a black box." },
         { icon: IBolt, title: "Traffic rules engine", desc: "Allow, review, block or tag traffic with a visual IF/THEN rule builder." },
         { icon: IServer, title: "Server-side shield", desc: "Block bots before your page loads — enforce rules at your server or edge with drop-in PHP, Django, nginx, Cloudflare or Node snippets." },
@@ -1645,7 +1655,7 @@ function FraudDetection() {
         { icon: IBolt, title: "Automatic actions", desc: "Route risky traffic to block, review or tag with your own rule thresholds." },
         { icon: ITarget, title: "Signal transparency", desc: "Every score lists the signals behind it so you can trust — and tune — decisions." }
       ],
-      bullets: ["Datacenter IP detection", "Proxy & VPN signals", "Headless-browser indicators", "Known bot fingerprints", "Synthetic-event detection", "Human-interaction verification", "Cross-customer threat corpus", "Abnormal request-rate detection", "IP / ASN reputation"]
+      bullets: ["Datacenter IP detection", "Proxy & VPN signals", "Headless-browser indicators", "Known bot fingerprints", "Synthetic-event detection", "Human-interaction verification", "Cross-customer threat corpus", "Ad-platform review reporting", "Abnormal request-rate detection", "IP / ASN reputation"]
     }
   );
 }
@@ -1804,6 +1814,8 @@ const QA = [
   ["Does behavioral detection block real visitors?", "No. Behavioral signals are collected passively and are never held against a first-time visitor: the initial pageview carries no interaction, so absence of it is never treated as suspicious. Observed human behavior only helps a real person clear faster; it can never be used to penalize one."],
   ["Do all customers benefit from bots caught on other sites?", "Yes. TryNoBot runs a shared threat corpus: an IP or fingerprint (JA3/JA4/browser) confirmed bad on any site becomes known across the network. Bot farms rotate IP addresses but reuse the same fingerprint, so the network recognizes them the moment they reappear elsewhere. The more traffic the network sees, the stronger every customer's protection gets."],
   ["Could the shared corpus flag a legitimate visitor?", "No — that's designed out. A fingerprint is never flagged from a single sighting, because real users share fingerprints. It is only treated as automation after it has appeared across multiple distinct, independently-confirmed bad IP addresses — a pattern legitimate visitors never produce. The threshold is the safeguard, and it can never be lowered to one."],
+  ["Can I tell which clicks were ad-platform review bots?", "Yes. TryNoBot verifies ad-network review crawlers — Google Ads, AdSense and Bing Ads — by reverse DNS, then labels and counts them separately from real human clicks. Advertisers get click-quality numbers that reflect actual people, not the platform's own automated landing-page checks."],
+  ["Do you show ad reviewers a different page to avoid disapproval?", "Never. A verified review bot is shown exactly the same page a real visitor sees — showing it anything different is cloaking, which gets ads disapproved and domains flagged. We identify reviewers only to report them transparently, never to deceive the ad network."],
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],

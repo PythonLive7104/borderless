@@ -60,6 +60,11 @@ const SLIDES: Slide[] = [
     subtitle: "A fingerprint caught attacking any site on the network becomes known to all of them. Bot farms rotate IPs — but reuse the same fingerprint, and that's what gives them away, everywhere at once.",
   },
   {
+    badge: "Ad-review transparency",
+    title: (<>See which clicks were<br /><span className="text-gradient">the ad platform reviewing.</span></>),
+    subtitle: "We verify and label Google Ads, AdSense and Bing Ads review bots — and show them the same page real visitors see, never a different one. Your click quality reflects real people, not the platform's own automated checks.",
+  },
+  {
     badge: "Fraud detection",
     title: (<>Stop paying<br />for <span className="text-gradient">bot traffic.</span></>),
     subtitle: "Detect datacenter IPs, proxies, VPNs and automation before they drain your ad budget — with transparent, explainable scoring.",
