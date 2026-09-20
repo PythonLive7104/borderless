@@ -42,6 +42,13 @@ const (
 	//     capped, so it can never fully whitewash an IP the provider knows is bad.
 	wSyntheticEvents  = 35  // events with isTrusted=false — script-dispatched
 	wHumanInteraction = -25 // real human interaction observed (exoneration)
+
+	// Shared threat corpus (cross-customer). A fingerprint (JA3/JA4/fp-hash)
+	// seen across many DISTINCT confirmed-bad IPs is a bot farm rotating IPs
+	// behind one client — corroborated by the whole network, not one customer.
+	// Weighted strongly but below the auto-fraud line: the distinct-bad-IP
+	// threshold is what makes it safe, not the score.
+	wBadFingerprintNet = 40
 )
 
 type Input struct {
@@ -62,6 +69,10 @@ type Input struct {
 
 	SyntheticEvents  bool // tracker saw a JS-dispatched (isTrusted=false) event
 	HumanInteraction bool // tracker saw genuine human interaction this session
+
+	// This visitor's fingerprint is in the shared corpus: seen across enough
+	// distinct confirmed-bad IPs, network-wide, to be treated as automation.
+	KnownBadFingerprint bool
 }
 
 func Evaluate(in Input) Result {
@@ -117,6 +128,9 @@ func Evaluate(in Input) Result {
 	}
 	if in.RepeatOffender {
 		add(wRepeatOffender, "repeat_offender")
+	}
+	if in.KnownBadFingerprint {
+		add(wBadFingerprintNet, "known_bad_fingerprint_network")
 	}
 	if in.SyntheticEvents {
 		add(wSyntheticEvents, "synthetic_events")

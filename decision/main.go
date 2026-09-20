@@ -212,26 +212,29 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	h.warmIntel(fp.IP, intel.ISP != "") // fill ISP/ASN/conn for next time, off the hot path
 	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(rctx, fp.IP)
+	badFP := h.corpusKnownBad(rctx, ja3, ja4, fpHash)
 	result := risk.Evaluate(risk.Input{
-		KnownBot:         fp.IsBot,
-		Webdriver:        webdriver,
-		HeadlessFP:       headlessFP,
-		Automation:       fp.IsHeadless,
-		Datacenter:       intel.Datacenter,
-		Proxy:            intel.Proxy || intel.VPN,
-		NoFingerprint:    noFP,
-		AbnormalRate:     rate > 20 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
-		BadJA3:           ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
-		BadJA4:           ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
-		IPBot:            intel.BotStatus,
-		RecentAbuse:      intel.RecentAbuse,
-		IPFraudScore:     intel.FraudScore,
-		RepeatOffender:   repeat,
-		SyntheticEvents:  syntheticEvents,
-		HumanInteraction: humanInteraction,
+		KnownBot:            fp.IsBot,
+		Webdriver:           webdriver,
+		HeadlessFP:          headlessFP,
+		Automation:          fp.IsHeadless,
+		Datacenter:          intel.Datacenter,
+		Proxy:               intel.Proxy || intel.VPN,
+		NoFingerprint:       noFP,
+		AbnormalRate:        rate > 20 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:              ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
+		BadJA4:              ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
+		IPBot:               intel.BotStatus,
+		RecentAbuse:         intel.RecentAbuse,
+		IPFraudScore:        intel.FraudScore,
+		RepeatOffender:      repeat,
+		SyntheticEvents:     syntheticEvents,
+		HumanInteraction:    humanInteraction,
+		KnownBadFingerprint: badFP,
 	})
 	if result.Classification == "bot" || result.Classification == "fraud" {
 		h.rememberBot(fp.IP)
+		h.rememberBadFingerprint(fp.IP, ja3, ja4, fpHash)
 	}
 	// --- traffic rules (Phase 8): evaluate after scoring ---
 	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
@@ -375,22 +378,25 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 	h.warmIntel(fp.IP, intel.ISP != "")
 	iprate := h.st.RateIncr(ctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(ctx, fp.IP)
+	badFP := h.corpusKnownBad(ctx, ja3, ja4, "")
 	result := risk.Evaluate(risk.Input{
-		KnownBot:       fp.IsBot,
-		Automation:     fp.IsHeadless,
-		Datacenter:     intel.Datacenter,
-		Proxy:          intel.Proxy || intel.VPN,
-		NoFingerprint:  false,
-		AbnormalRate:   rate > 40 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
-		BadJA3:         ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
-		BadJA4:         ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
-		IPBot:          intel.BotStatus,
-		RecentAbuse:    intel.RecentAbuse,
-		IPFraudScore:   intel.FraudScore,
-		RepeatOffender: repeat,
+		KnownBot:            fp.IsBot,
+		Automation:          fp.IsHeadless,
+		Datacenter:          intel.Datacenter,
+		Proxy:               intel.Proxy || intel.VPN,
+		NoFingerprint:       false,
+		AbnormalRate:        rate > 40 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:              ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+		BadJA4:              ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
+		IPBot:               intel.BotStatus,
+		RecentAbuse:         intel.RecentAbuse,
+		IPFraudScore:        intel.FraudScore,
+		RepeatOffender:      repeat,
+		KnownBadFingerprint: badFP,
 	})
 	if result.Classification == "bot" || result.Classification == "fraud" {
 		h.rememberBot(fp.IP)
+		h.rememberBadFingerprint(fp.IP, ja3, ja4, "")
 	}
 	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
@@ -614,19 +620,21 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	linkIntel := h.lookupIP(ctx, fp.IP)
 	iprate := h.st.RateIncr(ctx, "iprate:"+fp.IP, time.Minute) // global per-IP (#5)
 	repeat := h.isRepeatOffender(ctx, fp.IP)                   // cross-surface memory (#4)
+	badFP := h.corpusKnownBad(ctx, ja3, ja4, "")               // shared fingerprint corpus (#2)
 	result := risk.Evaluate(risk.Input{
-		KnownBot:       fp.IsBot,
-		Automation:     fp.IsHeadless,
-		Datacenter:     linkIntel.Datacenter,
-		Proxy:          linkIntel.Proxy || linkIntel.VPN,
-		NoFingerprint:  false,
-		AbnormalRate:   rate > 40 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
-		BadJA3:         ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
-		BadJA4:         ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
-		IPBot:          linkIntel.BotStatus,
-		RecentAbuse:    linkIntel.RecentAbuse,
-		IPFraudScore:   linkIntel.FraudScore,
-		RepeatOffender: repeat,
+		KnownBot:            fp.IsBot,
+		Automation:          fp.IsHeadless,
+		Datacenter:          linkIntel.Datacenter,
+		Proxy:               linkIntel.Proxy || linkIntel.VPN,
+		NoFingerprint:       false,
+		AbnormalRate:        rate > 40 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:              ja3 != "" && h.st.InSet(ctx, "ja3:blocklist", ja3),
+		BadJA4:              ja4 != "" && h.st.InSet(ctx, "ja4:blocklist", ja4),
+		IPBot:               linkIntel.BotStatus,
+		RecentAbuse:         linkIntel.RecentAbuse,
+		IPFraudScore:        linkIntel.FraudScore,
+		RepeatOffender:      repeat,
+		KnownBadFingerprint: badFP,
 	})
 
 	// A link filters more eagerly than a page: known-bot UAs, automation tools,
@@ -635,6 +643,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// Remember clear bots so every other link/site sees this IP as suspicious.
 	if result.Classification == "bot" || result.Classification == "fraud" {
 		h.rememberBot(fp.IP)
+		h.rememberBadFingerprint(fp.IP, ja3, ja4, "")
 	}
 
 	// Decide the outcome. Default: humans -> destination; bots -> the link's
@@ -912,6 +921,38 @@ func (h *handler) rememberBot(ip string) {
 // isRepeatOffender reports whether this IP was caught as a bot recently.
 func (h *handler) isRepeatOffender(ctx context.Context, ip string) bool {
 	return ip != "" && h.st.GetStr(ctx, "botmem:"+ip) != ""
+}
+
+// corpusBadIPThreshold is how many DISTINCT confirmed-bad IPs must have carried
+// a fingerprint before the shared corpus treats it as automation. Above 1 by
+// design: a legit fingerprint shared with one unlucky bad IP must never be
+// enough to flag every real user who shares it.
+func corpusBadIPThreshold() int64 {
+	n := int64(3)
+	if v := env("CORPUS_BAD_IP_THRESHOLD", ""); v != "" {
+		if x, err := strconv.Atoi(v); err == nil && x > 1 {
+			n = int64(x)
+		}
+	}
+	return n
+}
+
+// rememberBadFingerprint files a confirmed-bad IP under the fingerprints it used,
+// feeding the cross-customer corpus. Fire-and-forget, off the hot path.
+func (h *handler) rememberBadFingerprint(ip, ja3, ja4, fpHash string) {
+	if ip == "" || (ja3 == "" && ja4 == "" && fpHash == "") {
+		return
+	}
+	go h.st.RecordBadFingerprint(context.Background(), ip, ja3, ja4, fpHash, botmemTTL())
+}
+
+// corpusKnownBad reports whether any of this visitor's fingerprints has been
+// seen across enough distinct confirmed-bad IPs to be corroborated automation.
+func (h *handler) corpusKnownBad(ctx context.Context, ja3, ja4, fpHash string) bool {
+	if ja3 == "" && ja4 == "" && fpHash == "" {
+		return false
+	}
+	return h.st.FingerprintBadIPs(ctx, ja3, ja4, fpHash) >= corpusBadIPThreshold()
 }
 
 // ipRateLimit is the per-minute cap on one IP's requests ACROSS every link and

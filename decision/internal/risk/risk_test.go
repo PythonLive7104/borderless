@@ -53,6 +53,27 @@ func TestHumanInteractionOnACleanVisitIsANoOp(t *testing.T) {
 	}
 }
 
+func TestKnownBadFingerprintFromNetworkAddsRisk(t *testing.T) {
+	r := Evaluate(Input{KnownBadFingerprint: true})
+	if r.Score != wBadFingerprintNet {
+		t.Fatalf("network-corroborated bad fingerprint: got %d, want %d", r.Score, wBadFingerprintNet)
+	}
+	if !hasSignal(r, "known_bad_fingerprint_network") {
+		t.Fatalf("expected known_bad_fingerprint_network signal, got %v", r.Signals)
+	}
+}
+
+func TestNetworkFingerprintPlusOneMoreSignalReachesBot(t *testing.T) {
+	// Corroborated-bad fingerprint (40) + datacenter IP (25) = 65 -> still
+	// suspicious; add automation and it crosses into bot. Proves the corpus
+	// signal composes with the rest rather than acting alone.
+	r := Evaluate(Input{KnownBadFingerprint: true, Datacenter: true, Automation: true})
+	if r.Classification != "bot" && r.Classification != "fraud" {
+		t.Fatalf("corpus + datacenter + automation should classify bot/fraud, got %s (%d)",
+			r.Classification, r.Score)
+	}
+}
+
 func hasSignal(r Result, name string) bool {
 	for _, s := range r.Signals {
 		if s == name {

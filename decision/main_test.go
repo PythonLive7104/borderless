@@ -215,3 +215,19 @@ func TestMergeQueryKeepsAtLiteral(t *testing.T) {
 		t.Fatalf("no %%40 expected, got %q", got)
 	}
 }
+
+func TestCorpusThresholdNeverDropsBelowTwo(t *testing.T) {
+	// The corpus must never flag a fingerprint from a single confirmed-bad IP:
+	// legit users share fingerprints, so a floor of 2 (really >1) is the safety
+	// guarantee. A misconfigured env value must not be able to lower it to 1.
+	for _, v := range []string{"", "0", "1", "-5", "garbage"} {
+		t.Setenv("CORPUS_BAD_IP_THRESHOLD", v)
+		if got := corpusBadIPThreshold(); got < 2 {
+			t.Fatalf("threshold=%q gave %d; must be >= 2 to protect shared fingerprints", v, got)
+		}
+	}
+	t.Setenv("CORPUS_BAD_IP_THRESHOLD", "5")
+	if got := corpusBadIPThreshold(); got != 5 {
+		t.Fatalf("valid override 5 gave %d", got)
+	}
+}
