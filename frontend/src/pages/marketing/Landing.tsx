@@ -55,6 +55,11 @@ const SLIDES: Slide[] = [
     subtitle: "We score how real visitors move, scroll and type. Script-driven and synthetic interaction gives automation away — even on a clean IP with a perfect user-agent.",
   },
   {
+    badge: "Network defense",
+    title: (<>One customer's attacker<br />is <span className="text-gradient">everyone's known bot.</span></>),
+    subtitle: "A fingerprint caught attacking any site on the network becomes known to all of them. Bot farms rotate IPs — but reuse the same fingerprint, and that's what gives them away, everywhere at once.",
+  },
+  {
     badge: "Fraud detection",
     title: (<>Stop paying<br />for <span className="text-gradient">bot traffic.</span></>),
     subtitle: "Detect datacenter IPs, proxies, VPNs and automation before they drain your ad budget — with transparent, explainable scoring.",

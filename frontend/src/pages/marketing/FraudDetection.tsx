@@ -14,6 +14,6 @@ export default function FraudDetection() {
       { icon: IBolt, title: "Automatic actions", desc: "Route risky traffic to block, review or tag with your own rule thresholds." },
       { icon: ITarget, title: "Signal transparency", desc: "Every score lists the signals behind it so you can trust — and tune — decisions." },
     ]}
-    bullets={["Datacenter IP detection","Proxy & VPN signals","Headless-browser indicators","Known bot fingerprints","Synthetic-event detection","Human-interaction verification","Abnormal request-rate detection","IP / ASN reputation"]}
+    bullets={["Datacenter IP detection","Proxy & VPN signals","Headless-browser indicators","Known bot fingerprints","Synthetic-event detection","Human-interaction verification","Cross-customer threat corpus","Abnormal request-rate detection","IP / ASN reputation"]}
   />;
 }

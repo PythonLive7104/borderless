@@ -1075,6 +1075,16 @@ const SLIDES = [
     subtitle: "We score how real visitors move, scroll and type. Script-driven and synthetic interaction gives automation away — even on a clean IP with a perfect user-agent."
   },
   {
+    badge: "Network defense",
+    title: /* @__PURE__ */ jsxs(Fragment, { children: [
+      "One customer's attacker",
+      /* @__PURE__ */ jsx("br", {}),
+      "is ",
+      /* @__PURE__ */ jsx("span", { className: "text-gradient", children: "everyone's known bot." })
+    ] }),
+    subtitle: "A fingerprint caught attacking any site on the network becomes known to all of them. Bot farms rotate IPs — but reuse the same fingerprint, and that's what gives them away, everywhere at once."
+  },
+  {
     badge: "Fraud detection",
     title: /* @__PURE__ */ jsxs(Fragment, { children: [
       "Stop paying",
@@ -1607,6 +1617,7 @@ function Features() {
         { icon: IRadar, title: "Visitor & session intelligence", desc: "Rich signals for every visit: IP, ASN, geo, device, browser, OS, referrer and UTM data." },
         { icon: IShield, title: "Bot & fraud detection", desc: "Datacenter IPs, proxies, VPNs, headless browsers and automation caught in real time." },
         { icon: IRadar, title: "Behavioral analysis", desc: "How a visitor moves, scrolls and types is scored live — script-driven and synthetic interaction is flagged, while genuine human behavior clears real people faster." },
+        { icon: IUsers, title: "Shared threat intelligence", desc: "A bad IP or fingerprint caught on any site defends every site. Bot farms rotate IPs but reuse fingerprints — so the network catches them the moment they reappear." },
         { icon: IGauge, title: "Explainable risk scores", desc: "A 0–100 score per visitor with the exact contributing signals — never a black box." },
         { icon: IBolt, title: "Traffic rules engine", desc: "Allow, review, block or tag traffic with a visual IF/THEN rule builder." },
         { icon: IServer, title: "Server-side shield", desc: "Block bots before your page loads — enforce rules at your server or edge with drop-in PHP, Django, nginx, Cloudflare or Node snippets." },
@@ -1634,7 +1645,7 @@ function FraudDetection() {
         { icon: IBolt, title: "Automatic actions", desc: "Route risky traffic to block, review or tag with your own rule thresholds." },
         { icon: ITarget, title: "Signal transparency", desc: "Every score lists the signals behind it so you can trust — and tune — decisions." }
       ],
-      bullets: ["Datacenter IP detection", "Proxy & VPN signals", "Headless-browser indicators", "Known bot fingerprints", "Synthetic-event detection", "Human-interaction verification", "Abnormal request-rate detection", "IP / ASN reputation"]
+      bullets: ["Datacenter IP detection", "Proxy & VPN signals", "Headless-browser indicators", "Known bot fingerprints", "Synthetic-event detection", "Human-interaction verification", "Cross-customer threat corpus", "Abnormal request-rate detection", "IP / ASN reputation"]
     }
   );
 }
@@ -1791,6 +1802,8 @@ const QA = [
   ["How does risk scoring work?", "Each visitor is evaluated against weighted signals (datacenter IP, proxy, automation, abnormal request rate and more), normalized to a 0–100 score, and classified as Human, Suspicious, Bot or Fraud. Every score lists its contributing signals."],
   ["How does TryNoBot detect bots that pass fingerprint checks?", "Beyond network and fingerprint signals, TryNoBot analyzes behavior: how a visitor moves the pointer, scrolls and types. Script-dispatched (synthetic) events — a hallmark of automation — are flagged, while genuine human interaction corroborates real visitors and lowers their risk score. This catches automation that looks clean on IP and user-agent alone."],
   ["Does behavioral detection block real visitors?", "No. Behavioral signals are collected passively and are never held against a first-time visitor: the initial pageview carries no interaction, so absence of it is never treated as suspicious. Observed human behavior only helps a real person clear faster; it can never be used to penalize one."],
+  ["Do all customers benefit from bots caught on other sites?", "Yes. TryNoBot runs a shared threat corpus: an IP or fingerprint (JA3/JA4/browser) confirmed bad on any site becomes known across the network. Bot farms rotate IP addresses but reuse the same fingerprint, so the network recognizes them the moment they reappear elsewhere. The more traffic the network sees, the stronger every customer's protection gets."],
+  ["Could the shared corpus flag a legitimate visitor?", "No — that's designed out. A fingerprint is never flagged from a single sighting, because real users share fingerprints. It is only treated as automation after it has appeared across multiple distinct, independently-confirmed bad IP addresses — a pattern legitimate visitors never produce. The threshold is the safeguard, and it can never be lowered to one."],
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],
