@@ -73,6 +73,8 @@ services:
         VITE_GA_ID: ${VITE_GA_ID:-}
         VITE_GADS_ID: ${VITE_GADS_ID:-}
         VITE_GADS_SIGNUP_LABEL: ${VITE_GADS_SIGNUP_LABEL:-}
+        VITE_GADS_LEAD_LABEL: ${VITE_GADS_LEAD_LABEL:-}
+        VITE_GADS_PURCHASE_LABEL: ${VITE_GADS_PURCHASE_LABEL:-}
     environment:
       DOMAIN: ${DOMAIN}
       SHORT_DOMAIN: ${SHORT_DOMAIN:-}    # primary short-link domain

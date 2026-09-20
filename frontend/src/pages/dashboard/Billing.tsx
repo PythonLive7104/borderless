@@ -7,6 +7,7 @@ import Modal from "../../components/ui/Modal";
 import IntervalToggle from "../../components/ui/IntervalToggle";
 import PageNote from "../../components/dashboard/PageNote";
 import { ILink, IGlobe } from "../../components/ui/icons";
+import { trackPurchase } from "../../lib/analytics";
 
 const statusTone: Record<string, string> = {
   trialing: "bg-brand/10 text-brand", active: "bg-success/10 text-emerald-700", canceled: "bg-danger/10 text-red-600",
@@ -107,6 +108,11 @@ export default function Billing() {
         const s = await billingApi.verifyCheckout(current.id);
         if (s.status === "active") {
           setSub(s);
+          // Report the value so Ads can bid toward revenue rather than toward
+          // raw signups — the plan price for the interval actually bought.
+          trackPurchase(
+            s.interval === "monthly" ? s.plan.price_monthly : s.plan.price,
+            s.plan.slug, s.interval);
           setPayMsg({ kind: "done", text: `Payment confirmed — you're now on the ${s.plan.name} plan. A receipt has been emailed to you.` });
           clearInterval(iv); clear(); return;
         }

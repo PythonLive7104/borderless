@@ -1,4 +1,5 @@
 import { useSeo } from "../../lib/seo";
+import { trackLead } from "../../lib/analytics";
 import { useCta } from "../../lib/useCta";
 import { useState } from "react";
 import { botCheckApi, type BotCheckResult } from "../../lib/api";
@@ -31,7 +32,12 @@ export default function BotCheck() {
     setLeadBusy(true); setLeadErr("");
     try {
       const r = await botCheckApi.lead({ email: email.trim(), url: res.url, grade: res.grade, exposure: res.exposure });
-      if (r.ok) setLeadDone(true);
+      if (r.ok) {
+        setLeadDone(true);
+        // The conversion ad campaigns should bid on: the scan is free and
+        // anonymous, so this email is the first thing worth money.
+        trackLead();
+      }
       else setLeadErr(r.error || "Couldn't send the report. Try again.");
     } catch (e: any) {
       setLeadErr(e?.data?.error || "Couldn't send the report. Try again.");
