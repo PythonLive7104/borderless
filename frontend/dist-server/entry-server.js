@@ -1065,6 +1065,16 @@ const SLIDES = [
     subtitle: BRAND$1.subtitle
   },
   {
+    badge: "Behavioral detection",
+    title: /* @__PURE__ */ jsxs(Fragment, { children: [
+      "Catch bots that pass",
+      /* @__PURE__ */ jsx("br", {}),
+      "every ",
+      /* @__PURE__ */ jsx("span", { className: "text-gradient", children: "fingerprint check." })
+    ] }),
+    subtitle: "We score how real visitors move, scroll and type. Script-driven and synthetic interaction gives automation away — even on a clean IP with a perfect user-agent."
+  },
+  {
     badge: "Fraud detection",
     title: /* @__PURE__ */ jsxs(Fragment, { children: [
       "Stop paying",
@@ -1596,6 +1606,7 @@ function Features() {
       blocks: [
         { icon: IRadar, title: "Visitor & session intelligence", desc: "Rich signals for every visit: IP, ASN, geo, device, browser, OS, referrer and UTM data." },
         { icon: IShield, title: "Bot & fraud detection", desc: "Datacenter IPs, proxies, VPNs, headless browsers and automation caught in real time." },
+        { icon: IRadar, title: "Behavioral analysis", desc: "How a visitor moves, scrolls and types is scored live — script-driven and synthetic interaction is flagged, while genuine human behavior clears real people faster." },
         { icon: IGauge, title: "Explainable risk scores", desc: "A 0–100 score per visitor with the exact contributing signals — never a black box." },
         { icon: IBolt, title: "Traffic rules engine", desc: "Allow, review, block or tag traffic with a visual IF/THEN rule builder." },
         { icon: IServer, title: "Server-side shield", desc: "Block bots before your page loads — enforce rules at your server or edge with drop-in PHP, Django, nginx, Cloudflare or Node snippets." },
@@ -1618,12 +1629,12 @@ function FraudDetection() {
       blocks: [
         { icon: IShield, title: "Bot & automation", desc: "Headless browsers, known bot user-agents and scripted traffic flagged instantly." },
         { icon: IGlobe, title: "Datacenter & proxy", desc: "Datacenter IPs, proxies and VPNs identified via IP/ASN reputation." },
-        { icon: IRadar, title: "Behavioral anomalies", desc: "Abnormal request frequency and repeated suspicious activity surfaced automatically." },
+        { icon: IRadar, title: "Behavioral analysis", desc: "Mouse movement, scroll and keystrokes are scored in real time. Script-dispatched (synthetic) events give automation away; genuine human interaction corroborates real visitors." },
         { icon: IGauge, title: "Risk ranges", desc: "0–39 low · 40–69 medium · 70–84 high · 85–100 critical, each fully explained." },
         { icon: IBolt, title: "Automatic actions", desc: "Route risky traffic to block, review or tag with your own rule thresholds." },
         { icon: ITarget, title: "Signal transparency", desc: "Every score lists the signals behind it so you can trust — and tune — decisions." }
       ],
-      bullets: ["Datacenter IP detection", "Proxy & VPN signals", "Headless-browser indicators", "Known bot fingerprints", "Abnormal request-rate detection", "IP / ASN reputation"]
+      bullets: ["Datacenter IP detection", "Proxy & VPN signals", "Headless-browser indicators", "Known bot fingerprints", "Synthetic-event detection", "Human-interaction verification", "Abnormal request-rate detection", "IP / ASN reputation"]
     }
   );
 }
@@ -1778,14 +1789,26 @@ const QA = [
   ["What is TryNoBot?", "A traffic-intelligence platform that analyzes, scores and classifies your incoming traffic in real time so you can detect fraud, protect campaigns and measure conversions."],
   ["Do you deceive ad networks or hide content from reviewers?", "No. TryNoBot is built for legitimate traffic-quality, fraud detection and analytics. We don't provide ad-reviewer deception or platform-policy evasion."],
   ["How does risk scoring work?", "Each visitor is evaluated against weighted signals (datacenter IP, proxy, automation, abnormal request rate and more), normalized to a 0–100 score, and classified as Human, Suspicious, Bot or Fraud. Every score lists its contributing signals."],
+  ["How does TryNoBot detect bots that pass fingerprint checks?", "Beyond network and fingerprint signals, TryNoBot analyzes behavior: how a visitor moves the pointer, scrolls and types. Script-dispatched (synthetic) events — a hallmark of automation — are flagged, while genuine human interaction corroborates real visitors and lowers their risk score. This catches automation that looks clean on IP and user-agent alone."],
+  ["Does behavioral detection block real visitors?", "No. Behavioral signals are collected passively and are never held against a first-time visitor: the initial pageview carries no interaction, so absence of it is never treated as suspicious. Observed human behavior only helps a real person clear faster; it can never be used to penalize one."],
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],
   ["Is there a free trial?", "Every plan includes a 7-day free trial with no credit card required."]
 ];
+const FAQ_JSONLD = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: QA.map(([q, a]) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a }
+  }))
+});
 function Faq() {
   const [open, setOpen] = useState(0);
   return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx("script", { type: "application/ld+json", dangerouslySetInnerHTML: { __html: FAQ_JSONLD } }),
     /* @__PURE__ */ jsxs("section", { className: "hero-band relative overflow-hidden", children: [
       /* @__PURE__ */ jsx("div", { className: "binary-grid absolute inset-0 opacity-70" }),
       /* @__PURE__ */ jsxs("div", { className: "container-page relative py-16 text-center", children: [

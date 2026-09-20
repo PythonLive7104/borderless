@@ -6,16 +6,32 @@ const QA = [
   ["What is TryNoBot?", "A traffic-intelligence platform that analyzes, scores and classifies your incoming traffic in real time so you can detect fraud, protect campaigns and measure conversions."],
   ["Do you deceive ad networks or hide content from reviewers?", "No. TryNoBot is built for legitimate traffic-quality, fraud detection and analytics. We don't provide ad-reviewer deception or platform-policy evasion."],
   ["How does risk scoring work?", "Each visitor is evaluated against weighted signals (datacenter IP, proxy, automation, abnormal request rate and more), normalized to a 0–100 score, and classified as Human, Suspicious, Bot or Fraud. Every score lists its contributing signals."],
+  ["How does TryNoBot detect bots that pass fingerprint checks?", "Beyond network and fingerprint signals, TryNoBot analyzes behavior: how a visitor moves the pointer, scrolls and types. Script-dispatched (synthetic) events — a hallmark of automation — are flagged, while genuine human interaction corroborates real visitors and lowers their risk score. This catches automation that looks clean on IP and user-agent alone."],
+  ["Does behavioral detection block real visitors?", "No. Behavioral signals are collected passively and are never held against a first-time visitor: the initial pageview carries no interaction, so absence of it is never treated as suspicious. Observed human behavior only helps a real person clear faster; it can never be used to penalize one."],
   ["How do I install tracking?", "Add a website in your dashboard, copy the async script tag, and paste it before </head>. Installation is auto-detected once the first event arrives."],
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],
   ["Is there a free trial?", "Every plan includes a 7-day free trial with no credit card required."],
 ];
 
+// FAQPage structured data. Rendered into the markup (not injected via effect)
+// so it is present in the prerendered HTML, where search engines and AI answer
+// engines actually read it — a client-only script would be missed by most.
+const FAQ_JSONLD = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: QA.map(([q, a]) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+});
+
 export default function Faq() {
   const [open, setOpen] = useState<number | null>(0);
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: FAQ_JSONLD }} />
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
         <div className="container-page relative py-16 text-center">
