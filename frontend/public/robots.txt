@@ -7,7 +7,6 @@ User-agent: *
 Allow: /$
 Disallow: /dashboard/
 Disallow: /admin/
-Disallow: /django-admin/
 Disallow: /api/
 Disallow: /l/
 Disallow: /login
