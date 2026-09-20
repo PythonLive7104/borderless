@@ -32,11 +32,12 @@ var crawlers = []struct {
 	suffixes []string
 }{
 	{"googlebot", []string{".googlebot.com", ".google.com"}},
-	{"google-safety", []string{".google.com", ".googlebot.com"}},   // Safe Browsing fetcher
+	{"google-safety", []string{".google.com", ".googlebot.com"}}, // Safe Browsing fetcher
 	{"adsbot-google", []string{".google.com", ".googlebot.com"}},
 	{"apis-google", []string{".google.com"}},
 	{"mediapartners-google", []string{".google.com", ".googlebot.com"}},
 	{"bingbot", []string{".search.msn.com"}},
+	{"adidxbot", []string{".search.msn.com"}}, // Microsoft/Bing Ads landing-page reviewer
 	{"msnbot", []string{".search.msn.com"}},
 	{"bingpreview", []string{".search.msn.com"}},
 	{"duckduckbot", []string{".duckduckgo.com"}},
@@ -54,6 +55,34 @@ func Claims(ua string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// adReviewers are the verified crawlers that are ad-network landing-page
+// REVIEW/quality bots rather than search indexers. They see exactly what a
+// human sees (never a different page — that would be cloaking); we identify
+// them only to REPORT them, so an advertiser's analytics can separate genuine
+// human clicks from the platform's own automated review visits.
+var adReviewers = map[string]string{
+	"adsbot-google":        "google_ads",     // Google Ads landing-page quality
+	"mediapartners-google": "google_adsense", // AdSense content crawler
+	"adidxbot":             "bing_ads",       // Microsoft/Bing Ads reviewer
+}
+
+// Platform returns the ad-network label for a token if it is an ad reviewer,
+// else "". Used for reporting only.
+func Platform(token string) string { return adReviewers[token] }
+
+// VerifiedKind verifies the visitor and, if it is a forward-confirmed crawler,
+// returns its token and — when it is an ad reviewer — the platform label. A
+// non-crawler or a spoofed claim returns ("", "", false). One DNS path, so the
+// caller gets both the anti-cloaking "allow" decision and the reporting label
+// without resolving twice.
+func VerifiedKind(ctx context.Context, ip, ua string) (token, platform string, ok bool) {
+	t, claimed := Claims(ua)
+	if !claimed || !Verify(ctx, ip, ua) {
+		return "", "", false
+	}
+	return t, adReviewers[t], true
 }
 
 // Overridable in tests so the suite never touches real DNS.

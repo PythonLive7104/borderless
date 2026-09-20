@@ -255,6 +255,10 @@ class ShortLink(models.Model):
     clicks = models.IntegerField(default=0)
     human_clicks = models.IntegerField(default=0)
     bot_clicks = models.IntegerField(default=0)
+    # Verified ad-network review bots (Google Ads, AdSense, Bing Ads). Counted
+    # apart from human and bot so the human/bot ratio reflects real people, not
+    # the platform's own automated landing-page checks.
+    reviewer_clicks = models.IntegerField(default=0)
 
     # Where bots go when bot_action is "decoy". Blank means our built-in decoy
     # page, served from this link's OWN short domain — never the brand domain,

@@ -126,3 +126,28 @@ func TestClaims(t *testing.T) {
 }
 
 var _ = time.Second // keep time import if trimmed later
+
+func TestPlatformIdentifiesAdReviewers(t *testing.T) {
+	cases := map[string]string{
+		"adsbot-google":        "google_ads",
+		"mediapartners-google": "google_adsense",
+		"adidxbot":             "bing_ads",
+		"googlebot":            "", // a search crawler is not an ad reviewer
+		"bingbot":              "",
+	}
+	for token, want := range cases {
+		if got := Platform(token); got != want {
+			t.Errorf("Platform(%q) = %q, want %q", token, got, want)
+		}
+	}
+}
+
+func TestAdReviewerTokensAreAlsoVerifiableCrawlers(t *testing.T) {
+	// Every ad-reviewer token must exist in the crawler table, or VerifiedKind
+	// could never confirm it and the label would never fire.
+	for token := range adReviewers {
+		if _, ok := Claims("Mozilla/5.0 (compatible; " + token + "/2.1)"); !ok {
+			t.Errorf("ad reviewer %q is not a recognized crawler token", token)
+		}
+	}
+}

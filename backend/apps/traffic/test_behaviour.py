@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 
 from django.test import TestCase
+from django.utils import timezone
 
 from django.contrib.auth import get_user_model
 
@@ -64,3 +65,46 @@ class BehaviourIngestTest(TestCase):
     def test_pageview_stores_empty_behaviour(self):
         e = self._event(type="pageview", bh_mouse="-1", bh_human="0")
         self.assertEqual(e.behaviour, {})
+
+
+class ReviewerReportingTest(TestCase):
+    """Verified ad-network reviewers are labeled and counted apart from humans
+    and bots, so an advertiser's real click quality isn't skewed by the ad
+    platform's own landing-page review visits."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="rev@example.com", email="rev@example.com", password="testpass123")
+        self.org = create_workspace(user, "Rev Co")
+        self.site = Website.objects.create(organization=self.org, name="R",
+                                           domain="r.example", tracking_id="rev123")
+
+    def _ingest(self, **extra):
+        f = {"site_id": "rev123", "visitor_id": "v", "session_id": "s",
+             "type": "server_check", "url": "https://r.example/", "ts": str(int(time.time())),
+             "risk_score": "20", "classification": "human", "confidence": "0.6",
+             "signals": "[]", "ip": "66.249.66.1"}
+        f.update(extra)
+        Command()._ingest(f)
+
+    def test_reviewer_event_is_flagged_with_platform(self):
+        self._ingest(reviewer="1", reviewer_platform="google_ads")
+        e = TrafficEvent.objects.latest("id")
+        self.assertTrue(e.is_reviewer)
+        self.assertEqual(e.reviewer_platform, "google_ads")
+
+    def test_reviewer_click_counts_apart_from_human_and_bot(self):
+        from apps.links.models import ShortLink, ShortDomain
+        dom = ShortDomain.objects.create(host="r.cc", active=True, verified_at=timezone.now())
+        link = ShortLink.objects.create(organization=self.org, domain=dom,
+                                        slug="promo", destination_url="https://r.example")
+        # a human, a bot, and a reviewer all click the same link
+        self._ingest(slug="promo", classification="human")
+        self._ingest(slug="promo", classification="bot", reviewer="0")
+        self._ingest(slug="promo", classification="bot", reviewer="1",
+                     reviewer_platform="google_ads")
+        link.refresh_from_db()
+        self.assertEqual(link.clicks, 3)
+        self.assertEqual(link.human_clicks, 1)
+        self.assertEqual(link.bot_clicks, 1)          # the reviewer is NOT counted here
+        self.assertEqual(link.reviewer_clicks, 1)

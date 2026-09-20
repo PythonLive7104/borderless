@@ -104,11 +104,16 @@ class Command(BaseCommand):
         if slug:
             from apps.links.models import ShortLink
             from django.db.models import F
-            is_human = f.get("classification") == "human"
+            # A verified ad reviewer is neither a human customer nor a bot to
+            # block: count it on its own so the human/bot split stays honest.
+            is_reviewer = f.get("reviewer") == "1"
+            is_human = (not is_reviewer) and f.get("classification") == "human"
+            is_bot = not is_reviewer and not is_human
             ShortLink.objects.filter(slug=slug).update(
                 clicks=F("clicks") + 1,
                 human_clicks=F("human_clicks") + (1 if is_human else 0),
-                bot_clicks=F("bot_clicks") + (0 if is_human else 1),
+                bot_clicks=F("bot_clicks") + (1 if is_bot else 0),
+                reviewer_clicks=F("reviewer_clicks") + (1 if is_reviewer else 0),
             )
 
         site = Website.objects.filter(tracking_id=f.get("site_id")).first()
@@ -162,6 +167,8 @@ class Command(BaseCommand):
             ja3=f.get("ja3", "") or "",
             ja4=f.get("ja4", "") or "",
             behaviour=_behaviour(f),
+            is_reviewer=f.get("reviewer") == "1",
+            reviewer_platform=f.get("reviewer_platform", "") or "",
             created_at=ts,
         )
         # IP intelligence enrichment (populates shared sets + adjusts this event)

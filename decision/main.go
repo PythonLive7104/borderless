@@ -232,7 +232,19 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		HumanInteraction:    humanInteraction,
 		KnownBadFingerprint: badFP,
 	})
-	if result.Classification == "bot" || result.Classification == "fraud" {
+	// Identify verified crawlers up front: an ad reviewer or search bot must
+	// never be written into the bad-IP/fingerprint corpus (that would poison it
+	// with Google's own IPs), and ad reviewers are labeled here for reporting.
+	reviewerPlatform, verifiedCrawler := "", false
+	if h.allowCrawlers {
+		if _, platform, ok := crawler.VerifiedKind(rctx, fp.IP, fp.UserAgent); ok {
+			verifiedCrawler = true
+			if platform != "" {
+				reviewerPlatform = platform
+			}
+		}
+	}
+	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
 		h.rememberBot(fp.IP)
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, fpHash)
 	}
@@ -269,9 +281,15 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Verified crawler -> real content (anti-cloaking); see score() for why.
-	if h.allowCrawlers && crawler.Verify(rctx, fp.IP, fp.UserAgent) {
+	// Ad-network review bots get the SAME page as everyone (never a different
+	// one — that would be cloaking); we only label them so the advertiser's
+	// analytics can separate real human clicks from the platform's own reviews.
+	if verifiedCrawler {
 		action, tag, redirect = "allow", "", ""
 		result.Signals = append(result.Signals, "verified_crawler")
+		if reviewerPlatform != "" {
+			result.Signals = append(result.Signals, "ad_reviewer")
+		}
 	}
 	// --- IP allow/deny lists: whitelist always passes, blacklist blocks;
 	// both take precedence over the scored rules above. ---
@@ -286,44 +304,46 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	signalsJSON, _ := json.Marshal(result.Signals)
 
 	fields := map[string]any{
-		"site_id":        p.SiteID,
-		"visitor_id":     p.VisitorID,
-		"session_id":     p.SessionID,
-		"type":           p.Type,
-		"url":            p.URL,
-		"referrer":       p.Referrer,
-		"utm_source":     p.UTMSource,
-		"utm_medium":     p.UTMMedium,
-		"utm_campaign":   p.UTMCampaign,
-		"event_name":     p.EventName,
-		"revenue":        p.Revenue,
-		"currency":       p.Currency,
-		"ip":             fp.IP,
-		"country":        fp.Country,
-		"device":         fp.Device,
-		"browser":        fp.Browser,
-		"os":             fp.OS,
-		"ua":             fp.UserAgent,
-		"is_headless":    boolStr(fp.IsHeadless),
-		"risk_score":     result.Score,
-		"classification": result.Classification,
-		"confidence":     fmt.Sprintf("%.2f", result.Confidence),
-		"signals":        string(signalsJSON),
-		"fingerprint":    fpHash,
-		"fp_flags":       fpFlags,
-		"ja3":            ja3,
-		"ja4":            ja4,
-		"action":         action,
-		"tag":            tag,
-		"redirect_url":   redirect,
-		"bh_mouse":       bhInt(p.BH, func(b *BH) int { return b.Mouse }),
-		"bh_dirchg":      bhInt(p.BH, func(b *BH) int { return b.DirChg }),
-		"bh_scroll":      bhInt(p.BH, func(b *BH) int { return b.Scroll }),
-		"bh_keys":        bhInt(p.BH, func(b *BH) int { return b.Keys }),
-		"bh_ttfi":        bhInt(p.BH, func(b *BH) int { return b.TTFI }),
-		"bh_pointer":     bhStr(p.BH, func(b *BH) string { return b.Pointer }),
-		"bh_synthetic":   boolStr(syntheticEvents),
-		"bh_human":       boolStr(humanInteraction),
+		"site_id":           p.SiteID,
+		"visitor_id":        p.VisitorID,
+		"session_id":        p.SessionID,
+		"type":              p.Type,
+		"url":               p.URL,
+		"referrer":          p.Referrer,
+		"utm_source":        p.UTMSource,
+		"utm_medium":        p.UTMMedium,
+		"utm_campaign":      p.UTMCampaign,
+		"event_name":        p.EventName,
+		"revenue":           p.Revenue,
+		"currency":          p.Currency,
+		"ip":                fp.IP,
+		"country":           fp.Country,
+		"device":            fp.Device,
+		"browser":           fp.Browser,
+		"os":                fp.OS,
+		"ua":                fp.UserAgent,
+		"is_headless":       boolStr(fp.IsHeadless),
+		"risk_score":        result.Score,
+		"classification":    result.Classification,
+		"confidence":        fmt.Sprintf("%.2f", result.Confidence),
+		"signals":           string(signalsJSON),
+		"fingerprint":       fpHash,
+		"fp_flags":          fpFlags,
+		"ja3":               ja3,
+		"ja4":               ja4,
+		"action":            action,
+		"tag":               tag,
+		"redirect_url":      redirect,
+		"bh_mouse":          bhInt(p.BH, func(b *BH) int { return b.Mouse }),
+		"bh_dirchg":         bhInt(p.BH, func(b *BH) int { return b.DirChg }),
+		"bh_scroll":         bhInt(p.BH, func(b *BH) int { return b.Scroll }),
+		"bh_keys":           bhInt(p.BH, func(b *BH) int { return b.Keys }),
+		"bh_ttfi":           bhInt(p.BH, func(b *BH) int { return b.TTFI }),
+		"bh_pointer":        bhStr(p.BH, func(b *BH) string { return b.Pointer }),
+		"bh_synthetic":      boolStr(syntheticEvents),
+		"bh_human":          boolStr(humanInteraction),
+		"reviewer":          boolStr(reviewerPlatform != ""),
+		"reviewer_platform": reviewerPlatform,
 	}
 	// fire-and-forget; never block the caller
 	go h.st.EmitTraffic(context.Background(), fields)
@@ -394,7 +414,18 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 		RepeatOffender:      repeat,
 		KnownBadFingerprint: badFP,
 	})
-	if result.Classification == "bot" || result.Classification == "fraud" {
+	// Verified crawler first, so an ad reviewer / search bot is never written
+	// into the bad corpus, and ad reviewers are labeled for reporting.
+	reviewerPlatform, verifiedCrawler := "", false
+	if h.allowCrawlers {
+		if _, platform, ok := crawler.VerifiedKind(ctx, fp.IP, fp.UserAgent); ok {
+			verifiedCrawler = true
+			if platform != "" {
+				reviewerPlatform = platform
+			}
+		}
+	}
+	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
 		h.rememberBot(fp.IP)
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, "")
 	}
@@ -428,9 +459,12 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 	// A forward-confirmed crawler (Googlebot, Safe Browsing, Bing…) sees exactly
 	// what a human sees. Overrides a rule-driven block/redirect so the site
 	// isn't deceptive to Google; a manual IP denylist below can still stop it.
-	if h.allowCrawlers && crawler.Verify(ctx, fp.IP, fp.UserAgent) {
+	if verifiedCrawler {
 		action, tag, redirect = "allow", "", ""
 		result.Signals = append(result.Signals, "verified_crawler")
+		if reviewerPlatform != "" {
+			result.Signals = append(result.Signals, "ad_reviewer")
+		}
 	}
 	switch ipfilter.Match(ipfilter.Parse(h.st.GetIPFilter(ctx, siteID)), fp.IP) {
 	case ipfilter.Allow:
@@ -442,6 +476,7 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 	go h.st.EmitTraffic(context.Background(), map[string]any{
 		"site_id": siteID, "visitor_id": "server:" + fp.IP, "session_id": "",
 		"type": "server_check", "url": path, "referrer": referrer,
+		"reviewer": boolStr(reviewerPlatform != ""), "reviewer_platform": reviewerPlatform,
 		"ip": fp.IP, "country": fp.Country, "device": fp.Device, "browser": fp.Browser, "os": fp.OS,
 		"ua": fp.UserAgent, "is_headless": boolStr(fp.IsHeadless),
 		"risk_score": result.Score, "classification": result.Classification,
@@ -637,11 +672,27 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		KnownBadFingerprint: badFP,
 	})
 
+	// A verified crawler — including an ad-network reviewer — must reach the
+	// real destination, never a decoy: showing a reviewer a different page than
+	// a human is textbook cloaking, and on an ad's landing URL it gets the ad
+	// disapproved. Detected before the bot-memory write so Google's own IPs are
+	// never poisoned into the shared corpus; ad reviewers are labeled to report.
+	reviewerPlatform, verifiedCrawler := "", false
+	if h.allowCrawlers {
+		if _, platform, ok := crawler.VerifiedKind(ctx, fp.IP, fp.UserAgent); ok {
+			verifiedCrawler = true
+			result.Signals = append(result.Signals, "verified_crawler")
+			if platform != "" {
+				reviewerPlatform = platform
+				result.Signals = append(result.Signals, "ad_reviewer")
+			}
+		}
+	}
 	// A link filters more eagerly than a page: known-bot UAs, automation tools,
-	// and anything suspicious+ (risk >= 40).
-	isBot := fp.IsBot || fp.IsHeadless || result.Score >= 40
+	// and anything suspicious+ (risk >= 40) — but never a verified crawler.
+	isBot := !verifiedCrawler && (fp.IsBot || fp.IsHeadless || result.Score >= 40)
 	// Remember clear bots so every other link/site sees this IP as suspicious.
-	if result.Classification == "bot" || result.Classification == "fraud" {
+	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
 		h.rememberBot(fp.IP)
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, "")
 	}
@@ -783,6 +834,7 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		"confidence": fmt.Sprintf("%.2f", result.Confidence), "signals": string(sigJSON),
 		"ja3": ja3,
 		"ja4": ja4, "action": mode, "tag": "", "redirect_url": "",
+		"reviewer": boolStr(reviewerPlatform != ""), "reviewer_platform": reviewerPlatform,
 	})
 
 	switch mode {

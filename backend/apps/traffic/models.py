@@ -75,6 +75,11 @@ class TrafficEvent(models.Model):
     # raw record so a later model can be trained on it without re-instrumenting;
     # empty on the pageview, which carries no behaviour. See the decision engine.
     behaviour = models.JSONField(default=dict, blank=True)
+    # A verified ad-network review crawler (labeled, never served a different
+    # page). Reported so advertisers can separate real clicks from platform
+    # review visits. reviewer_platform names which network (e.g. google_ads).
+    is_reviewer = models.BooleanField(default=False)
+    reviewer_platform = models.CharField(max_length=32, blank=True)
 
     created_at = models.DateTimeField(db_index=True)
 
