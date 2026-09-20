@@ -20,6 +20,7 @@ media/
 # --- Node / frontend ---
 node_modules/
 frontend/dist/
+frontend/dist-server/
 frontend/node_modules/
 *.local
 
