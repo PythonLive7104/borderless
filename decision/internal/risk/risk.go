@@ -28,23 +28,40 @@ const (
 	wHighFraudIP     = 40 // provider fraud score very high (>=85): actionable alone
 	wElevatedFraudIP = 20 // provider fraud score elevated (>=75): a nudge
 	wRepeatOffender  = 30 // this IP was caught as a bot recently (any link/site)
+
+	// Behavioural signals (Phase 1). These come from the JS tracker watching how
+	// the visitor actually interacts, not from the network or fingerprint.
+	//
+	// The pageview event fires BEFORE any interaction can exist, so absence of
+	// interaction is NOT incriminating on its own — a real first-time visitor
+	// looks identical to a bot at that instant. So behaviour is used two ways:
+	//   * synthetic events (isTrusted=false: JS-dispatched, never user-driven)
+	//     are a genuine automation tell and ADD risk;
+	//   * observed human interaction (varied movement, real scroll, keystrokes)
+	//     is corroborating evidence a person is present and SUBTRACTS risk — but
+	//     capped, so it can never fully whitewash an IP the provider knows is bad.
+	wSyntheticEvents  = 35  // events with isTrusted=false — script-dispatched
+	wHumanInteraction = -25 // real human interaction observed (exoneration)
 )
 
 type Input struct {
-	KnownBot      bool
-	Webdriver     bool // navigator.webdriver === true
-	HeadlessFP    bool // fingerprint looks like a headless browser
-	Automation    bool // headless / framework-driven (UA-based)
-	Datacenter    bool
-	Proxy         bool
-	NoFingerprint bool // no JS fingerprint received (non-browser client)
-	AbnormalRate  bool
-	BadJA3        bool // TLS JA3 hash matches a known bad-client fingerprint
-	BadJA4        bool // TLS JA4 hash matches a known bad-client fingerprint
-	IPBot         bool // IP-intelligence provider flags the IP as a bot
-	RecentAbuse   bool // IP-intelligence provider: recent abuse/fraud from this IP
-	IPFraudScore  int  // IP-intelligence fraud score, 0..100 (0 = unknown)
+	KnownBot       bool
+	Webdriver      bool // navigator.webdriver === true
+	HeadlessFP     bool // fingerprint looks like a headless browser
+	Automation     bool // headless / framework-driven (UA-based)
+	Datacenter     bool
+	Proxy          bool
+	NoFingerprint  bool // no JS fingerprint received (non-browser client)
+	AbnormalRate   bool
+	BadJA3         bool // TLS JA3 hash matches a known bad-client fingerprint
+	BadJA4         bool // TLS JA4 hash matches a known bad-client fingerprint
+	IPBot          bool // IP-intelligence provider flags the IP as a bot
+	RecentAbuse    bool // IP-intelligence provider: recent abuse/fraud from this IP
+	IPFraudScore   int  // IP-intelligence fraud score, 0..100 (0 = unknown)
 	RepeatOffender bool // caught as a bot recently, anywhere in the platform
+
+	SyntheticEvents  bool // tracker saw a JS-dispatched (isTrusted=false) event
+	HumanInteraction bool // tracker saw genuine human interaction this session
 }
 
 func Evaluate(in Input) Result {
@@ -101,8 +118,20 @@ func Evaluate(in Input) Result {
 	if in.RepeatOffender {
 		add(wRepeatOffender, "repeat_offender")
 	}
+	if in.SyntheticEvents {
+		add(wSyntheticEvents, "synthetic_events")
+	}
+	// Exoneration is applied only when there is something to subtract from, so a
+	// clean human visit still scores 0 rather than going negative, and the
+	// signal is only recorded when it actually moved the score.
+	if in.HumanInteraction && score > 0 {
+		add(wHumanInteraction, "human_interaction")
+	}
 	if score > 100 {
 		score = 100
+	}
+	if score < 0 {
+		score = 0
 	}
 
 	return Result{

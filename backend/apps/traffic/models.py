@@ -70,6 +70,11 @@ class TrafficEvent(models.Model):
     fp_signals = models.JSONField(default=list, blank=True)  # client-side fingerprint flags
     ja3 = models.CharField(max_length=64, blank=True)  # TLS/JA3 fingerprint hash
     ja4 = models.CharField(max_length=64, blank=True)  # TLS/JA4 fingerprint hash
+    # Passive behaviour from the JS tracker: mouse/scroll/keys, pointer type,
+    # time-to-first-interaction, and the synthetic/human verdicts. Kept as the
+    # raw record so a later model can be trained on it without re-instrumenting;
+    # empty on the pageview, which carries no behaviour. See the decision engine.
+    behaviour = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(db_index=True)
 

@@ -48,6 +48,31 @@ def _classify(score):
     return "human"
 
 
+def _behaviour(f: dict) -> dict:
+    """Pull the behavioural fields out of a stream event into a compact dict.
+
+    The engine emits -1 / "" for "unknown" (e.g. a pageview, which carries no
+    behaviour); we keep only what was actually measured, so a pageview stores
+    {} rather than a row full of -1s that a trainer would have to special-case.
+    """
+    out = {}
+    for key, field in (("mm", "bh_mouse"), ("md", "bh_dirchg"), ("sc", "bh_scroll"),
+                       ("kd", "bh_keys"), ("ttfi", "bh_ttfi")):
+        raw = f.get(field)
+        if raw not in (None, "", "-1"):
+            try:
+                out[key] = int(raw)
+            except (TypeError, ValueError):
+                pass
+    if f.get("bh_pointer"):
+        out["tp"] = f["bh_pointer"]
+    if f.get("bh_synthetic") == "1":
+        out["syn"] = True
+    if f.get("bh_human") == "1":
+        out["human"] = True
+    return out
+
+
 class Command(BaseCommand):
     help = "Consume traffic events from Redis Streams into Visitor/Session/TrafficEvent."
 
@@ -136,6 +161,7 @@ class Command(BaseCommand):
             fp_signals=[x for x in (f.get("fp_flags", "") or "").split(",") if x],
             ja3=f.get("ja3", "") or "",
             ja4=f.get("ja4", "") or "",
+            behaviour=_behaviour(f),
             created_at=ts,
         )
         # IP intelligence enrichment (populates shared sets + adjusts this event)

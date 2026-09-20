@@ -93,6 +93,66 @@
 
   var FP = fingerprint();
 
+  // Passive behaviour collector. A human moves the pointer along curved,
+  // variable-speed paths, scrolls, and types; automation typically does none of
+  // that, or fires events the browser marks isTrusted=false (script-dispatched).
+  // We only OBSERVE here — the initial pageview carries no behaviour because
+  // none has happened yet, so absence is never held against a first-time
+  // visitor. The engine treats real interaction as exoneration and synthetic
+  // events as a bot tell; see internal/risk.
+  var BH = { mm: 0, md: 0, sc: 0, kd: 0, tp: '', ttfi: -1, syn: false };
+  (function () {
+    var lastX = null, lastY = null, lastDir = null, t0 = Date.now();
+    function firstInteraction() { if (BH.ttfi < 0) BH.ttfi = Date.now() - t0; }
+    function onMove(e) {
+      if (e && e.isTrusted === false) { BH.syn = true; return; }
+      BH.mm++;
+      if (!BH.tp) BH.tp = (e && e.pointerType) || 'mouse';
+      if (lastX !== null) {
+        var dir = Math.atan2(e.clientY - lastY, e.clientX - lastX);
+        // Count direction changes as a cheap movement-entropy proxy: a straight
+        // programmatic line barely changes heading, a hand never stops wobbling.
+        if (lastDir !== null && Math.abs(dir - lastDir) > 0.3) BH.md++;
+        lastDir = dir;
+      }
+      lastX = e.clientX; lastY = e.clientY;
+      firstInteraction();
+    }
+    function onScroll() {
+      var h = document.documentElement;
+      var max = (h.scrollHeight - h.clientHeight) || 1;
+      var pct = Math.round((h.scrollTop || window.pageYOffset || 0) / max * 100);
+      if (pct > BH.sc) BH.sc = Math.min(pct, 100);
+      firstInteraction();
+    }
+    function onKey(e) {
+      if (e && e.isTrusted === false) { BH.syn = true; return; }
+      BH.kd++; firstInteraction();
+    }
+    function onDown(e) {
+      if (e && e.isTrusted === false) { BH.syn = true; return; }
+      if (!BH.tp) BH.tp = (e && e.pointerType) || 'mouse';
+      firstInteraction();
+    }
+    try {
+      var opt = { passive: true, capture: true };
+      addEventListener('pointermove', onMove, opt);
+      addEventListener('pointerdown', onDown, opt);
+      addEventListener('scroll', onScroll, opt);
+      addEventListener('keydown', onKey, opt);
+    } catch (e) {}
+  })();
+
+  // Whether we have seen enough genuine interaction to vouch for a human. Kept
+  // deliberately conservative: a couple of stray mouse samples is not a person.
+  function humanSeen() {
+    return (BH.mm >= 5 && BH.md >= 2) || BH.kd >= 2 || BH.sc >= 25;
+  }
+  function behaviour() {
+    return { mm: BH.mm, md: BH.md, sc: BH.sc, kd: BH.kd, tp: BH.tp,
+             ttfi: BH.ttfi, syn: BH.syn, human: humanSeen() };
+  }
+
   function send(type, extra) {
     var p = {
       site_id: siteId, visitor_id: vid, session_id: sid, type: type,
@@ -101,6 +161,7 @@
       tz: FP.tz || '', lang: navigator.language || '',
       fp: FP
     };
+    if (type !== 'pageview') p.bh = behaviour();
     if (extra) for (var k in extra) p[k] = extra[k];
     var body = JSON.stringify(p);
     // Prefer fetch so we can read the decision (e.g. a Redirect rule) and act
@@ -157,4 +218,22 @@
   if (existing && existing.q) for (var i = 0; i < existing.q.length; i++) bl.apply(null, existing.q[i]);
 
   send('pageview', {});
+
+  // A parting behaviour beacon: most sessions never fire a custom event, so
+  // without this the only signal we would ever have is the behaviour-free
+  // pageview. Fired once, best-effort, as the page goes away.
+  var flushed = false;
+  function flushBehaviour() {
+    if (flushed) return; flushed = true;
+    try {
+      if (!navigator.sendBeacon) return;
+      var p = { site_id: siteId, visitor_id: vid, session_id: sid, type: 'behaviour',
+                url: location.href, tz: FP.tz || '', bh: behaviour(), fp: FP };
+      navigator.sendBeacon(endpoint, new Blob([JSON.stringify(p)], { type: 'text/plain' }));
+    } catch (e) {}
+  }
+  addEventListener('pagehide', flushBehaviour);
+  addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushBehaviour();
+  });
 })();

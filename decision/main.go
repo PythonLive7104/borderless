@@ -44,6 +44,21 @@ type CollectPayload struct {
 	Revenue     float64 `json:"revenue"`
 	Currency    string  `json:"currency"`
 	FP          *FP     `json:"fp"`
+	BH          *BH     `json:"bh"`
+}
+
+// BH is the passive behaviour block from the JS tracker. It is absent on the
+// initial pageview (no interaction has happened yet), so a nil BH must read as
+// "unknown", never as "no human" — see the risk wiring in the collect handler.
+type BH struct {
+	Mouse     int    `json:"mm"`    // pointermove samples
+	DirChg    int    `json:"md"`    // heading changes (movement-entropy proxy)
+	Scroll    int    `json:"sc"`    // max scroll depth %
+	Keys      int    `json:"kd"`    // keydown count
+	Pointer   string `json:"tp"`    // pointer type first seen
+	TTFI      int    `json:"ttfi"`  // ms to first interaction (-1 = none)
+	Synthetic bool   `json:"syn"`   // an isTrusted=false event was observed
+	Human     bool   `json:"human"` // tracker's own "a human was here" verdict
 }
 
 type FP struct {
@@ -183,6 +198,14 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Behavioural signals. A nil BH (the pageview case) leaves both false, so a
+	// first-time visitor is neither exonerated nor penalised for it.
+	syntheticEvents, humanInteraction := false, false
+	if p.BH != nil {
+		syntheticEvents = p.BH.Synthetic
+		humanInteraction = p.BH.Human
+	}
+
 	// One intel read feeds both the score and the rule fields (the datacenter/
 	// proxy sets used to be checked twice per decision).
 	intel := h.knownIntel(rctx, fp.IP)
@@ -190,20 +213,22 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(rctx, fp.IP)
 	result := risk.Evaluate(risk.Input{
-		KnownBot:       fp.IsBot,
-		Webdriver:      webdriver,
-		HeadlessFP:     headlessFP,
-		Automation:     fp.IsHeadless,
-		Datacenter:     intel.Datacenter,
-		Proxy:          intel.Proxy || intel.VPN,
-		NoFingerprint:  noFP,
-		AbnormalRate:   rate > 20 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
-		BadJA3:         ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
-		BadJA4:         ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
-		IPBot:          intel.BotStatus,
-		RecentAbuse:    intel.RecentAbuse,
-		IPFraudScore:   intel.FraudScore,
-		RepeatOffender: repeat,
+		KnownBot:         fp.IsBot,
+		Webdriver:        webdriver,
+		HeadlessFP:       headlessFP,
+		Automation:       fp.IsHeadless,
+		Datacenter:       intel.Datacenter,
+		Proxy:            intel.Proxy || intel.VPN,
+		NoFingerprint:    noFP,
+		AbnormalRate:     rate > 20 || (ipRateLimit() > 0 && iprate > ipRateLimit()),
+		BadJA3:           ja3 != "" && h.st.InSet(rctx, "ja3:blocklist", ja3),
+		BadJA4:           ja4 != "" && h.st.InSet(rctx, "ja4:blocklist", ja4),
+		IPBot:            intel.BotStatus,
+		RecentAbuse:      intel.RecentAbuse,
+		IPFraudScore:     intel.FraudScore,
+		RepeatOffender:   repeat,
+		SyntheticEvents:  syntheticEvents,
+		HumanInteraction: humanInteraction,
 	})
 	if result.Classification == "bot" || result.Classification == "fraud" {
 		h.rememberBot(fp.IP)
@@ -288,6 +313,14 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		"action":         action,
 		"tag":            tag,
 		"redirect_url":   redirect,
+		"bh_mouse":       bhInt(p.BH, func(b *BH) int { return b.Mouse }),
+		"bh_dirchg":      bhInt(p.BH, func(b *BH) int { return b.DirChg }),
+		"bh_scroll":      bhInt(p.BH, func(b *BH) int { return b.Scroll }),
+		"bh_keys":        bhInt(p.BH, func(b *BH) int { return b.Keys }),
+		"bh_ttfi":        bhInt(p.BH, func(b *BH) int { return b.TTFI }),
+		"bh_pointer":     bhStr(p.BH, func(b *BH) string { return b.Pointer }),
+		"bh_synthetic":   boolStr(syntheticEvents),
+		"bh_human":       boolStr(humanInteraction),
 	}
 	// fire-and-forget; never block the caller
 	go h.st.EmitTraffic(context.Background(), fields)
@@ -540,27 +573,27 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var link struct {
-		Destination    string   `json:"destination"`
-		TID            string   `json:"tid"`
-		Org            string   `json:"org"`
-		BotAction      string   `json:"bot_action"` // off | decoy | notfound | blank
-		DecoyURL       string   `json:"decoy_url"`
-		Active         bool     `json:"active"`
-		Challenge      bool     `json:"challenge"`
-		ChallengeStyle string   `json:"challenge_style"` // hold | checkbox | slide
-		ForwardQS      bool     `json:"forward_params"`
-		ForwardKeys    []string `json:"forward_keys"`
-		BlockVPN       bool     `json:"block_vpn"`
-		BlockDatacenter bool    `json:"block_datacenter"`
-		DeepCheck      bool     `json:"deep_check"`
-		CountryMode    string   `json:"country_mode"` // off | allow | block
-		Countries      []string `json:"countries"`
-		DeviceMode     string   `json:"device_mode"`
-		Devices        []string `json:"devices"`
-		OSMode         string   `json:"os_mode"`
-		OSList         []string `json:"operating_systems"`
-		MaxRisk        int      `json:"max_risk"`
-		Rules          string   `json:"rules"`
+		Destination     string   `json:"destination"`
+		TID             string   `json:"tid"`
+		Org             string   `json:"org"`
+		BotAction       string   `json:"bot_action"` // off | decoy | notfound | blank
+		DecoyURL        string   `json:"decoy_url"`
+		Active          bool     `json:"active"`
+		Challenge       bool     `json:"challenge"`
+		ChallengeStyle  string   `json:"challenge_style"` // hold | checkbox | slide
+		ForwardQS       bool     `json:"forward_params"`
+		ForwardKeys     []string `json:"forward_keys"`
+		BlockVPN        bool     `json:"block_vpn"`
+		BlockDatacenter bool     `json:"block_datacenter"`
+		DeepCheck       bool     `json:"deep_check"`
+		CountryMode     string   `json:"country_mode"` // off | allow | block
+		Countries       []string `json:"countries"`
+		DeviceMode      string   `json:"device_mode"`
+		Devices         []string `json:"devices"`
+		OSMode          string   `json:"os_mode"`
+		OSList          []string `json:"operating_systems"`
+		MaxRisk         int      `json:"max_risk"`
+		Rules           string   `json:"rules"`
 	}
 	if err := json.Unmarshal([]byte(raw), &link); err != nil || !link.Active || link.Destination == "" {
 		http.NotFound(w, r)
@@ -786,6 +819,23 @@ func boolStr(b bool) string {
 	return "0"
 }
 
+// bhInt/bhStr read one field from a possibly-nil behaviour block, so the emitted
+// event carries explicit "unknown" values (-1 / "") rather than a partial row
+// when no behaviour was collected (e.g. on the pageview).
+func bhInt(b *BH, get func(*BH) int) int {
+	if b == nil {
+		return -1
+	}
+	return get(b)
+}
+
+func bhStr(b *BH, get func(*BH) string) string {
+	if b == nil {
+		return ""
+	}
+	return get(b)
+}
+
 // firstHeader returns the first non-empty value among the given header names.
 func firstHeader(r *http.Request, names ...string) string {
 	for _, n := range names {
@@ -821,16 +871,16 @@ func urlPath(raw string) string {
 // the spot — cache first (shared with Django), then a short live lookup.
 
 type ipIntel struct {
-	Proxy      bool   `json:"proxy"`
-	VPN        bool   `json:"vpn"`
-	Datacenter bool   `json:"datacenter"`
-	ISP        string `json:"isp,omitempty"`
-	ASN        string `json:"asn,omitempty"`
-	ConnType   string `json:"conn_type,omitempty"` // Residential | Corporate | Mobile | Data Center | ...
-	Mobile     bool   `json:"mobile,omitempty"`
-	FraudScore int    `json:"fraud_score,omitempty"` // provider fraud score 0..100
-	RecentAbuse bool  `json:"recent_abuse,omitempty"`
-	BotStatus  bool   `json:"bot_status,omitempty"`
+	Proxy       bool   `json:"proxy"`
+	VPN         bool   `json:"vpn"`
+	Datacenter  bool   `json:"datacenter"`
+	ISP         string `json:"isp,omitempty"`
+	ASN         string `json:"asn,omitempty"`
+	ConnType    string `json:"conn_type,omitempty"` // Residential | Corporate | Mobile | Data Center | ...
+	Mobile      bool   `json:"mobile,omitempty"`
+	FraudScore  int    `json:"fraud_score,omitempty"` // provider fraud score 0..100
+	RecentAbuse bool   `json:"recent_abuse,omitempty"`
+	BotStatus   bool   `json:"bot_status,omitempty"`
 }
 
 func (i ipIntel) flagged() bool { return i.Proxy || i.VPN || i.Datacenter }
