@@ -544,4 +544,6 @@ export interface BotCheckResult {
 }
 export const botCheckApi = {
   run: (url: string) => http.post<BotCheckResult>("/v1/bot-check/", { url }, false),
+  lead: (p: { email: string; url: string; grade?: string; exposure?: number }) =>
+    http.post<{ ok: boolean; error?: string }>("/v1/bot-check/lead/", p, false),
 };

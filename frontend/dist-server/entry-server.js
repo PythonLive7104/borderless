@@ -328,7 +328,8 @@ const adminApi = {
   grantPlan: (organization, plan) => http.post("/admin/grant-plan/", { organization, plan })
 };
 const botCheckApi = {
-  run: (url) => http.post("/v1/bot-check/", { url }, false)
+  run: (url) => http.post("/v1/bot-check/", { url }, false),
+  lead: (p) => http.post("/v1/bot-check/lead/", p, false)
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const Ctx$1 = createContext(null);
@@ -1478,6 +1479,26 @@ function BotCheck() {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
   const [err, setErr] = useState("");
+  const [email, setEmail] = useState("");
+  const [leadBusy, setLeadBusy] = useState(false);
+  const [leadDone, setLeadDone] = useState(false);
+  const [leadErr, setLeadErr] = useState("");
+  async function captureLead(e) {
+    var _a;
+    e.preventDefault();
+    if (!email.trim() || !(res == null ? void 0 : res.url)) return;
+    setLeadBusy(true);
+    setLeadErr("");
+    try {
+      const r = await botCheckApi.lead({ email: email.trim(), url: res.url, grade: res.grade, exposure: res.exposure });
+      if (r.ok) setLeadDone(true);
+      else setLeadErr(r.error || "Couldn't send the report. Try again.");
+    } catch (e2) {
+      setLeadErr(((_a = e2 == null ? void 0 : e2.data) == null ? void 0 : _a.error) || "Couldn't send the report. Try again.");
+    } finally {
+      setLeadBusy(false);
+    }
+  }
   async function scan(e) {
     var _a;
     e.preventDefault();
@@ -1485,6 +1506,9 @@ function BotCheck() {
     setBusy(true);
     setErr("");
     setRes(null);
+    setLeadDone(false);
+    setLeadErr("");
+    setEmail("");
     try {
       const r = await botCheckApi.run(url.trim());
       if (!r.ok) setErr(r.error || "Something went wrong.");
@@ -1551,6 +1575,39 @@ function BotCheck() {
           ] }, i);
         }) })
       ] }),
+      /* @__PURE__ */ jsx("div", { className: "mt-6 rounded-2xl border border-brand/30 bg-brand/5 p-7", children: leadDone ? /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsx("div", { className: "mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand/15 text-brand", children: /* @__PURE__ */ jsx("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", children: /* @__PURE__ */ jsx("path", { d: "M20 6L9 17l-5-5", strokeLinecap: "round", strokeLinejoin: "round" }) }) }),
+        /* @__PURE__ */ jsx("h3", { className: "mt-3 text-lg font-bold", children: "Report on its way" }),
+        /* @__PURE__ */ jsxs("p", { className: "mx-auto mt-1 max-w-md text-sm text-fg-muted", children: [
+          "We've emailed your full report. To see your bot exposure ",
+          /* @__PURE__ */ jsx("b", { children: "live" }),
+          " — the real bots and ad clicks hitting your site right now — add the free tracker."
+        ] }),
+        /* @__PURE__ */ jsx(Button, { to: cta.signupHref, size: "lg", className: "mt-4", children: cta.label("Start monitoring free") })
+      ] }) : /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsx("h3", { className: "text-lg font-bold", children: "Get the full report + free monitoring" }),
+        /* @__PURE__ */ jsxs("p", { className: "mx-auto mt-1 max-w-md text-sm text-fg-muted", children: [
+          "We'll email your detailed exposure report and show you how to watch bots hitting ",
+          /* @__PURE__ */ jsx("span", { className: "font-mono", children: res.url }),
+          " in real time — free."
+        ] }),
+        /* @__PURE__ */ jsxs("form", { onSubmit: captureLead, className: "mx-auto mt-4 flex max-w-md flex-col gap-2 sm:flex-row", children: [
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "email",
+              required: true,
+              value: email,
+              onChange: (e) => setEmail(e.target.value),
+              placeholder: "you@company.com",
+              className: "flex-1 rounded-full border border-line bg-white px-5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            }
+          ),
+          /* @__PURE__ */ jsx(Button, { type: "submit", size: "lg", disabled: leadBusy, children: leadBusy ? "Sending…" : "Email me the report" })
+        ] }),
+        leadErr && /* @__PURE__ */ jsx("p", { className: "mt-3 text-sm text-red-600", children: leadErr }),
+        /* @__PURE__ */ jsx("p", { className: "mt-3 text-xs text-fg-dim", children: "No spam. Your report and setup steps, nothing else." })
+      ] }) }),
       /* @__PURE__ */ jsxs("div", { className: "mt-6 rounded-2xl bg-navy-900 p-7 text-center text-white", children: [
         /* @__PURE__ */ jsx("h3", { className: "text-xl font-bold", children: "Close these gaps with TryNoBot" }),
         /* @__PURE__ */ jsx("p", { className: "mx-auto mt-2 max-w-md text-sm text-white/70", children: "TryNoBot scores every visitor in real time, blocks bots and fraud, and shows you exactly what's hitting your site — free to start." }),

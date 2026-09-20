@@ -20,11 +20,28 @@ export default function BotCheck() {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<BotCheckResult | null>(null);
   const [err, setErr] = useState("");
+  const [email, setEmail] = useState("");
+  const [leadBusy, setLeadBusy] = useState(false);
+  const [leadDone, setLeadDone] = useState(false);
+  const [leadErr, setLeadErr] = useState("");
+
+  async function captureLead(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !res?.url) return;
+    setLeadBusy(true); setLeadErr("");
+    try {
+      const r = await botCheckApi.lead({ email: email.trim(), url: res.url, grade: res.grade, exposure: res.exposure });
+      if (r.ok) setLeadDone(true);
+      else setLeadErr(r.error || "Couldn't send the report. Try again.");
+    } catch (e: any) {
+      setLeadErr(e?.data?.error || "Couldn't send the report. Try again.");
+    } finally { setLeadBusy(false); }
+  }
 
   async function scan(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
-    setBusy(true); setErr(""); setRes(null);
+    setBusy(true); setErr(""); setRes(null); setLeadDone(false); setLeadErr(""); setEmail("");
     try {
       const r = await botCheckApi.run(url.trim());
       if (!r.ok) setErr(r.error || "Something went wrong.");
@@ -80,6 +97,33 @@ export default function BotCheck() {
                 );
               })}
             </ul>
+          </div>
+
+          {/* Lead capture — the visitor has just seen their exposure; offer the
+              full report + free monitoring in exchange for an email. */}
+          <div className="mt-6 rounded-2xl border border-brand/30 bg-brand/5 p-7">
+            {leadDone ? (
+              <div className="text-center">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand/15 text-brand">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
+                <h3 className="mt-3 text-lg font-bold">Report on its way</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-fg-muted">We've emailed your full report. To see your bot exposure <b>live</b> — the real bots and ad clicks hitting your site right now — add the free tracker.</p>
+                <Button to={cta.signupHref} size="lg" className="mt-4">{cta.label("Start monitoring free")}</Button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <h3 className="text-lg font-bold">Get the full report + free monitoring</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-fg-muted">We'll email your detailed exposure report and show you how to watch bots hitting <span className="font-mono">{res.url}</span> in real time — free.</p>
+                <form onSubmit={captureLead} className="mx-auto mt-4 flex max-w-md flex-col gap-2 sm:flex-row">
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
+                    className="flex-1 rounded-full border border-line bg-white px-5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                  <Button type="submit" size="lg" disabled={leadBusy}>{leadBusy ? "Sending…" : "Email me the report"}</Button>
+                </form>
+                {leadErr && <p className="mt-3 text-sm text-red-600">{leadErr}</p>}
+                <p className="mt-3 text-xs text-fg-dim">No spam. Your report and setup steps, nothing else.</p>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 rounded-2xl bg-navy-900 p-7 text-center text-white">

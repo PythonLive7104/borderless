@@ -14,3 +14,14 @@ class JA4BlockAdmin(admin.ModelAdmin):
     list_display = ("ja4", "label", "active", "created_at")
     list_filter = ("active",)
     search_fields = ("ja4", "label")
+
+
+from .models import BotCheckLead
+
+
+@admin.register(BotCheckLead)
+class BotCheckLeadAdmin(admin.ModelAdmin):
+    list_display = ("email", "url", "grade", "exposure", "converted", "created_at")
+    list_filter = ("grade", "converted", "created_at")
+    search_fields = ("email", "url")
+    readonly_fields = ("email", "url", "grade", "exposure", "ip", "created_at")

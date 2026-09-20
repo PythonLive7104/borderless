@@ -98,3 +98,38 @@ class JA4BlocklistTest(TestCase):
         r = _r()
         self.assertTrue(r.sismember(JA4_REDIS_SET, "t13d1516h2_8daaf6152771_b186095e22b6"))
         self.assertFalse(r.sismember(JA4_REDIS_SET, "t13d1516h2_deadbeef0000_cafebabe1111"))
+
+
+from django.test import TestCase as _DjangoTestCase
+from django.core import mail as _mail
+
+
+class BotCheckLeadTest(_DjangoTestCase):
+    """The lead endpoint is the funnel's turnstile: a valid email becomes a
+    stored lead and gets the report; junk is rejected without a row."""
+
+    def _post(self, **body):
+        from django.test import Client
+        return Client().post("/api/v1/bot-check/lead/", data=body,
+                             content_type="application/json")
+
+    def test_valid_lead_is_stored_and_emailed(self):
+        from apps.intelligence.models import BotCheckLead
+        r = self._post(email="buyer@shop.example", url="https://shop.example",
+                       grade="D", exposure=72)
+        self.assertEqual(r.status_code, 200)
+        lead = BotCheckLead.objects.get(email="buyer@shop.example")
+        self.assertEqual(lead.url, "https://shop.example")
+        self.assertEqual(lead.grade, "D")
+        self.assertEqual(len(_mail.outbox), 1)
+        self.assertIn("shop.example", _mail.outbox[0].subject)
+
+    def test_bad_email_is_rejected_without_a_row(self):
+        from apps.intelligence.models import BotCheckLead
+        r = self._post(email="not-an-email", url="https://shop.example")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(BotCheckLead.objects.count(), 0)
+
+    def test_missing_url_is_rejected(self):
+        r = self._post(email="buyer@shop.example", url="")
+        self.assertEqual(r.status_code, 400)

@@ -65,3 +65,30 @@ def sync_ja4_to_redis():
         pipe.sadd(JA4_REDIS_SET, *hashes)
     pipe.execute()
     return len(hashes)
+
+
+class BotCheckLead(models.Model):
+    """A prospect who ran the free Bot Check and asked for the full report.
+
+    The Bot Check is the top of the funnel: anyone can scan a site with no
+    signup, but a visitor who leaves their email to get the full report (and
+    free monitoring) is a warm lead — they've just seen their own exposure and
+    raised their hand. This is the list to follow up.
+    """
+    email = models.EmailField()
+    url = models.CharField(max_length=2000, help_text="The site they scanned.")
+    grade = models.CharField(max_length=2, blank=True)
+    exposure = models.IntegerField(default=0, help_text="0-100 exposure score at scan time.")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    # Whether this lead has converted to a signup, filled in later by matching
+    # the email against a registered user — so the operator can measure the
+    # funnel without a heavy analytics stack.
+    converted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["email", "created_at"])]
+
+    def __str__(self):
+        return f"{self.email} — {self.url} ({self.grade or '?'})"
