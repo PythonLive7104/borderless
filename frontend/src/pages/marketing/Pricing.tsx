@@ -8,7 +8,7 @@ import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
 import { ICheck } from "../../components/ui/icons";
 import PaymentMethods from "../../components/marketing/PaymentMethods";
-import { feeNote, usePaymentMethods } from "../../lib/usePaymentMethods";
+import { feeLine, feeNote, usePaymentMethods } from "../../lib/usePaymentMethods";
 
 type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
@@ -80,7 +80,9 @@ const INCLUDED = [
 function faqs(fee: string): [string, string][] {
   return [
   ["How do I pay?", "Card (Visa, Mastercard, American Express) or major cryptocurrencies — BTC, ETH, USDT, USDC and TON — through our hosted checkout. Prices are in USD. Card availability is shown on this page; whatever you see there is what checkout accepts."],
-  ["Are there any extra charges?", `No hidden ones. The payment processor adds ${fee ? fee.replace("plus a ", "a ") : "a processing fee"} on top of the plan price, shown in the price list above and itemised at checkout before you pay. There is nothing else: no setup fee, no overage billing, and no automatic renewal.`],
+  ["Are there any extra charges?", fee
+    ? `The payment processor adds ${fee} on top of the plan price. The exact amount and your total are shown beside each price above, and itemised again at checkout before you pay. Nothing else: no setup fee, no overage billing, no automatic renewal.`
+    : "No. The price you see is the price you pay — we cover the payment processing fee ourselves. There's no setup fee, no overage billing, and no automatic renewal."],
   ["What are redirects and antibot sites?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Antibot sites' are the websites you protect with the tracking snippet. Each tier includes a set number of both. (These are NOT private short domains — a private domain is an optional paid add-on.)"],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
@@ -119,9 +121,11 @@ export default function Pricing() {
   useSeo("Pricing", "Simple weekly or monthly plans for real-time bot and fraud detection. Pay by card or cryptocurrency.");
   const [interval, setInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
-  // Disclosed next to every price rather than sprung at checkout — see
-  // PAYMENT_FEE_PCT in settings for why.
-  const fee = feeNote(usePaymentMethods());
+  // Any fee the buyer pays on top is disclosed next to the price rather than
+  // sprung at checkout. Empty while the fee is absorbed merchant-side, which
+  // is the current setting — see PAYMENT_FEE_PCT in settings.
+  const payMethods = usePaymentMethods();
+  const fee = feeNote(payMethods);
   return (
     <>
       <section className="hero-band relative overflow-hidden">
@@ -131,7 +135,7 @@ export default function Pricing() {
           <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Tariffs & payment</h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-300">
             Weekly or monthly access — renew when it runs out, and unused days roll over. No auto-charge, cancel by simply not renewing.
-            {fee && <> All prices are in USD, {fee}.</>}
+            {fee && <> All prices are in USD, plus {fee} at checkout.</>}
           </p>
         </div>
       </section>
@@ -178,7 +182,11 @@ export default function Pricing() {
                   · save ${p.price * 4 - p.priceMonthly}/mo vs weekly
                 </span>}
               </div>
-              {fee && <div className="mt-1 text-xs text-fg-dim">{fee}</div>}
+              {feeLine(payMethods, monthly ? p.priceMonthly : p.price) && (
+                <div className="mt-1 text-xs text-fg-dim">
+                  {feeLine(payMethods, monthly ? p.priceMonthly : p.price)}
+                </div>
+              )}
 
               <div className="mt-6 text-xs font-bold uppercase tracking-wider text-fg-dim">Key features</div>
               <div className="mt-3">
@@ -205,7 +213,7 @@ export default function Pricing() {
           ))}
         </div>
         <p className="mt-8 text-center text-sm text-fg-dim">
-          All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD{fee ? `, ${fee}` : ""}.
+          All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD{fee ? `, plus ${fee} at checkout` : ""}.
         </p>
       </Section>
 

@@ -263,7 +263,7 @@ export default function Billing() {
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
               You'll be taken to our secure hosted checkout (Bachs) to pay{methodPhrase(payMethods)}
-              {feeNote(payMethods) && <>, {feeNote(payMethods)}</>}. Access starts as
+              {feeNote(payMethods) && <>, plus {feeNote(payMethods)}</>}. Access starts as
               soon as payment succeeds, for {monthly ? 30 : 7} days. Any days you have left are added on top, so you never lose time.
             </p>
             {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}

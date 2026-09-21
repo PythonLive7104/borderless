@@ -36,10 +36,19 @@ def available():
 
 
 def fee_pct() -> float:
-    """The processing fee Bachs adds on top of the plan price, as a percentage.
-
-    Disclosed on the pricing page rather than sprung at checkout: advertising
-    $70 and charging $73.90 is drip pricing, and it is the surprise at the
-    payment step that loses the sale as much as the money.
-    """
+    """Percentage component of the processing fee Bachs adds at checkout."""
     return float(getattr(settings, "PAYMENT_FEE_PCT", 0) or 0)
+
+
+def fee_fixed() -> float:
+    """Fixed component, in USD. Small, but it's what makes the effective rate
+    on the cheapest plan (6.6%) so different from the dearest (5.27%) — which
+    is why the pricing page quotes an amount per plan rather than one rate."""
+    return float(getattr(settings, "PAYMENT_FEE_FIXED", 0) or 0)
+
+
+def fee_for(price):
+    """The fee on `price`, rounded to the cent as the checkout shows it."""
+    if not (fee_pct() or fee_fixed()):
+        return 0.0
+    return round(price * fee_pct() / 100 + fee_fixed(), 2)

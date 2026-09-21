@@ -224,17 +224,20 @@ BACHS_WEBHOOK_SECRET = os.getenv("BACHS_WEBHOOK_SECRET", "")
 # pricing page reads it, and advertising a method checkout can't honour is a
 # misrepresentation Google Ads suspends accounts over.
 BACHS_CARD_ENABLED = os.getenv("BACHS_CARD_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
-# Bachs adds a processing fee on top of the plan price at checkout ($70 ->
-# $73.90 observed). Advertising $70 and charging $73.90 is drip pricing, which
-# the ACCC, the ASA/CMA and Google Ads' misrepresentation policy all treat as
-# misleading — so the pricing page discloses it, and this is the number it
-# quotes. Set to 0 to hide the disclosure entirely (e.g. if the fee is ever
-# absorbed merchant-side).
+# Processing fee passed on to the buyer at checkout, disclosed beside every
+# price so the advertised figure and the amount charged agree — advertising $70
+# and charging $73.90 is drip pricing, which the ACCC, the ASA/CMA and Google
+# Ads' misrepresentation policy all treat as misleading.
 #
-# CONFIRM the exact formula against a live checkout on the cheapest plan: a
-# flat 5.57%, 5.5% + $0.05 and 5% + $0.40 all fit the single $70 data point but
-# diverge at $25. Adjust this once you've seen a second amount.
-PAYMENT_FEE_PCT = float(os.getenv("PAYMENT_FEE_PCT", "5.6"))
+# Both default to 0 because the fee is absorbed merchant-side in the Bachs
+# dashboard: the buyer pays the advertised price and there is nothing to
+# disclose. Keep these two in step with that setting. If Bachs is ever switched
+# back to charging the buyer, set them again and the disclosure returns
+# everywhere at once. The observed formula was 5% + $0.40, confirmed to the
+# cent at $25, $40, $70, $100 and $150 — note it is percent PLUS fixed, so the
+# effective rate ran from 6.6% on the cheapest plan to 5.27% on the dearest.
+PAYMENT_FEE_PCT = float(os.getenv("PAYMENT_FEE_PCT", "0"))
+PAYMENT_FEE_FIXED = float(os.getenv("PAYMENT_FEE_FIXED", "0"))
 # Map each plan slug to its Bachs product id (used by checkout). The weekly
 # Basic/Plus/Pro tiers reuse the existing products (starter->basic, growth->plus,
 # business->pro), so the BACHS_PRODUCT_* env keys stay unchanged. NOTE: a product's

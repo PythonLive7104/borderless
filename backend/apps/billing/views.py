@@ -38,9 +38,12 @@ class PaymentMethodsView(views.APIView):
         return Response({"methods": methods, "card": "card" in methods,
                          "crypto": "crypto" in methods,
                          # Quoted on the pricing page so the advertised price
-                         # and the amount actually charged agree. 0 = no fee
-                         # to disclose.
-                         "fee_pct": payment_methods.fee_pct()})
+                         # and the amount actually charged agree. The fee is
+                         # percent + fixed, so the page computes it per plan
+                         # rather than printing one rate that's wrong at both
+                         # ends of the range. Both 0 = nothing to disclose.
+                         "fee_pct": payment_methods.fee_pct(),
+                         "fee_fixed": payment_methods.fee_fixed()})
 
 
 class SubscriptionView(views.APIView):

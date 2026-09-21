@@ -575,15 +575,32 @@ class PaymentMethodsTest(TestCase):
 
 
 class PaymentFeeDisclosureTest(TestCase):
-    """The pricing page quotes this number. If it silently went missing the
-    site would be back to advertising $70 and charging $73.90."""
+    """The pricing page reads these to decide what it says about the total. If
+    the fee is ever passed back to the buyer, the page has to say so — silently
+    advertising $70 while checkout charges $73.90 is the failure this guards."""
 
-    def test_fee_is_published(self):
-        with self.settings(PAYMENT_FEE_PCT=5.6):
-            body = self.client.get("/api/billing/payment-methods/").json()
-        self.assertEqual(body["fee_pct"], 5.6)
-
-    def test_zero_means_nothing_to_disclose(self):
-        with self.settings(PAYMENT_FEE_PCT=0):
-            body = self.client.get("/api/billing/payment-methods/").json()
+    def test_absorbed_by_default(self):
+        """We cover the fee merchant-side, so there is nothing to disclose."""
+        body = self.client.get("/api/billing/payment-methods/").json()
         self.assertEqual(body["fee_pct"], 0)
+        self.assertEqual(body["fee_fixed"], 0)
+
+    def test_published_when_passed_to_the_buyer(self):
+        with self.settings(PAYMENT_FEE_PCT=5, PAYMENT_FEE_FIXED=0.40):
+            body = self.client.get("/api/billing/payment-methods/").json()
+        self.assertEqual(body["fee_pct"], 5)
+        self.assertEqual(body["fee_fixed"], 0.40)
+
+    def test_fee_matches_what_bachs_actually_charged(self):
+        """Percent PLUS fixed, checked against real checkouts. A flat rate
+        would understate the cheapest plan, which is the one ads sell."""
+        from apps.billing import payment_methods as pm
+        observed = {25: 1.65, 40: 2.40, 70: 3.90, 100: 5.40, 150: 7.90}
+        with self.settings(PAYMENT_FEE_PCT=5, PAYMENT_FEE_FIXED=0.40):
+            for price, fee in observed.items():
+                self.assertEqual(pm.fee_for(price), fee, f"${price}")
+
+    def test_no_fee_computed_when_absorbed(self):
+        from apps.billing import payment_methods as pm
+        with self.settings(PAYMENT_FEE_PCT=0, PAYMENT_FEE_FIXED=0):
+            self.assertEqual(pm.fee_for(70), 0)

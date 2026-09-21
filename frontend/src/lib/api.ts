@@ -497,8 +497,10 @@ export const telegramApi = {
 
 export interface PaymentMethods {
   methods: ("card" | "crypto")[]; card: boolean; crypto: boolean;
-  /** Processing fee added on top at checkout, as a percentage. 0 = none to disclose. */
+  /** Processing fee added on top at checkout: percentage component... */
   fee_pct: number;
+  /** ...plus this fixed amount in USD. Both 0 = nothing to disclose. */
+  fee_fixed: number;
 }
 
 export const billingApi = {
