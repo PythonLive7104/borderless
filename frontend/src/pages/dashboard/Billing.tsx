@@ -8,7 +8,7 @@ import IntervalToggle from "../../components/ui/IntervalToggle";
 import PageNote from "../../components/dashboard/PageNote";
 import { ILink, IGlobe } from "../../components/ui/icons";
 import { trackPurchase } from "../../lib/analytics";
-import { methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
+import { feeNote, methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
 
 const statusTone: Record<string, string> = {
   trialing: "bg-brand/10 text-brand", active: "bg-success/10 text-emerald-700", canceled: "bg-danger/10 text-red-600",
@@ -262,7 +262,8 @@ export default function Billing() {
               {" "}({redirectsOf(target) || "∞"} redirects, {websitesOf(target) || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
-              You'll be taken to our secure hosted checkout (Bachs) to pay{methodPhrase(payMethods)}. Access starts as
+              You'll be taken to our secure hosted checkout (Bachs) to pay{methodPhrase(payMethods)}
+              {feeNote(payMethods) && <>, {feeNote(payMethods)}</>}. Access starts as
               soon as payment succeeds, for {monthly ? 30 : 7} days. Any days you have left are added on top, so you never lose time.
             </p>
             {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}

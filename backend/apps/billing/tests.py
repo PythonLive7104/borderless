@@ -572,3 +572,18 @@ class PaymentMethodsTest(TestCase):
     def test_public_no_auth_required(self):
         """The marketing page asks before anyone has logged in."""
         self.assertEqual(self.client.get("/api/billing/payment-methods/").status_code, 200)
+
+
+class PaymentFeeDisclosureTest(TestCase):
+    """The pricing page quotes this number. If it silently went missing the
+    site would be back to advertising $70 and charging $73.90."""
+
+    def test_fee_is_published(self):
+        with self.settings(PAYMENT_FEE_PCT=5.6):
+            body = self.client.get("/api/billing/payment-methods/").json()
+        self.assertEqual(body["fee_pct"], 5.6)
+
+    def test_zero_means_nothing_to_disclose(self):
+        with self.settings(PAYMENT_FEE_PCT=0):
+            body = self.client.get("/api/billing/payment-methods/").json()
+        self.assertEqual(body["fee_pct"], 0)

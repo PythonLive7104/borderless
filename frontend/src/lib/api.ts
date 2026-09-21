@@ -495,7 +495,11 @@ export const telegramApi = {
   disconnect: (orgId: number) => http.del(`/telegram/connect/?organization=${orgId}`),
 };
 
-export interface PaymentMethods { methods: ("card" | "crypto")[]; card: boolean; crypto: boolean; }
+export interface PaymentMethods {
+  methods: ("card" | "crypto")[]; card: boolean; crypto: boolean;
+  /** Processing fee added on top at checkout, as a percentage. 0 = none to disclose. */
+  fee_pct: number;
+}
 
 export const billingApi = {
   plans: () => http.get<Plan[]>("/billing/plans/"),

@@ -36,7 +36,11 @@ class PaymentMethodsView(views.APIView):
     def get(self, request):
         methods = payment_methods.available()
         return Response({"methods": methods, "card": "card" in methods,
-                         "crypto": "crypto" in methods})
+                         "crypto": "crypto" in methods,
+                         # Quoted on the pricing page so the advertised price
+                         # and the amount actually charged agree. 0 = no fee
+                         # to disclose.
+                         "fee_pct": payment_methods.fee_pct()})
 
 
 class SubscriptionView(views.APIView):

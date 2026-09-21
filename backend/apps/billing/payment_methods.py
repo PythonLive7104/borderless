@@ -33,3 +33,13 @@ def available():
     # activates instantly — crypto is still the method being offered.
     methods.append("crypto")
     return methods
+
+
+def fee_pct() -> float:
+    """The processing fee Bachs adds on top of the plan price, as a percentage.
+
+    Disclosed on the pricing page rather than sprung at checkout: advertising
+    $70 and charging $73.90 is drip pricing, and it is the surprise at the
+    payment step that loses the sale as much as the money.
+    """
+    return float(getattr(settings, "PAYMENT_FEE_PCT", 0) or 0)

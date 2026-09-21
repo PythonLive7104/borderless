@@ -224,6 +224,17 @@ BACHS_WEBHOOK_SECRET = os.getenv("BACHS_WEBHOOK_SECRET", "")
 # pricing page reads it, and advertising a method checkout can't honour is a
 # misrepresentation Google Ads suspends accounts over.
 BACHS_CARD_ENABLED = os.getenv("BACHS_CARD_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+# Bachs adds a processing fee on top of the plan price at checkout ($70 ->
+# $73.90 observed). Advertising $70 and charging $73.90 is drip pricing, which
+# the ACCC, the ASA/CMA and Google Ads' misrepresentation policy all treat as
+# misleading — so the pricing page discloses it, and this is the number it
+# quotes. Set to 0 to hide the disclosure entirely (e.g. if the fee is ever
+# absorbed merchant-side).
+#
+# CONFIRM the exact formula against a live checkout on the cheapest plan: a
+# flat 5.57%, 5.5% + $0.05 and 5% + $0.40 all fit the single $70 data point but
+# diverge at $25. Adjust this once you've seen a second amount.
+PAYMENT_FEE_PCT = float(os.getenv("PAYMENT_FEE_PCT", "5.6"))
 # Map each plan slug to its Bachs product id (used by checkout). The weekly
 # Basic/Plus/Pro tiers reuse the existing products (starter->basic, growth->plus,
 # business->pro), so the BACHS_PRODUCT_* env keys stay unchanged. NOTE: a product's

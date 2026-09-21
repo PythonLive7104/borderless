@@ -28,3 +28,12 @@ export function methodPhrase(m: PaymentMethods | null): string {
   if (m.crypto) return " in cryptocurrency";
   return "";
 }
+
+/** "plus a 5.6% payment processing fee" — or "" when there's no fee to
+ *  disclose, or the answer hasn't arrived. Trimmed to at most one decimal so
+ *  the page never prints a long float at someone. */
+export function feeNote(m: PaymentMethods | null): string {
+  if (!m?.fee_pct) return "";
+  const pct = Math.round(m.fee_pct * 10) / 10;
+  return `plus a ${pct}% payment processing fee`;
+}
