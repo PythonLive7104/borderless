@@ -247,7 +247,7 @@ class MonthlyIntervalTest(TestCase):
         from apps.billing.models import Plan
         self.assertEqual(
             {p.slug: p.price_monthly for p in Plan.objects.all()},
-            {"basic": 50, "plus": 100, "pro": 150})
+            {"basic": 69, "plus": 119, "pro": 199})
 
     def test_monthly_is_cheaper_than_four_weeks(self):
         # If this ever inverts, the toggle is advertising a discount that isn't one.
@@ -292,7 +292,7 @@ class MonthlyIntervalTest(TestCase):
         from apps.billing.models import Plan
         pro = Plan.objects.get(slug="pro")
         self.assertEqual(pro.price_for("weekly"), 70)
-        self.assertEqual(pro.price_for("monthly"), 150)
+        self.assertEqual(pro.price_for("monthly"), 199)
         pro.bachs_product_id = "prod_weekly"
         pro.bachs_product_id_monthly = "prod_monthly"
         self.assertEqual(pro.product_for("weekly"), "prod_weekly")

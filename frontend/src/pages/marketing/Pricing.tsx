@@ -42,17 +42,17 @@ const PRO_ADD: string[] = [
 
 const PLANS: Plan[] = [
   {
-    name: "Basic", price: 25, priceMonthly: 50, tag: "Smart redirects with bot detection, for solo buyers",
+    name: "Basic", price: 25, priceMonthly: 69, tag: "Smart redirects with bot detection, for solo buyers",
     cta: "Get Basic", redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", access: "7 days of access",
     groups: [{ items: BASE }],
   },
   {
-    name: "Plus", price: 40, priceMonthly: 100, tag: "More links & domains for growing campaigns",
+    name: "Plus", price: 40, priceMonthly: 119, tag: "More links & domains for growing campaigns",
     cta: "Get Plus", highlight: true, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", access: "7 days of access",
     groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }],
   },
   {
-    name: "Pro", price: 70, priceMonthly: 150, tag: "Top limits & dedicated support for agencies",
+    name: "Pro", price: 70, priceMonthly: 199, tag: "Top limits & dedicated support for agencies",
     cta: "Get Pro", ribbon: "TOP VALUE", redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", access: "7 days of access",
     groups: [
       { items: BASE },
@@ -116,6 +116,14 @@ function PlusDivider() {
   );
 }
 
+/** The best monthly-vs-weekly saving across the tiers, as the badge text.
+ *  Derived rather than hand-written: the old badge said "up to 46%", which was
+ *  a number someone would have had to remember to update on every reprice. */
+function maxSaving(plans: Plan[]): string {
+  const best = Math.max(...plans.map((p) => 1 - p.priceMonthly / (p.price * 4)));
+  return `Save up to ${Math.floor(best * 100)}%`;
+}
+
 export default function Pricing() {
   const cta = useCta();
   useSeo("Pricing", "Simple weekly or monthly plans for real-time bot and fraud detection. Pay by card or cryptocurrency.");
@@ -148,7 +156,7 @@ export default function Pricing() {
 
       <Section className="!pt-20">
         <div className="mb-10 flex justify-center">
-          <IntervalToggle value={interval} onChange={setInterval} savings="Save up to 46%" />
+          <IntervalToggle value={interval} onChange={setInterval} savings={maxSaving(PLANS)} />
         </div>
         <div className="grid items-stretch gap-6 lg:grid-cols-3">
           {PLANS.map((p) => (
