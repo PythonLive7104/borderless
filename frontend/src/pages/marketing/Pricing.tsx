@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
 import { ICheck } from "../../components/ui/icons";
+import { PLAN_ADD, PLAN_BASE, PLAN_ROLLUP } from "../../data/plans";
 import ComparisonTable from "../../components/marketing/ComparisonTable";
 import PaymentMethods from "../../components/marketing/PaymentMethods";
 import { feeLine, feeNote, usePaymentMethods } from "../../lib/usePaymentMethods";
@@ -24,43 +25,25 @@ type Plan = {
   groups: Group[];
 };
 
-const BASE: string[] = [
-  "Smart redirects with bot detection on every click",
-  "Full anti-bot engine (Shield + Traffic Rules)",
-  "Deep filters: country, device, OS, connection type, ISP/ASN",
-  "VPN / proxy / datacenter blocking + live IP reputation",
-  "TLS fingerprinting (JA3 & JA4) + silent deep browser check",
-  "Filtering funnel & campaign analytics",
-  "IP allow / deny rules",
-];
-const PLUS_ADD: string[] = [
-  "Higher redirect & antibot-site limits",
-  "Priority support",
-];
-const PRO_ADD: string[] = [
-  "Highest redirect & antibot-site limits",
-  "Bring your own domain — run redirects on your brand",
-  "Private domains available",
-  "Dedicated support",
-];
 
 const PLANS: Plan[] = [
   {
     name: "Basic", price: 25, priceMonthly: 69, tag: "Smart redirects with bot detection, for solo buyers",
     cta: "Get Basic", adClicks: 10000, redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", access: "7 days of access",
-    groups: [{ items: BASE }],
+    groups: [{ items: PLAN_BASE }],
   },
   {
     name: "Plus", price: 40, priceMonthly: 119, tag: "More links & domains for growing campaigns",
     cta: "Get Plus", highlight: true, adClicks: 50000, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", access: "7 days of access",
-    groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }],
+    groups: [{ items: PLAN_BASE },
+             { label: `${PLAN_ROLLUP.plus}, plus:`, items: PLAN_ADD.plus, added: true }],
   },
   {
     name: "Pro", price: 70, priceMonthly: 199, tag: "Top limits & dedicated support for agencies",
     cta: "Get Pro", ribbon: "TOP VALUE", adClicks: 150000, redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", access: "7 days of access",
     groups: [
-      { items: BASE },
-      { label: "Everything in Plus, plus:", items: PRO_ADD, added: true },
+      { items: PLAN_BASE },
+      { label: `${PLAN_ROLLUP.pro}, plus:`, items: PLAN_ADD.pro, added: true },
     ],
   },
 ];

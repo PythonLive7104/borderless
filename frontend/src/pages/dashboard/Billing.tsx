@@ -6,7 +6,8 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import IntervalToggle from "../../components/ui/IntervalToggle";
 import PageNote from "../../components/dashboard/PageNote";
-import { ILink, IGlobe } from "../../components/ui/icons";
+import { ILink, IGlobe, ITarget } from "../../components/ui/icons";
+import { PLAN_ADD, PLAN_BASE, PLAN_ROLLUP } from "../../data/plans";
 import { trackPurchase } from "../../lib/analytics";
 import { feeNote, methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
 
@@ -14,33 +15,20 @@ const statusTone: Record<string, string> = {
   trialing: "bg-brand/10 text-brand", active: "bg-success/10 text-emerald-700", canceled: "bg-danger/10 text-red-600",
 };
 
-// Per-tier feature lists (cumulative). `muted` rows render a hollow check, like
-// the "Everything in <lower tier>" roll-up lines.
+// Feature copy comes from data/plans.ts, shared with the marketing pricing
+// page. They used to be two hand-maintained lists and had already drifted —
+// this page sold TLS fingerprinting and the deep browser check as Plus
+// upgrades that Basic customers were in fact already getting.
 type Feat = { text: string; muted?: boolean };
-const PLAN_FEATURES: Record<string, Feat[]> = {
-  basic: [
-    { text: "Smart redirects with bot detection on every click" },
-    { text: "Full anti-bot engine (Shield + Traffic Rules)" },
-    { text: "Deep filters: country, device, OS, connection type, ISP/ASN" },
-    { text: "VPN / proxy / datacenter blocking + IP reputation" },
-    { text: "Human check + IP allow / deny rules" },
-    { text: "Filtering funnel & campaign analytics" },
-  ],
-  plus: [
-    { text: "Everything in Basic", muted: true },
-    { text: "Higher redirect & antibot-site limits" },
-    { text: "TLS fingerprinting (JA3 & JA4)" },
-    { text: "Silent deep browser check" },
-    { text: "Priority support" },
-  ],
-  pro: [
-    { text: "Everything in Plus", muted: true },
-    { text: "Highest redirect & antibot-site limits" },
-    { text: "Bring your own domain — run redirects on your brand" },
-    { text: "Private domains available" },
-    { text: "Dedicated support" },
-  ],
-};
+
+function featuresFor(slug: string): Feat[] {
+  const rollup = PLAN_ROLLUP[slug];
+  const adds = PLAN_ADD[slug] || [];
+  // Lower tier: show everything. Higher tiers: roll the rest up in one line,
+  // so the card stays scannable next to its neighbours.
+  if (!rollup) return PLAN_BASE.map((text) => ({ text }));
+  return [{ text: rollup, muted: true }, ...adds.map((text) => ({ text }))];
+}
 
 const CheckFull = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mt-0.5 shrink-0 text-brand"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -55,7 +43,7 @@ function Spec({ icon, label, value }: { icon: ReactNode; label: string; value: n
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-dim">
         <span className="text-fg-muted">{icon}</span>{label}
       </div>
-      <div className="mt-1 text-lg font-extrabold tabular-nums">{value || "∞"}</div>
+      <div className="mt-1 text-lg font-extrabold tabular-nums">{value ? value.toLocaleString() : "∞"}</div>
     </div>
   );
 }
@@ -72,6 +60,10 @@ export default function Billing() {
   // 0 on a monthly cap means "same as weekly" — mirrors Plan.redirects_for().
   const redirectsOf = (p: Plan) => (monthly && p.max_redirects_monthly ? p.max_redirects_monthly : p.max_redirects);
   const websitesOf = (p: Plan) => (monthly && p.max_websites_monthly ? p.max_websites_monthly : p.max_websites);
+  // Mirrors Plan.ad_clicks_for() on the server: the cap is stored monthly and a
+  // weekly period gets a quarter of it. 0 stays 0 — unlimited on either.
+  const adClicksOf = (p: Plan) =>
+    !p.monthly_ad_clicks ? 0 : monthly ? p.monthly_ad_clicks : Math.ceil(p.monthly_ad_clicks / 4);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -206,7 +198,7 @@ export default function Billing() {
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
         {plans.map((p) => {
           const isCurrent = isCurrentPlan(p);
-          const feats = PLAN_FEATURES[p.slug] || [];
+          const feats = featuresFor(p.slug);
           return (
             <div key={p.id} className={`card relative flex flex-col p-6 ${isCurrent ? "ring-2 ring-brand" : "shadow-soft"}`}>
               {isCurrent && (
@@ -219,10 +211,14 @@ export default function Billing() {
               </div>
               <div className="mt-0.5 text-xs text-fg-dim">{monthly ? "30" : "7"} days of access</div>
 
-              {/* redirects / domains caps */}
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Spec icon={<ILink width={13} />} label="Redirects" value={redirectsOf(p)} />
-                <Spec icon={<IGlobe width={13} />} label="Antibot sites" value={websitesOf(p)} />
+              {/* Ad clicks first — it's what the plan is sold on and what the
+                  pricing page leads with, so the two pages agree. */}
+              <div className="mt-4 grid gap-3">
+                <Spec icon={<ITarget width={13} />} label="Ad clicks protected" value={adClicksOf(p)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <Spec icon={<ILink width={13} />} label="Redirects" value={redirectsOf(p)} />
+                  <Spec icon={<IGlobe width={13} />} label="Antibot sites" value={websitesOf(p)} />
+                </div>
               </div>
 
               {/* features */}
