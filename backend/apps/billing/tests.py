@@ -545,3 +545,30 @@ class CurrentPlanIsOnlyWhenPaidTest(TestCase):
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.status, Subscription.Status.ACTIVE)
         self.assertFalse(self.sub.access_state()["locked"])
+
+
+class PaymentMethodsTest(TestCase):
+    """This endpoint decides what the public pricing page claims we accept, so
+    it must never advertise a method checkout can't complete."""
+
+    def test_crypto_is_always_offered(self):
+        body = self.client.get("/api/billing/payment-methods/").json()
+        self.assertTrue(body["crypto"])
+        self.assertIn("crypto", body["methods"])
+
+    def test_card_is_off_unless_enabled_on_the_bachs_account(self):
+        with self.settings(BACHS_CARD_ENABLED=False):
+            body = self.client.get("/api/billing/payment-methods/").json()
+        self.assertFalse(body["card"])
+        self.assertNotIn("card", body["methods"])
+
+    def test_card_leads_when_enabled(self):
+        """Card first: it's what a UK/US/CA/AU buyer expects to see."""
+        with self.settings(BACHS_CARD_ENABLED=True):
+            body = self.client.get("/api/billing/payment-methods/").json()
+        self.assertTrue(body["card"])
+        self.assertEqual(body["methods"][0], "card")
+
+    def test_public_no_auth_required(self):
+        """The marketing page asks before anyone has logged in."""
+        self.assertEqual(self.client.get("/api/billing/payment-methods/").status_code, 200)

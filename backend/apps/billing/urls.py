@@ -1,9 +1,10 @@
 from django.urls import path
-from .views import (PlanListView, SubscriptionView, ChangePlanView, CancelView,
+from .views import (PaymentMethodsView, PlanListView, SubscriptionView, ChangePlanView, CancelView,
                     UsageView, CheckoutView, VerifyCheckoutView, BachsWebhookView)
 
 urlpatterns = [
     path("plans/", PlanListView.as_view(), name="plans"),
+    path("payment-methods/", PaymentMethodsView.as_view(), name="payment-methods"),
     path("subscription/", SubscriptionView.as_view(), name="subscription"),
     path("subscription/change/", ChangePlanView.as_view(), name="change-plan"),
     path("subscription/cancel/", CancelView.as_view(), name="cancel"),

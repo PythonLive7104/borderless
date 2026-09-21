@@ -495,8 +495,12 @@ export const telegramApi = {
   disconnect: (orgId: number) => http.del(`/telegram/connect/?organization=${orgId}`),
 };
 
+export interface PaymentMethods { methods: ("card" | "crypto")[]; card: boolean; crypto: boolean; }
+
 export const billingApi = {
   plans: () => http.get<Plan[]>("/billing/plans/"),
+  // Public — the marketing pricing page asks before anyone has logged in.
+  paymentMethods: () => http.get<PaymentMethods>("/billing/payment-methods/"),
   subscription: (orgId: number) => http.get<Subscription>(`/billing/subscription/?organization=${orgId}`),
   changePlan: (orgId: number, plan: string, interval?: BillingInterval) =>
     http.post<Subscription>("/billing/subscription/change/", { organization: orgId, plan, interval }),

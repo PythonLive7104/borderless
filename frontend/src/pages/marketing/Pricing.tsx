@@ -7,7 +7,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
 import { ICheck } from "../../components/ui/icons";
-import CryptoIcons from "../../components/marketing/CryptoIcons";
+import PaymentMethods from "../../components/marketing/PaymentMethods";
 
 type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
@@ -77,7 +77,7 @@ const INCLUDED = [
 ];
 
 const FAQ = [
-  ["How do I pay?", "We accept major cryptocurrencies — BTC, ETH, USDT, USDC and TON. Crypto keeps billing private and borderless."],
+  ["How do I pay?", "Card (Visa, Mastercard, American Express) or major cryptocurrencies — BTC, ETH, USDT, USDC and TON — through our hosted checkout. Prices are in USD. Card availability is shown on this page; whatever you see there is what checkout accepts."],
   ["What are redirects and antibot sites?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Antibot sites' are the websites you protect with the tracking snippet. Each tier includes a set number of both. (These are NOT private short domains — a private domain is an optional paid add-on.)"],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
@@ -112,7 +112,7 @@ function PlusDivider() {
 
 export default function Pricing() {
   const cta = useCta();
-  useSeo("Pricing", "Simple weekly or monthly plans for smart redirects with real-time bot and fraud detection. Pay with cryptocurrency.");
+  useSeo("Pricing", "Simple weekly or monthly plans for real-time bot and fraud detection. Pay by card or cryptocurrency.");
   const [interval, setInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
   return (
@@ -123,15 +123,14 @@ export default function Pricing() {
           <Badge tone="light">Simple, weekly pricing</Badge>
           <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Tariffs & payment</h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-300">
-            Weekly or monthly access — renew when it runs out, and unused days roll over. Pay with cryptocurrency.
+            Weekly or monthly access — renew when it runs out, and unused days roll over. No auto-charge, cancel by simply not renewing.
           </p>
         </div>
       </section>
 
       <div className="border-b border-line bg-white">
         <div className="container-page py-10 text-center">
-          <p className="text-sm font-semibold text-fg-muted">We accept cryptocurrency to keep your billing private</p>
-          <div className="mt-5"><CryptoIcons /></div>
+          <PaymentMethods />
         </div>
       </div>
 
@@ -197,7 +196,7 @@ export default function Pricing() {
           ))}
         </div>
         <p className="mt-8 text-center text-sm text-fg-dim">
-          All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD, payable in cryptocurrency.
+          All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD.
         </p>
       </Section>
 

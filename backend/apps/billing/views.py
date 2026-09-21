@@ -1,9 +1,10 @@
 from django.utils import timezone
-from rest_framework import views
+from rest_framework import permissions, views
 from rest_framework.response import Response
 
 from apps.organizations.models import OrganizationMember
 from apps.traffic.models import TrafficEvent
+from . import payment_methods
 from .models import Plan, Subscription
 from .serializers import PlanSerializer, SubscriptionSerializer
 
@@ -24,6 +25,18 @@ def _get_subscription(org_id):
 class PlanListView(views.APIView):
     def get(self, request):
         return Response(PlanSerializer(Plan.objects.all(), many=True).data)
+
+
+class PaymentMethodsView(views.APIView):
+    """Public: the marketing pricing page reads this before anyone has logged
+    in, so it can show what checkout will actually accept."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        methods = payment_methods.available()
+        return Response({"methods": methods, "card": "card" in methods,
+                         "crypto": "crypto" in methods})
 
 
 class SubscriptionView(views.APIView):

@@ -218,6 +218,12 @@ SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@trynobot.com")
 # key prefix (sk_sandbox_ / sk_live_).
 BACHS_API_KEY = os.getenv("BACHS_API_KEY", "")
 BACHS_WEBHOOK_SECRET = os.getenv("BACHS_WEBHOOK_SECRET", "")
+# Card payments run through the same Bachs hosted checkout as crypto, so this
+# is a merchant-side switch in the Bachs dashboard rather than a code change.
+# Set it true ONLY once card is actually live on the account: the public
+# pricing page reads it, and advertising a method checkout can't honour is a
+# misrepresentation Google Ads suspends accounts over.
+BACHS_CARD_ENABLED = os.getenv("BACHS_CARD_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
 # Map each plan slug to its Bachs product id (used by checkout). The weekly
 # Basic/Plus/Pro tiers reuse the existing products (starter->basic, growth->plus,
 # business->pro), so the BACHS_PRODUCT_* env keys stay unchanged. NOTE: a product's
