@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
 import { ICheck } from "../../components/ui/icons";
+import ComparisonTable from "../../components/marketing/ComparisonTable";
 import PaymentMethods from "../../components/marketing/PaymentMethods";
 import { feeLine, feeNote, usePaymentMethods } from "../../lib/usePaymentMethods";
 
@@ -130,7 +131,7 @@ function maxSaving(plans: Plan[]): string {
 
 export default function Pricing() {
   const cta = useCta();
-  useSeo("Pricing", "Simple weekly or monthly plans for real-time bot and fraud detection. Pay by card or cryptocurrency.");
+  useSeo("Pricing", "10,000 ad clicks protected from $69/month — real-time bot and click-fraud detection, with TLS fingerprinting and a shared bot network.");
   const [interval, setInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
   // Any fee the buyer pays on top is disclosed next to the price rather than
@@ -246,6 +247,19 @@ export default function Pricing() {
             </div>
           ))}
         </div>
+      </Section>
+
+      <Section>
+        <SectionHead eyebrow="Compare" title="How the entry plans line up"
+          sub="Same job, same buyer — here is what each one includes at its cheapest paid tier." />
+        <div className="mt-12"><ComparisonTable /></div>
+        <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-fg-muted">
+          The difference that isn't in the table: TryNoBot fingerprints TLS (JA3 and JA4) and
+          shares confirmed bot fingerprints across every customer, so an attacker caught on one
+          site is known on all of them. Bot farms rotate IPs — the fingerprint is what gives them
+          away. You also get branded redirect links that bot-score every click before forwarding
+          it — a second place to catch fraud, before it ever reaches your site.
+        </p>
       </Section>
 
       <Section className="bg-bg-soft rounded-none">
