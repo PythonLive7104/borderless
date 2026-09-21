@@ -604,3 +604,61 @@ class PaymentFeeDisclosureTest(TestCase):
         from apps.billing import payment_methods as pm
         with self.settings(PAYMENT_FEE_PCT=0, PAYMENT_FEE_FIXED=0):
             self.assertEqual(pm.fee_for(70), 0)
+
+
+class AdClickMeterTest(TestCase):
+    """Plans are sold in ad clicks now, so the number the dashboard shows has
+    to be the number the pricing page promised."""
+
+    def setUp(self):
+        from apps.organizations.models import create_workspace
+        from apps.websites.models import Website
+        user = get_user_model().objects.create_user(
+            username="ad@example.com", email="ad@example.com", password="testpass123")
+        self.org = create_workspace(user, "Ad Co")
+        self.site = Website.objects.create(organization=self.org, name="A",
+                                           domain="a.example", tracking_id="adtrack1")
+        self.c = APIClient()
+        self.c.force_authenticate(user=user)
+
+    def _session(self, sid, paid=True):
+        from apps.traffic.models import Session, Visitor
+        v, _ = Visitor.objects.get_or_create(website=self.site, visitor_id=f"v-{sid}")
+        return Session.objects.create(website=self.site, visitor=v, session_id=sid,
+                                      is_paid_click=paid,
+                                      ad_platform="google_ads" if paid else "")
+
+    def test_seeded_allowances(self):
+        from apps.billing.models import Plan
+        self.assertEqual(
+            {p.slug: p.monthly_ad_clicks for p in Plan.objects.all()},
+            {"basic": 10_000, "plus": 50_000, "pro": 150_000})
+
+    def test_weekly_gets_a_quarter_of_the_monthly_allowance(self):
+        from apps.billing.models import Plan
+        basic = Plan.objects.get(slug="basic")
+        self.assertEqual(basic.ad_clicks_for("monthly"), 10_000)
+        self.assertEqual(basic.ad_clicks_for("weekly"), 2_500)
+
+    def test_unlimited_stays_unlimited_on_both_intervals(self):
+        from apps.billing.models import Plan
+        p = Plan.objects.get(slug="pro")
+        p.monthly_ad_clicks = 0
+        self.assertEqual(p.ad_clicks_for("weekly"), 0)
+        self.assertEqual(p.ad_clicks_for("monthly"), 0)
+
+    def test_usage_counts_paid_sessions_only(self):
+        for i in range(3):
+            self._session(f"paid-{i}", paid=True)
+        for i in range(5):
+            self._session(f"organic-{i}", paid=False)
+        body = self.c.get(f"/api/billing/usage/?organization={self.org.id}").json()
+        self.assertEqual(body["ad_clicks"]["used"], 3)
+
+    def test_usage_reports_the_plan_allowance_and_headroom(self):
+        self._session("paid-1")
+        body = self.c.get(f"/api/billing/usage/?organization={self.org.id}").json()
+        ad = body["ad_clicks"]
+        self.assertEqual(ad["limit"], 2_500)   # trial/weekly interval
+        self.assertEqual(ad["remaining"], 2_499)
+        self.assertEqual(ad["level"], "ok")

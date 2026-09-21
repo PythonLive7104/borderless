@@ -31,6 +31,13 @@ class Session(models.Model):
     utm_source = models.CharField(max_length=120, blank=True)
     utm_medium = models.CharField(max_length=120, blank=True)
     utm_campaign = models.CharField(max_length=120, blank=True)
+    # Whether this session began with a paid ad click, and on which network.
+    # Set once at session creation from the landing URL — see paid_click.py.
+    # This is the billing meter customers actually compare against rivals, so
+    # it lives on the session rather than the event: one ad click is one
+    # session, however many pages the visitor then reads.
+    is_paid_click = models.BooleanField(default=False, db_index=True)
+    ad_platform = models.CharField(max_length=24, blank=True)
 
     class Meta:
         unique_together = ("website", "session_id")

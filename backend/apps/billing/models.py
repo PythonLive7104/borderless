@@ -24,6 +24,12 @@ class Plan(models.Model):
     price = models.IntegerField(help_text="USD per week")
     price_monthly = models.IntegerField(default=0, help_text="USD per month (0 = monthly not offered)")
     monthly_events = models.BigIntegerField(help_text="Metered event limit per period")
+    # The meter customers are sold on and compare against rivals, who all
+    # price in "ad clicks protected". Events stay as the technical backstop:
+    # a site with no paid traffic has an ad-click count of zero forever, so
+    # ad clicks alone cannot bound usage.
+    monthly_ad_clicks = models.BigIntegerField(
+        default=0, help_text="Paid ad clicks included per MONTH (0 = unlimited)")
     retention_days = models.IntegerField(default=30)
     team_members = models.IntegerField(default=3, help_text="0 = unlimited")
     max_websites = models.IntegerField(default=0, help_text="Domains cap on WEEKLY billing (0 = unlimited)")
@@ -60,6 +66,19 @@ class Plan(models.Model):
         if interval == MONTHLY and self.max_websites_monthly:
             return self.max_websites_monthly
         return self.max_websites
+
+    def ad_clicks_for(self, interval: str) -> int:
+        """Included ad clicks for one period of `interval`.
+
+        The cap is stored monthly; a weekly period gets a quarter of it, which
+        is the same 4-weeks-to-a-month comparison the pricing toggle makes.
+        0 stays 0 — unlimited is unlimited on either interval.
+        """
+        if not self.monthly_ad_clicks:
+            return 0
+        if interval == MONTHLY:
+            return self.monthly_ad_clicks
+        return -(-self.monthly_ad_clicks // 4)  # ceil, never round a cap down
 
     def price_for(self, interval: str) -> int:
         return self.price_monthly if interval == MONTHLY else self.price

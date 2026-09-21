@@ -17,6 +17,9 @@ type Plan = {
   redirectsMonthly: string; domainsMonthly: string;
   highlight?: boolean; ribbon?: string; warning?: string;
   redirects: string; domains: string; access: string;
+  /** Paid ad clicks included per MONTH. Weekly shows a quarter of it,
+   *  matching Plan.ad_clicks_for() on the server. */
+  adClicks: number;
   groups: Group[];
 };
 
@@ -43,17 +46,17 @@ const PRO_ADD: string[] = [
 const PLANS: Plan[] = [
   {
     name: "Basic", price: 25, priceMonthly: 69, tag: "Smart redirects with bot detection, for solo buyers",
-    cta: "Get Basic", redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", access: "7 days of access",
+    cta: "Get Basic", adClicks: 10000, redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", access: "7 days of access",
     groups: [{ items: BASE }],
   },
   {
     name: "Plus", price: 40, priceMonthly: 119, tag: "More links & domains for growing campaigns",
-    cta: "Get Plus", highlight: true, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", access: "7 days of access",
+    cta: "Get Plus", highlight: true, adClicks: 50000, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", access: "7 days of access",
     groups: [{ items: BASE }, { label: "Everything in Basic, plus:", items: PLUS_ADD, added: true }],
   },
   {
     name: "Pro", price: 70, priceMonthly: 199, tag: "Top limits & dedicated support for agencies",
-    cta: "Get Pro", ribbon: "TOP VALUE", redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", access: "7 days of access",
+    cta: "Get Pro", ribbon: "TOP VALUE", adClicks: 150000, redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", access: "7 days of access",
     groups: [
       { items: BASE },
       { label: "Everything in Plus, plus:", items: PRO_ADD, added: true },
@@ -83,6 +86,7 @@ function faqs(fee: string): [string, string][] {
   ["Are there any extra charges?", fee
     ? `The payment processor adds ${fee} on top of the plan price. The exact amount and your total are shown beside each price above, and itemised again at checkout before you pay. Nothing else: no setup fee, no overage billing, no automatic renewal.`
     : "No. The price you see is the price you pay — we cover the payment processing fee ourselves. There's no setup fee, no overage billing, and no automatic renewal."],
+  ["What counts as an ad click?", "One visit that arrived from a paid ad — we read the click identifier the ad network adds to your landing URL (Google's gclid, Microsoft's msclkid and the rest), or a paid utm_medium. It's counted once per visitor session, not per page: someone who clicks your ad and then reads six pages is one ad click. Organic, direct and email traffic is still scored and shown in your dashboard, but never counted against this allowance."],
   ["What are redirects and antibot sites?", "'Redirects' are the smart short links you create — each click is bot-scored and routed. 'Antibot sites' are the websites you protect with the tracking snippet. Each tier includes a set number of both. (These are NOT private short domains — a private domain is an optional paid add-on.)"],
   ["How does weekly billing work?", "Every plan gives 7 days of access. Renew when it runs out. Any days you have left are added on top of whatever you buy next, so renewing early or switching tier never loses you time."],
   ["Can I change plans later?", "Yes — upgrade or downgrade anytime. Your unused days carry over to the new tier."],
@@ -212,7 +216,13 @@ export default function Pricing() {
               {/* limits + CTA pinned to bottom for card alignment */}
               <div className="mt-6 flex-1" />
               <div className="border-t border-line pt-5 text-sm">
-                <div className="flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{monthly ? p.redirectsMonthly : p.redirects}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-fg-dim">Ad clicks protected</span>
+                  <span className="font-semibold">
+                    {(monthly ? p.adClicks : Math.ceil(p.adClicks / 4)).toLocaleString()}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{monthly ? p.redirectsMonthly : p.redirects}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Antibot sites</span><span className="font-semibold">{monthly ? p.domainsMonthly : p.domains}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>

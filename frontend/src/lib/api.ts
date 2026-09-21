@@ -469,7 +469,7 @@ export const webhookApi = {
 
 // ---- billing ----
 export type BillingInterval = "weekly" | "monthly";
-export interface Plan { id: number; slug: string; name: string; price: number; price_monthly: number; monthly_events: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; max_websites_monthly: number; max_redirects_monthly: number; }
+export interface Plan { id: number; slug: string; name: string; price: number; price_monthly: number; monthly_events: number; monthly_ad_clicks: number; retention_days: number; team_members: number; max_websites: number; max_redirects: number; max_websites_monthly: number; max_redirects_monthly: number; }
 export interface AccessState {
   locked: boolean;
   reason: "active" | "trialing" | "trial_expired" | "period_ended" | "canceled";
@@ -478,9 +478,12 @@ export interface AccessState {
   days_left: number | null;
 }
 export interface Subscription { id: number; plan: Plan; status: "trialing" | "active" | "canceled"; interval: BillingInterval; period_start: string; period_end: string; trial_end: string | null; access: AccessState; created_at: string; }
+export type UsageLevel = "ok" | "notice" | "warning" | "critical";
 export interface Usage {
   period: { start: string; end: string };
-  events: { used: number; limit: number; pct: number; remaining: number; level: "ok" | "notice" | "warning" | "critical" };
+  events: { used: number; limit: number; pct: number; remaining: number; level: UsageLevel };
+  /** The meter customers are sold on: one per session that began with a paid ad click. */
+  ad_clicks: { used: number; limit: number; pct: number; remaining: number; level: UsageLevel };
   team: { used: number; limit: number };
   websites: { used: number; limit: number };
   campaigns: { used: number; limit: number };

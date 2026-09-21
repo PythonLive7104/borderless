@@ -86,6 +86,17 @@ class CancelView(views.APIView):
         return Response(SubscriptionSerializer(sub).data)
 
 
+def _level(pct: float) -> str:
+    """Shared by both meters so a warning means the same thing on each."""
+    if pct >= 1.0:
+        return "critical"
+    if pct >= 0.85:
+        return "warning"
+    if pct >= 0.70:
+        return "notice"
+    return "ok"
+
+
 class UsageView(views.APIView):
     def get(self, request):
         org_id = request.query_params.get("organization")
@@ -96,6 +107,16 @@ class UsageView(views.APIView):
         used = TrafficEvent.objects.filter(website__organization_id=org_id, created_at__gte=start, created_at__lt=end).count()
         limit = sub.plan.monthly_events
         pct = round(used / limit, 4) if limit else 0
+
+        # Ad clicks: the meter shown to customers, counted one per SESSION that
+        # began with a paid click — not per pageview — so it matches how the
+        # rest of the category counts and can be compared plan for plan.
+        from apps.traffic.models import Session
+        ad_used = Session.objects.filter(
+            website__organization_id=org_id, is_paid_click=True,
+            started_at__gte=start, started_at__lt=end).count()
+        ad_limit = sub.plan.ad_clicks_for(sub.interval)
+        ad_pct = round(ad_used / ad_limit, 4) if ad_limit else 0
         members = OrganizationMember.objects.filter(organization_id=org_id).count()
 
         # Website / campaign counts vs. their limits. Trial caps at 1/1; paid
@@ -109,17 +130,14 @@ class UsageView(views.APIView):
         n_campaigns = Campaign.objects.filter(website__organization_id=org_id).count()
         n_redirects = ShortLink.objects.filter(organization_id=org_id).count()
 
-        level = "ok"
-        if pct >= 1.0:
-            level = "critical"
-        elif pct >= 0.85:
-            level = "warning"
-        elif pct >= 0.70:
-            level = "notice"
+        level = _level(pct)
 
         return Response({
             "period": {"start": start, "end": end},
             "events": {"used": used, "limit": limit, "pct": pct, "remaining": max(limit - used, 0), "level": level},
+            "ad_clicks": {"used": ad_used, "limit": ad_limit, "pct": ad_pct,
+                          "remaining": max(ad_limit - ad_used, 0) if ad_limit else 0,
+                          "level": _level(ad_pct)},
             "team": {"used": members, "limit": sub.plan.team_members},
             "websites": {"used": n_sites, "limit": website_limit(org_id)},
             "domains": {"used": n_sites, "limit": website_limit(org_id)},
