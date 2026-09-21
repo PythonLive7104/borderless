@@ -108,6 +108,22 @@ class BotCheckLeadTest(_DjangoTestCase):
     """The lead endpoint is the funnel's turnstile: a valid email becomes a
     stored lead and gets the report; junk is rejected without a row."""
 
+    def setUp(self):
+        """Clear the per-IP rate-limit counter.
+
+        It lives in Redis, which Django does not roll back between tests, and
+        the key outlives a test run by its 10-minute TTL. Without this the
+        suite passes or fails depending on how recently it was last run —
+        every test here shares one counter keyed on 127.0.0.1.
+        """
+        try:
+            from apps.intelligence.service import _r
+            r = _r()
+            for key in r.scan_iter("botcheck:rl:*"):
+                r.delete(key)
+        except Exception:
+            pass  # no Redis here = no limiter to clear
+
     def _post(self, **body):
         from django.test import Client
         return Client().post("/api/v1/bot-check/lead/", data=body,

@@ -13,6 +13,22 @@ class ContactFormTest(TestCase):
     PAYLOAD = {"name": "Jane Marketer", "email": "jane@acme.co",
                "company": "Acme Media", "message": "How does pricing work?"}
 
+    def setUp(self):
+        """Clear the rate-limit counter.
+
+        It lives in Redis, which Django does NOT roll back between tests, so
+        every test in the run shares one counter keyed on 127.0.0.1 — without
+        this the sixth POST in the whole suite 429s and unrelated tests start
+        failing depending on what ran before them.
+        """
+        try:
+            from apps.intelligence.service import _r
+            r = _r()
+            for key in r.scan_iter("contact:rl:*"):
+                r.delete(key)
+        except Exception:
+            pass  # no Redis in this environment = no limiter to clear
+
     def test_saves_and_notifies(self):
         res = self.client.post("/api/v1/contact/", self.PAYLOAD, content_type="application/json")
         self.assertEqual(res.status_code, 200)
