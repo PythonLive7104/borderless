@@ -13,12 +13,10 @@ export const COMPANY = {
   legalName: "Mailiondev Technology Ltd",
   /** CAC registration number, incorporated 20 January 2026. */
   registration: "RC 9233525",
-  /** Full registered postal address, on one line.
-   *  TODO: the registered address from the CAC filing. Until this is set,
-   *  companyLine() prints the name and number without it — which is enough
-   *  for the footer, but NOT enough for commercial email, where a postal
+  /** Full postal address, on one line. Published in the site footer, the
+   *  privacy policy and the footer of every commercial email — where a postal
    *  address is a legal requirement in the US, Canada and Australia. */
-  address: "",
+  address: "2 Okanlomo Street, Apete, Obantoko, Ogun State, Nigeria",
   /** Governing-law jurisdiction for the Terms. */
   jurisdiction: "the Federal Republic of Nigeria",
   supportEmail: "support@trynobot.com",

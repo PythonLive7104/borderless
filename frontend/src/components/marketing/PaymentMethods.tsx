@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { billingApi, type PaymentMethods } from "../../lib/api";
+import { usePaymentMethods } from "../../lib/usePaymentMethods";
 
 const COINS = [
   { s: "₿", n: "Bitcoin", bg: "#f7931a" },
@@ -30,16 +29,7 @@ function CardMark({ label, fg }: { label: string; fg: string }) {
  *  the answer is in flight we render nothing rather than guessing.
  */
 export default function PaymentMethods({ compact = false }: { compact?: boolean }) {
-  const [methods, setMethods] = useState<PaymentMethods | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    billingApi.paymentMethods()
-      .then((m) => { if (live) setMethods(m); })
-      .catch(() => { /* leave it hidden rather than claim anything */ });
-    return () => { live = false; };
-  }, []);
-
+  const methods = usePaymentMethods();
   if (!methods) return null;
 
   const heading = methods.card

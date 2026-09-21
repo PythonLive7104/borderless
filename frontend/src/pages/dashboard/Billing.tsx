@@ -8,6 +8,7 @@ import IntervalToggle from "../../components/ui/IntervalToggle";
 import PageNote from "../../components/dashboard/PageNote";
 import { ILink, IGlobe } from "../../components/ui/icons";
 import { trackPurchase } from "../../lib/analytics";
+import { methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
 
 const statusTone: Record<string, string> = {
   trialing: "bg-brand/10 text-brand", active: "bg-success/10 text-emerald-700", canceled: "bg-danger/10 text-red-600",
@@ -91,6 +92,10 @@ export default function Billing() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
 
+  // What checkout will actually offer, so the copy below names the real
+  // methods instead of hard-coding them and drifting out of date.
+  const payMethods = usePaymentMethods();
+
   // After returning from Bachs checkout we ASK Bachs whether the payment landed
   // rather than waiting for a webhook. Waiting was the old behaviour and it left
   // a paying customer on the free plan when no webhook arrived.
@@ -160,7 +165,7 @@ export default function Billing() {
   return (
     <div>
       <PageNote id="billing">
-        Choose <b>weekly</b> or <b>monthly</b> access — renew when it runs out, and any unused days roll over. Pay through our secure hosted checkout (Bachs); accepted methods are shown at checkout.
+        Choose <b>weekly</b> or <b>monthly</b> access — renew when it runs out, and any unused days roll over. Pay{methodPhrase(payMethods)} through our secure hosted checkout (Bachs).
       </PageNote>
       <h1 className="text-2xl font-extrabold tracking-tight">Billing</h1>
       <p className="mt-1 text-sm text-fg-muted">
@@ -257,7 +262,7 @@ export default function Billing() {
               {" "}({redirectsOf(target) || "∞"} redirects, {websitesOf(target) || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
-              You'll be taken to our secure hosted checkout (Bachs) to pay. Access starts as
+              You'll be taken to our secure hosted checkout (Bachs) to pay{methodPhrase(payMethods)}. Access starts as
               soon as payment succeeds, for {monthly ? 30 : 7} days. Any days you have left are added on top, so you never lose time.
             </p>
             {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
