@@ -9,14 +9,18 @@
 // FILL THESE IN BEFORE LAUNCH. The backend has the matching settings
 // (COMPANY_LEGAL_NAME / COMPANY_ADDRESS) for the email footers.
 export const COMPANY = {
-  /** Registered legal entity name, e.g. "Trynobot Ltd". */
-  legalName: "",
-  /** Company/registration number, if the jurisdiction issues one. */
-  registration: "",
-  /** Full registered postal address, on one line. */
+  /** Registered legal entity name, exactly as incorporated. */
+  legalName: "Mailiondev Technology Ltd",
+  /** CAC registration number, incorporated 20 January 2026. */
+  registration: "RC 9233525",
+  /** Full registered postal address, on one line.
+   *  TODO: the registered address from the CAC filing. Until this is set,
+   *  companyLine() prints the name and number without it — which is enough
+   *  for the footer, but NOT enough for commercial email, where a postal
+   *  address is a legal requirement in the US, Canada and Australia. */
   address: "",
-  /** Governing-law jurisdiction for the Terms, e.g. "England and Wales". */
-  jurisdiction: "",
+  /** Governing-law jurisdiction for the Terms. */
+  jurisdiction: "the Federal Republic of Nigeria",
   supportEmail: "support@trynobot.com",
   privacyEmail: "privacy@trynobot.com",
   /** Shown as "Last updated" on the legal pages. */
