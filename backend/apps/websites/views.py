@@ -61,16 +61,60 @@ class WebsiteViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def verify(self, request, pk=None):
-        """Report installation status. Active once the tracker has sent an event."""
+        """Report installation status.
+
+        Two signals, in order of certainty:
+          1. If any event has ever arrived, it's installed and working — done.
+          2. Otherwise actively fetch the customer's live page and look for the
+             snippet, so we can say WHY nothing has arrived: the tag isn't on
+             the served page (the usual cause — edited the wrong file), it's
+             there but no one has visited, or the page can't be reached.
+        The active fetch is best-effort: any failure falls back to the old
+        passive message rather than erroring the button.
+        """
+        from apps.websites import snippet_check
+
         w = self.get_object()
         installed = w.last_event_at is not None
+        if installed:
+            return Response({
+                "status": w.status,
+                "live_state": w.live_state(),
+                "installed": True,
+                "snippet_state": snippet_check.FOUND,
+                "last_event_at": w.last_event_at,
+                "message": "Installation detected — you're receiving traffic.",
+            })
+
+        try:
+            probe = snippet_check.check(w)
+        except Exception:
+            probe = {"state": "unreachable", "url": w.url or w.domain}
+
+        state = probe["state"]
+        messages = {
+            snippet_check.FOUND:
+                "Snippet found on your page — now open it in a browser to send "
+                "the first event, then verify again.",
+            snippet_check.MISSING:
+                f"We loaded {probe.get('checked_url') or probe.get('url')} but the "
+                "snippet isn't in the page. Make sure you pasted it before </head> "
+                "on the page that's actually served — not a backup or a different file.",
+            snippet_check.UNREACHABLE:
+                f"We couldn't load {probe.get('url') or 'your site'}. Check the "
+                "website URL in settings, then try again.",
+            snippet_check.NO_URL:
+                "Add your site's URL in settings so we can check the snippet for you.",
+        }
         return Response({
             "status": w.status,
             "live_state": w.live_state(),
-            "installed": installed,
-            "last_event_at": w.last_event_at,
-            "message": "Installation detected — you're receiving traffic." if installed
-                       else "No events received yet. Make sure the snippet is on your site.",
+            "installed": False,
+            "snippet_state": state,
+            "checked_url": probe.get("checked_url") or probe.get("url", ""),
+            "last_event_at": None,
+            "message": messages.get(state, "No events received yet. "
+                                            "Make sure the snippet is on your site."),
         })
 
     @action(detail=True, methods=["post"], url_path="check-safebrowsing")

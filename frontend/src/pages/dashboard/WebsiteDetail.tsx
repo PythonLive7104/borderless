@@ -86,7 +86,10 @@ export default function WebsiteDetail() {
     setVerifying(true); setVerifyMsg(null);
     try {
       const r = await websiteApi.verify(Number(id));
-      setVerifyMsg({ ok: r.installed, text: r.message });
+      // "found" (snippet on the page, just no visit yet) is good news too, not
+      // just a live event — so it shows green rather than a warning amber.
+      const ok = r.installed || r.snippet_state === "found";
+      setVerifyMsg({ ok, text: r.message });
       load();
     } finally { setVerifying(false); }
   }
