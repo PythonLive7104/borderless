@@ -80,6 +80,33 @@ class IngestTest(_Base):
         self.assertEqual(r["Access-Control-Allow-Origin"], "*")
         self.assertIn("POST", r["Access-Control-Allow-Methods"])
 
+    def test_multipart_form_shows_field_values_not_the_envelope(self):
+        """A real HTML form POST is multipart; the viewer must see the values,
+        never the WebKitFormBoundary / Content-Disposition wrapper."""
+        ch, raw = self._channel()
+        r = self.client.post(f"/api/v1/notify/{raw}/",
+                             data={"aa": "mmm@mweb.co.za", "bb": "tthtrtyuy"})  # multipart
+        self.assertEqual(r.status_code, 200)
+        msg = Notification.objects.get().message
+        self.assertNotIn("WebKitFormBoundary", msg)
+        self.assertNotIn("Content-Disposition", msg)
+        self.assertIn("aa: mmm@mweb.co.za", msg)
+        self.assertIn("bb: tthtrtyuy", msg)
+
+    def test_form_message_field_wins(self):
+        ch, raw = self._channel()
+        self.client.post(f"/api/v1/notify/{raw}/",
+                         data={"message": "Clean text", "title": "Lead", "spam": "x"})
+        n = Notification.objects.get()
+        self.assertEqual((n.title, n.message), ("Lead", "Clean text"))
+
+    def test_urlencoded_curl_dash_d_stays_raw(self):
+        """`curl -d "text"` is urlencoded but has no '=' — keep it as the text."""
+        ch, raw = self._channel()
+        self.client.post(f"/api/v1/notify/{raw}/", data="New lead from your form",
+                         content_type="application/x-www-form-urlencoded")
+        self.assertEqual(Notification.objects.get().message, "New lead from your form")
+
     def test_put_also_works(self):
         ch, raw = self._channel()
         r = self.client.put(f"/api/v1/notify/{raw}/", data="via PUT", content_type="text/plain")
@@ -264,6 +291,25 @@ class ChannelManagementTest(_Base):
         oc = APIClient(); oc.force_authenticate(user=other)
         r = oc.get(f"/api/notifications/unread-count/?organization={self.org.id}")
         self.assertEqual(r.json()["unread"], 0)
+
+    def test_delete_single_notification(self):
+        ch, raw = self._channel()
+        self.client.post(f"/api/v1/notify/{raw}/", data="x", content_type="text/plain")
+        nid = Notification.objects.get().id
+        r = self.c.delete(f"/api/notifications/feed/{nid}/")
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(Notification.objects.count(), 0)
+
+    def test_cannot_delete_another_workspaces_notification(self):
+        ch, raw = self._channel()
+        self.client.post(f"/api/v1/notify/{raw}/", data="x", content_type="text/plain")
+        nid = Notification.objects.get().id
+        other = get_user_model().objects.create_user(
+            username="z@ex.com", email="z@ex.com", password="testpass123")
+        oc = APIClient(); oc.force_authenticate(user=other)
+        r = oc.delete(f"/api/notifications/feed/{nid}/")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(Notification.objects.count(), 1)
 
     def test_another_workspace_cannot_read_the_feed(self):
         other = get_user_model().objects.create_user(

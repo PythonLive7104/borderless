@@ -82,6 +82,11 @@ export default function NotifyTab({ orgId }: { orgId: number }) {
   async function markAllRead() {
     await notifyApi.markRead(orgId); load(page);
   }
+  async function removeNote(id: number) {
+    await notifyApi.deleteNote(id);
+    // If we just emptied the page (and it isn't the first), step back one.
+    load(feed && feed.results.length === 1 && page > 1 ? page - 1 : page);
+  }
 
   return (
     <div className="space-y-6">
@@ -148,7 +153,13 @@ export default function NotifyTab({ orgId }: { orgId: number }) {
               <li key={n.id} className={`rounded-xl border px-4 py-3 ${n.read ? "border-line" : "border-brand/30 bg-brand/5"}`}>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold">{n.title}</span>
-                  <span className="shrink-0 text-xs text-fg-dim">{new Date(n.created_at).toLocaleString()}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-fg-dim">{new Date(n.created_at).toLocaleString()}</span>
+                    <button onClick={() => removeNote(n.id)} title="Delete"
+                      className="grid h-6 w-6 place-items-center rounded-md text-fg-dim hover:bg-danger/10 hover:text-danger">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-0.5 whitespace-pre-wrap break-words text-sm text-fg-muted">{n.message}</div>
                 <div className="mt-1 text-[11px] text-fg-dim">{n.channel_name}</div>

@@ -15,6 +15,7 @@ import json
 
 from django.utils import timezone
 from rest_framework import permissions, views
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from . import quota
@@ -70,21 +71,57 @@ def _rate_limited(channel_id) -> bool:
         return False  # never drop a real notification over a Redis hiccup
 
 
+def _fields_to_message(items):
+    """Turn submitted form fields into a readable (title, message).
+
+    Honours the ntfy-style convention first — a `message`/`body` field, with an
+    optional `title` — so an intentional integration controls exactly what shows.
+    Otherwise it's a plain HTML form we don't control the field names of, so each
+    non-empty field is rendered as "name: value", one per line. Either way the
+    viewer sees the VALUES, never the multipart envelope.
+    """
+    d = {}
+    for k, v in items:
+        d.setdefault(k, v)  # first value wins for the message/title lookup
+    title = str(d.get("title") or "")[:MAX_TITLE]
+    body = d.get("message") or d.get("body")
+    if body is not None:
+        return title, str(body)[:MAX_MESSAGE]
+    lines = [f"{k}: {v}" for k, v in items if str(v).strip()]
+    return title, "\n".join(lines)[:MAX_MESSAGE]
+
+
 def _parse(request):
-    """Pull (title, message) from the request, JSON or raw text."""
+    """Pull (title, message) from a POST/PUT body — JSON, a submitted form, or
+    raw text — never the raw multipart envelope."""
     ctype = request.META.get("CONTENT_TYPE", "")
-    raw = request.body or b""
+
     if "application/json" in ctype:
         try:
-            data = json.loads(raw.decode("utf-8", "replace") or "{}")
+            data = json.loads((request.body or b"").decode("utf-8", "replace") or "{}")
         except ValueError:
             return "", ""
         if isinstance(data, dict):
             return (str(data.get("title") or "")[:MAX_TITLE],
                     str(data.get("message") or data.get("body") or "")[:MAX_MESSAGE])
         return "", ""
-    # raw text body
-    return "", raw.decode("utf-8", "replace")[:MAX_MESSAGE]
+
+    if "multipart/form-data" in ctype:
+        # Let DRF's MultiPartParser turn the envelope into fields.
+        items = [(k, str(v)) for k in request.data.keys() for v in request.data.getlist(k)]
+        return _fields_to_message(items)
+
+    if "application/x-www-form-urlencoded" in ctype:
+        raw = (request.body or b"").decode("utf-8", "replace")
+        # `curl -d "just a message"` is urlencoded but has no "=" — treat that as
+        # raw text so the simplest one-liner still works.
+        if "=" in raw:
+            from urllib.parse import parse_qsl
+            return _fields_to_message(parse_qsl(raw, keep_blank_values=True))
+        return "", raw[:MAX_MESSAGE]
+
+    # anything else: raw text body
+    return "", (request.body or b"").decode("utf-8", "replace")[:MAX_MESSAGE]
 
 
 def _parse_query(request):
@@ -101,6 +138,7 @@ def _parse_query(request):
 class NotifyIngestView(views.APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request, key):
         return self._ingest(request, key)

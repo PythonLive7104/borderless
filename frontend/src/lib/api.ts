@@ -612,6 +612,7 @@ export const notifyApi = {
   markRead: (orgId: number, ids?: number[]) =>
     http.post<{ marked: number }>("/notifications/feed/read/",
       { organization: orgId, ...(ids ? { ids } : {}) }),
+  deleteNote: (id: number) => request(`/notifications/feed/${id}/`, { method: "DELETE" }),
   // The publish URL a user pastes into a form/survey. Same origin as the app.
   publishUrl: (key: string) => `${location.origin}/api/v1/notify/${key}/`,
 };

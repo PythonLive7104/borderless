@@ -117,6 +117,20 @@ class UnreadCountView(views.APIView):
             channel__organization_id=org_id, read=False).count()})
 
 
+class NotificationDeleteView(views.APIView):
+    """Delete a single notification the viewer owns."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        note = (Notification.objects
+                .filter(pk=pk, channel__organization_id__in=_member_org_ids(request.user))
+                .first())
+        if not note:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        note.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class MarkReadView(views.APIView):
     """Mark some or all of the workspace's notifications read."""
     permission_classes = [IsAuthenticated, HasWorkspaceAccess]
