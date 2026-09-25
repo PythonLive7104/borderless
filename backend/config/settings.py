@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "apps.links",
     "apps.telegrambot",
     "apps.support",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [

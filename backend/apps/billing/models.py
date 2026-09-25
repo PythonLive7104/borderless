@@ -30,6 +30,11 @@ class Plan(models.Model):
     # ad clicks alone cannot bound usage.
     monthly_ad_clicks = models.BigIntegerField(
         default=0, help_text="Paid ad clicks included per MONTH (0 = unlimited)")
+    # Inbound notification quota (the ntfy-style feed). Paid plans get this many
+    # notifications PER DAY; free/trial workspaces instead get a fixed lifetime
+    # credit allowance (billing.FREE_NOTIFY_CREDITS), not a daily reset.
+    notify_daily_limit = models.BigIntegerField(
+        default=0, help_text="Inbound notifications per DAY on this plan (0 = unlimited)")
     retention_days = models.IntegerField(default=30)
     team_members = models.IntegerField(default=3, help_text="0 = unlimited")
     max_websites = models.IntegerField(default=0, help_text="Domains cap on WEEKLY billing (0 = unlimited)")
@@ -182,6 +187,24 @@ class Subscription(models.Model):
 # limited number of sites/campaigns, and cannot create short links at all.
 TRIAL_MAX_WEBSITES = 1
 TRIAL_MAX_CAMPAIGNS = 1
+
+
+# Free/trial workspaces get a one-off pool of notification credits rather than a
+# daily allowance — enough to try the feature, not to run production traffic on.
+FREE_NOTIFY_CREDITS = 50
+
+
+def notify_quota(organization_id) -> dict:
+    """How the notification meter applies to this workspace.
+
+    Returns {"mode": "daily"|"credits", "limit": int}. Paid+active -> the plan's
+    daily limit (0 = unlimited). Everyone else (trial, lapsed, no sub) -> a
+    lifetime pool of FREE_NOTIFY_CREDITS.
+    """
+    sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
+    if _paid_active(sub):
+        return {"mode": "daily", "limit": sub.plan.notify_daily_limit}
+    return {"mode": "credits", "limit": FREE_NOTIFY_CREDITS}
 
 
 def is_on_trial(organization_id) -> bool:

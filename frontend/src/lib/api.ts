@@ -577,3 +577,37 @@ export interface SystemStatus {
 export const statusApi = {
   get: () => http.get<SystemStatus>("/v1/status/"),
 };
+
+// --- Inbound notifications (ntfy-style) ---
+export interface NotifyChannel {
+  id: number; organization: number; name: string; prefix: string;
+  active: boolean; last_used: string | null; created_at: string;
+}
+export interface NotifyQuota {
+  mode: "daily" | "credits"; limit: number; used: number;
+  remaining: number | null; unlimited: boolean;
+}
+export interface NotifyItem {
+  id: number; channel: number; channel_name: string; title: string;
+  message: string; read: boolean; created_at: string;
+}
+export interface NotifyFeed { results: NotifyItem[]; unread: number; quota: NotifyQuota; }
+
+export const notifyApi = {
+  channels: (orgId: number) =>
+    http.get<NotifyChannel[]>(`/notifications/channels/?organization=${orgId}`),
+  createChannel: (orgId: number, name: string) =>
+    http.post<NotifyChannel & { key: string }>("/notifications/channels/",
+      { organization: orgId, name }),
+  setActive: (id: number, active: boolean) =>
+    request<NotifyChannel>(`/notifications/channels/${id}/`,
+      { method: "PATCH", body: JSON.stringify({ active }) }),
+  deleteChannel: (id: number) =>
+    request(`/notifications/channels/${id}/`, { method: "DELETE" }),
+  feed: (orgId: number) => http.get<NotifyFeed>(`/notifications/feed/?organization=${orgId}`),
+  markRead: (orgId: number, ids?: number[]) =>
+    http.post<{ marked: number }>("/notifications/feed/read/",
+      { organization: orgId, ...(ids ? { ids } : {}) }),
+  // The publish URL a user pastes into a form/survey. Same origin as the app.
+  publishUrl: (key: string) => `${location.origin}/api/v1/notify/${key}/`,
+};

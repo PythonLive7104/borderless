@@ -6,9 +6,10 @@ import Button from "../../components/ui/Button";
 import Field from "../../components/auth/Field";
 import PageNote from "../../components/dashboard/PageNote";
 import TelegramConnect from "../../components/dashboard/TelegramConnect";
+import NotifyTab from "../../components/dashboard/NotifyTab";
 import { useWorkspace } from "../../context/WorkspaceContext";
 
-const TABS = ["Profile", "Security", "Notifications", "Connections"] as const;
+const TABS = ["Profile", "Security", "Notifications", "Notify API", "Connections"] as const;
 type Tab = typeof TABS[number];
 
 const TIMEZONES = ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Africa/Lagos", "Asia/Dubai", "Asia/Singapore"];
@@ -84,6 +85,11 @@ export default function Settings() {
         {tab === "Profile" && <ProfileTab onSaved={() => { refreshUser(); flash("Profile saved."); }} />}
         {tab === "Security" && <SecurityTab onSaved={() => flash("Password updated.")} />}
         {tab === "Notifications" && <NotificationsTab onSaved={() => { refreshUser(); flash("Preferences saved."); }} />}
+        {tab === "Notify API" && (
+          current
+            ? <NotifyTab orgId={current.id} />
+            : <p className="text-sm text-fg-muted">Pick a workspace first.</p>
+        )}
         {tab === "Connections" && (
           current
             ? <TelegramConnect orgId={current.id} />
