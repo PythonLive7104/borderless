@@ -90,6 +90,55 @@ class IngestTest(_Base):
         self.assertFalse(NotifyQuota.objects.filter(organization=self.org).exists())
 
 
+class PruneTest(_Base):
+    def test_history_capped_per_workspace_across_channels(self):
+        """The 500 cap is per workspace, not per channel — two channels can't
+        each keep their own 500. Uses a small cap so the test stays fast."""
+        from unittest.mock import patch
+        from .models import Notification
+        a, _ = self._channel()
+        b, _ = self._channel()
+        # 5 notifications spread across the two channels, oldest first
+        for i in range(5):
+            ch = a if i % 2 == 0 else b
+            Notification.objects.create(channel=ch, title="t", message=f"m{i}")
+        with patch("apps.notifications.ingest.KEEP_PER_ORG", 3):
+            from apps.notifications.ingest import _prune
+            _prune(self.org.id)
+        remaining = list(Notification.objects.order_by("-created_at")
+                         .values_list("message", flat=True))
+        self.assertEqual(remaining, ["m4", "m3", "m2"])  # newest 3 kept, across both channels
+
+
+class ExpiryTest(_Base):
+    def test_write_expires_notifications_older_than_48h(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Notification
+        ch, raw = self._channel()
+        old = Notification.objects.create(channel=ch, title="t", message="old")
+        Notification.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(hours=49))
+        # a fresh publish triggers the sweep
+        self.client.post(f"/api/v1/notify/{raw}/", data="new", content_type="text/plain")
+        msgs = set(Notification.objects.values_list("message", flat=True))
+        self.assertEqual(msgs, {"new"})  # the 49h-old one is gone
+
+    def test_cron_clears_quiet_channels(self):
+        from datetime import timedelta
+        from io import StringIO
+        from django.core.management import call_command
+        from django.utils import timezone
+        from .models import Notification
+        ch, _ = self._channel()
+        keep = Notification.objects.create(channel=ch, title="t", message="recent")
+        gone = Notification.objects.create(channel=ch, title="t", message="stale")
+        Notification.objects.filter(pk=gone.pk).update(
+            created_at=timezone.now() - timedelta(hours=50))
+        call_command("clear_old_notifications", stdout=StringIO())
+        self.assertEqual(list(Notification.objects.values_list("message", flat=True)), ["recent"])
+
+
 class FreeQuotaTest(_Base):
     def test_free_pool_is_fifty_then_blocks(self):
         ch, raw = self._channel()

@@ -52,12 +52,13 @@ export default function NotifyTab({ orgId }: { orgId: number }) {
   const [creating, setCreating] = useState(false);
   const [fresh, setFresh] = useState<(NotifyChannel & { key: string }) | null>(null);
   const [err, setErr] = useState("");
+  const [page, setPage] = useState(1);
 
-  async function load() {
-    const [chs, fd] = await Promise.all([notifyApi.channels(orgId), notifyApi.feed(orgId)]);
-    setChannels(chs); setFeed(fd);
+  async function load(p = page) {
+    const [chs, fd] = await Promise.all([notifyApi.channels(orgId), notifyApi.feed(orgId, p)]);
+    setChannels(chs); setFeed(fd); setPage(fd.page);
   }
-  useEffect(() => { load().catch(() => setErr("Couldn't load your channels.")); /* eslint-disable-next-line */ }, [orgId]);
+  useEffect(() => { load(1).catch(() => setErr("Couldn't load your channels.")); /* eslint-disable-next-line */ }, [orgId]);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -72,14 +73,14 @@ export default function NotifyTab({ orgId }: { orgId: number }) {
   }
 
   async function toggle(ch: NotifyChannel) {
-    await notifyApi.setActive(ch.id, !ch.active); load();
+    await notifyApi.setActive(ch.id, !ch.active); load(page);
   }
   async function remove(ch: NotifyChannel) {
     if (!confirm(`Delete "${ch.name}"? Its publish URL stops working and its history is removed.`)) return;
-    await notifyApi.deleteChannel(ch.id); load();
+    await notifyApi.deleteChannel(ch.id); load(1);
   }
   async function markAllRead() {
-    await notifyApi.markRead(orgId); load();
+    await notifyApi.markRead(orgId); load(page);
   }
 
   return (
@@ -153,6 +154,20 @@ export default function NotifyTab({ orgId }: { orgId: number }) {
               </li>
             ))}
           </ul>
+        )}
+
+        {feed && (feed.has_prev || feed.has_next) && (
+          <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm">
+            <span className="text-fg-dim">
+              Showing {(feed.page - 1) * feed.page_size + 1}–{Math.min(feed.page * feed.page_size, feed.total)} of {feed.total.toLocaleString()}
+            </span>
+            <div className="flex gap-2">
+              <button disabled={!feed.has_prev} onClick={() => load(feed.page - 1)}
+                className="rounded-lg border border-line px-3 py-1.5 font-semibold text-fg disabled:cursor-not-allowed disabled:opacity-40 hover:border-brand/40 hover:text-brand">Previous</button>
+              <button disabled={!feed.has_next} onClick={() => load(feed.page + 1)}
+                className="rounded-lg border border-line px-3 py-1.5 font-semibold text-fg disabled:cursor-not-allowed disabled:opacity-40 hover:border-brand/40 hover:text-brand">Next</button>
+            </div>
+          </div>
         )}
       </div>
     </div>

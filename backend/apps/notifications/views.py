@@ -69,22 +69,39 @@ class NotifyChannelViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+PAGE_SIZE = 50
+
+
 class FeedView(views.APIView):
-    """Recent notifications for the workspace, newest first."""
+    """A page of the workspace's notifications, newest first.
+
+    50 per page so the settings tab stays short; unread and quota are
+    workspace-wide totals, unaffected by which page you're on.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         org_id = _org_from_request(request)
         if org_id is None or int(org_id) not in set(_member_org_ids(request.user)):
             return Response({"detail": "Not a member."}, status=403)
-        notes = (Notification.objects
-                 .filter(channel__organization_id=org_id)
-                 .select_related("channel")[:100])
+
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+        except (TypeError, ValueError):
+            page = 1
+        base = Notification.objects.filter(channel__organization_id=org_id)
+        total = base.count()
+        start = (page - 1) * PAGE_SIZE
+        notes = base.select_related("channel")[start:start + PAGE_SIZE]
         return Response({
             "results": NotificationSerializer(notes, many=True).data,
-            "unread": Notification.objects.filter(
-                channel__organization_id=org_id, read=False).count(),
+            "unread": base.filter(read=False).count(),
             "quota": quota.status(org_id),
+            "page": page,
+            "page_size": PAGE_SIZE,
+            "total": total,
+            "has_next": start + PAGE_SIZE < total,
+            "has_prev": page > 1,
         })
 
 

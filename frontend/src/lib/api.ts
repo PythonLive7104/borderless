@@ -591,7 +591,10 @@ export interface NotifyItem {
   id: number; channel: number; channel_name: string; title: string;
   message: string; read: boolean; created_at: string;
 }
-export interface NotifyFeed { results: NotifyItem[]; unread: number; quota: NotifyQuota; }
+export interface NotifyFeed {
+  results: NotifyItem[]; unread: number; quota: NotifyQuota;
+  page: number; page_size: number; total: number; has_next: boolean; has_prev: boolean;
+}
 
 export const notifyApi = {
   channels: (orgId: number) =>
@@ -604,7 +607,7 @@ export const notifyApi = {
       { method: "PATCH", body: JSON.stringify({ active }) }),
   deleteChannel: (id: number) =>
     request(`/notifications/channels/${id}/`, { method: "DELETE" }),
-  feed: (orgId: number) => http.get<NotifyFeed>(`/notifications/feed/?organization=${orgId}`),
+  feed: (orgId: number, page = 1) => http.get<NotifyFeed>(`/notifications/feed/?organization=${orgId}&page=${page}`),
   unreadCount: (orgId: number) => http.get<{ unread: number }>(`/notifications/unread-count/?organization=${orgId}`),
   markRead: (orgId: number, ids?: number[]) =>
     http.post<{ marked: number }>("/notifications/feed/read/",

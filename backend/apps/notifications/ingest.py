@@ -19,9 +19,13 @@ from .models import Notification, NotifyChannel, sha256
 
 MAX_MESSAGE = 4000
 MAX_TITLE = 200
-# Keep a channel's history bounded so a runaway publisher can't grow the table
-# without limit. Oldest rows fall off; the feed only ever shows recent activity.
-KEEP_PER_CHANNEL = 500
+# Two retention rules, applied together on every publish (and by a cron for
+# channels that go quiet):
+#   - keep at most KEEP_PER_ORG per WORKSPACE, oldest dropped first
+#   - drop anything older than MAX_AGE_HOURS regardless of count
+# The feed is a short-lived "what just happened", not an archive.
+KEEP_PER_ORG = 100
+MAX_AGE_HOURS = 48
 
 RL_LIMIT = 60      # publishes
 RL_WINDOW = 60     # per minute, per channel
@@ -108,14 +112,28 @@ class NotifyIngestView(views.APIView):
             source_ip=_client_ip(request) or None,
         )
         NotifyChannel.objects.filter(pk=channel.pk).update(last_used=timezone.now())
-        _prune(channel.id)
+        _prune(channel.organization_id)
+        _expire(channel.organization_id)
         return Response({"ok": True, "id": note.id}, status=200)
 
 
-def _prune(channel_id):
-    """Trim a channel to its most recent KEEP_PER_CHANNEL notifications."""
-    ids = list(Notification.objects.filter(channel_id=channel_id)
+def _prune(organization_id):
+    """Trim a workspace to its most recent KEEP_PER_ORG notifications, across
+    every channel it owns."""
+    ids = list(Notification.objects
+               .filter(channel__organization_id=organization_id)
                .order_by("-created_at")
-               .values_list("id", flat=True)[KEEP_PER_CHANNEL:KEEP_PER_CHANNEL + 200])
+               .values_list("id", flat=True)[KEEP_PER_ORG:KEEP_PER_ORG + 200])
     if ids:
         Notification.objects.filter(id__in=ids).delete()
+
+
+def _expire(organization_id):
+    """Delete this workspace's notifications older than MAX_AGE_HOURS."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+    cutoff = timezone.now() - timedelta(hours=MAX_AGE_HOURS)
+    (Notification.objects
+     .filter(channel__organization_id=organization_id, created_at__lt=cutoff)
+     .delete())
