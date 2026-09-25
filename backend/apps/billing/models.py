@@ -31,8 +31,8 @@ class Plan(models.Model):
     monthly_ad_clicks = models.BigIntegerField(
         default=0, help_text="Paid ad clicks included per MONTH (0 = unlimited)")
     # Inbound notification quota (the ntfy-style feed). Paid plans get this many
-    # notifications PER DAY; free/trial workspaces instead get a fixed lifetime
-    # credit allowance (billing.FREE_NOTIFY_CREDITS), not a daily reset.
+    # notifications PER DAY; free/trial workspaces get billing.FREE_NOTIFY_DAILY
+    # per day instead.
     notify_daily_limit = models.BigIntegerField(
         default=0, help_text="Inbound notifications per DAY on this plan (0 = unlimited)")
     retention_days = models.IntegerField(default=30)
@@ -189,22 +189,21 @@ TRIAL_MAX_WEBSITES = 1
 TRIAL_MAX_CAMPAIGNS = 1
 
 
-# Free/trial workspaces get a one-off pool of notification credits rather than a
-# daily allowance — enough to try the feature, not to run production traffic on.
-FREE_NOTIFY_CREDITS = 50
+# Free/trial workspaces get a daily notification allowance, same mechanism as
+# paid plans — just a smaller number that resets each day.
+FREE_NOTIFY_DAILY = 500
 
 
 def notify_quota(organization_id) -> dict:
-    """How the notification meter applies to this workspace.
+    """The notification allowance for this workspace, per day.
 
-    Returns {"mode": "daily"|"credits", "limit": int}. Paid+active -> the plan's
-    daily limit (0 = unlimited). Everyone else (trial, lapsed, no sub) -> a
-    lifetime pool of FREE_NOTIFY_CREDITS.
+    Returns {"mode": "daily", "limit": int}. Paid+active -> the plan's daily
+    limit (0 = unlimited). Everyone else (trial, lapsed, no sub) -> FREE_NOTIFY_DAILY.
     """
     sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
     if _paid_active(sub):
         return {"mode": "daily", "limit": sub.plan.notify_daily_limit}
-    return {"mode": "credits", "limit": FREE_NOTIFY_CREDITS}
+    return {"mode": "daily", "limit": FREE_NOTIFY_DAILY}
 
 
 def is_on_trial(organization_id) -> bool:

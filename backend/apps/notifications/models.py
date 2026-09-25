@@ -62,12 +62,10 @@ class Notification(models.Model):
 class NotifyQuota(models.Model):
     """Per-workspace notification usage counters.
 
-    Two meters share one row so a single read tells the whole story:
-      - credits_used: lifetime, for free/trial workspaces (a 50-credit pool)
-      - day / day_used: today's count, for paid workspaces on a daily limit
-    Which one applies is decided by the plan at consume time (billing.notify_quota),
-    but both are always tracked so an upgrade or downgrade needs no migration of
-    counters — the relevant meter is simply the one that gets read.
+    Every workspace is on a daily allowance, so day / day_used is the live
+    meter: today's count, reset at local midnight. credits_used is a legacy
+    column from an earlier lifetime-pool design, kept to avoid a migration and
+    no longer read.
     """
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE,
                                          related_name="notify_quota")

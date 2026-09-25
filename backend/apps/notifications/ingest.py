@@ -4,9 +4,12 @@ Deliberately not behind bearer auth — the secret is the URL, exactly like an
 ntfy topic, so it drops straight into a form action, a survey webhook, or a
 `curl` from someone else's server with nothing else to configure.
 
-Accepts either a raw text body or JSON {"message", "title"}. The message is the
-only required part; the title falls back to the channel name so the feed always
-has a heading.
+Accepts POST, PUT or GET. POST/PUT take a raw text body or JSON
+{"message", "title"}; GET takes ?message= (or ?m=) and ?title= (or ?t=), so a
+tool that can only fire a GET — a link, an uptime ping, a webhook that won't do
+POST — can still publish. The message is the only required part, and on a bare
+GET it defaults to a trigger note so even a pinged link records something. The
+title falls back to the channel name so the feed always has a heading.
 """
 import json
 
@@ -29,6 +32,22 @@ MAX_AGE_HOURS = 48
 
 RL_LIMIT = 60      # publishes
 RL_WINDOW = 60     # per minute, per channel
+
+# The whole point is publishing from a customer's own form/site, which is
+# cross-origin, so the browser needs these. The key in the URL is the auth, so
+# allowing any origin is intended (same posture as ntfy and our /v1/collect).
+CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+}
+
+
+def _cors(response):
+    for k, v in CORS.items():
+        response[k] = v
+    return response
 
 
 def _client_ip(request):
@@ -68,6 +87,17 @@ def _parse(request):
     return "", raw.decode("utf-8", "replace")[:MAX_MESSAGE]
 
 
+def _parse_query(request):
+    """(title, message) from the query string, for GET publishes. A bare GET
+    with no message still records — the point is often just 'this link was hit'."""
+    q = request.query_params
+    title = (q.get("title") or q.get("t") or "")[:MAX_TITLE]
+    message = (q.get("message") or q.get("m") or "").strip()[:MAX_MESSAGE]
+    if not message:
+        message = "Notification triggered"
+    return title, message
+
+
 class NotifyIngestView(views.APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
@@ -78,7 +108,18 @@ class NotifyIngestView(views.APIView):
     def put(self, request, key):
         return self._ingest(request, key)
 
+    def get(self, request, key):
+        return self._ingest(request, key)
+
+    def options(self, request, *args, **kwargs):
+        # Preflight for a cross-origin JSON POST. No body, just the headers.
+        from rest_framework.response import Response as _R
+        return _cors(_R(status=204))
+
     def _ingest(self, request, key):
+        return _cors(self._do(request, key))
+
+    def _do(self, request, key):
         channel = NotifyChannel.objects.filter(key_hash=sha256(key), active=True).first()
         if not channel:
             # Same response whether the key is unknown, revoked or paused — a
@@ -90,7 +131,10 @@ class NotifyIngestView(views.APIView):
             return Response({"ok": False, "error": "Too many notifications — slow down."},
                             status=429)
 
-        title, message = _parse(request)
+        if request.method == "GET":
+            title, message = _parse_query(request)
+        else:
+            title, message = _parse(request)
         message = (message or "").strip()
         if not message:
             return Response({"ok": False, "error": "Send a message (raw text or JSON message field)."},

@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.billing.models import FREE_NOTIFY_CREDITS, Plan, Subscription
+from apps.billing.models import FREE_NOTIFY_DAILY, Plan, Subscription
 from apps.organizations.models import create_workspace
 
 from .models import Notification, NotifyChannel, NotifyQuota
@@ -66,10 +66,42 @@ class IngestTest(_Base):
         n = Notification.objects.get()
         self.assertEqual((n.title, n.message), ("New lead", "jane@acme.co"))
 
+    def test_cors_headers_allow_browser_publishing(self):
+        """Forms publish via cross-origin fetch(), so the response must carry
+        Access-Control-Allow-Origin or the browser blocks it."""
+        ch, raw = self._channel()
+        r = self.client.post(f"/api/v1/notify/{raw}/", data="hi", content_type="text/plain")
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+
+    def test_options_preflight_is_allowed(self):
+        ch, raw = self._channel()
+        r = self.client.options(f"/api/v1/notify/{raw}/")
+        self.assertIn(r.status_code, (200, 204))
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+        self.assertIn("POST", r["Access-Control-Allow-Methods"])
+
     def test_put_also_works(self):
         ch, raw = self._channel()
         r = self.client.put(f"/api/v1/notify/{raw}/", data="via PUT", content_type="text/plain")
         self.assertEqual(r.status_code, 200)
+
+    def test_get_publishes_with_query_message(self):
+        ch, raw = self._channel()
+        r = self.client.get(f"/api/v1/notify/{raw}/?message=Ping%20from%20link&title=Uptime")
+        self.assertEqual(r.status_code, 200)
+        n = Notification.objects.get()
+        self.assertEqual((n.title, n.message), ("Uptime", "Ping from link"))
+
+    def test_bare_get_still_records_a_trigger(self):
+        ch, raw = self._channel()
+        r = self.client.get(f"/api/v1/notify/{raw}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Notification.objects.get().message, "Notification triggered")
+
+    def test_get_short_alias_m(self):
+        ch, raw = self._channel()
+        self.client.get(f"/api/v1/notify/{raw}/?m=hi")
+        self.assertEqual(Notification.objects.get().message, "hi")
 
     def test_unknown_key_is_404_and_stores_nothing(self):
         r = self.client.post("/api/v1/notify/ntk_nope/", data="x", content_type="text/plain")
@@ -140,24 +172,25 @@ class ExpiryTest(_Base):
 
 
 class FreeQuotaTest(_Base):
-    def test_free_pool_is_fifty_then_blocks(self):
-        ch, raw = self._channel()
-        for i in range(FREE_NOTIFY_CREDITS):
-            _clear_rl(ch.id)
-            self.assertEqual(
-                self.client.post(f"/api/v1/notify/{raw}/", data=f"m{i}",
-                                 content_type="text/plain").status_code, 200)
-        _clear_rl(ch.id)
-        r = self.client.post(f"/api/v1/notify/{raw}/", data="one too many",
-                             content_type="text/plain")
-        self.assertEqual(r.status_code, 429)
-        self.assertEqual(Notification.objects.count(), FREE_NOTIFY_CREDITS)
+    def test_free_gets_a_daily_allowance(self):
+        from . import quota
+        st = quota.status(self.org.id)
+        self.assertEqual(st["mode"], "daily")
+        self.assertEqual(st["limit"], FREE_NOTIFY_DAILY)
 
-    def test_credits_are_shared_across_a_workspaces_channels(self):
-        """The 50 is per workspace, not per channel — two channels can't each
-        get their own pool."""
+    def test_free_daily_limit_blocks_once_reached(self):
+        from django.utils import timezone
+        NotifyQuota.objects.create(organization=self.org,
+                                   day=timezone.localdate(), day_used=FREE_NOTIFY_DAILY)
+        ch, raw = self._channel()
+        r = self.client.post(f"/api/v1/notify/{raw}/", data="over", content_type="text/plain")
+        self.assertEqual(r.status_code, 429)
+
+    def test_free_allowance_is_per_workspace_across_channels(self):
+        from django.utils import timezone
         a, ra = self._channel()
-        NotifyQuota.objects.create(organization=self.org, credits_used=FREE_NOTIFY_CREDITS)
+        NotifyQuota.objects.create(organization=self.org,
+                                   day=timezone.localdate(), day_used=FREE_NOTIFY_DAILY)
         b, rb = self._channel()
         _clear_rl(b.id)
         r = self.client.post(f"/api/v1/notify/{rb}/", data="x", content_type="text/plain")
@@ -209,7 +242,7 @@ class ChannelManagementTest(_Base):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.json()["results"]), 1)
         self.assertEqual(r.json()["unread"], 1)
-        self.assertEqual(r.json()["quota"]["mode"], "credits")
+        self.assertEqual(r.json()["quota"]["mode"], "daily")
 
     def test_mark_read(self):
         ch, raw = self._channel()
