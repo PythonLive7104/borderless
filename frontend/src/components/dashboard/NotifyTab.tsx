@@ -97,15 +97,16 @@ export default function NotifyTab({ orgId }: { orgId: number }) {
 
         {err && <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{err}</p>}
 
-        {fresh
-          ? <div className="mt-4"><NewKeyCard ch={fresh} onDone={() => setFresh(null)} /></div>
-          : (
-            <form onSubmit={create} className="mt-4 flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Contact form leads" className={input} maxLength={120} />
-              <Button type="submit" disabled={creating}>{creating ? "Creating…" : "Create channel"}</Button>
-            </form>
-          )}
+        {/* The one-time key card sits ABOVE the form, not in place of it, so it's
+            always obvious you can create another channel. */}
+        {fresh && <div className="mt-4"><NewKeyCard ch={fresh} onDone={() => setFresh(null)} /></div>}
+
+        <form onSubmit={create} className="mt-4 flex gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Contact form leads, Survey replies…" className={input} maxLength={120} />
+          <Button type="submit" disabled={creating}>{creating ? "Creating…" : "Create channel"}</Button>
+        </form>
+        <p className="mt-2 text-xs text-fg-dim">Create as many channels as you like — one per form, survey or source you want to track separately.</p>
 
         {channels.length > 0 && (
           <div className="mt-5 divide-y divide-line rounded-xl border border-line">
