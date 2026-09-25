@@ -168,6 +168,21 @@ class ChannelManagementTest(_Base):
         self.c.post("/api/notifications/feed/read/", {"organization": self.org.id}, format="json")
         self.assertEqual(Notification.objects.filter(read=False).count(), 0)
 
+    def test_unread_count_endpoint(self):
+        ch, raw = self._channel()
+        self.client.post(f"/api/v1/notify/{raw}/", data="a", content_type="text/plain")
+        self.client.post(f"/api/v1/notify/{raw}/", data="b", content_type="text/plain")
+        r = self.c.get(f"/api/notifications/unread-count/?organization={self.org.id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["unread"], 2)
+
+    def test_unread_count_zero_for_non_member(self):
+        other = get_user_model().objects.create_user(
+            username="x@ex.com", email="x@ex.com", password="testpass123")
+        oc = APIClient(); oc.force_authenticate(user=other)
+        r = oc.get(f"/api/notifications/unread-count/?organization={self.org.id}")
+        self.assertEqual(r.json()["unread"], 0)
+
     def test_another_workspace_cannot_read_the_feed(self):
         other = get_user_model().objects.create_user(
             username="o@ex.com", email="o@ex.com", password="testpass123")

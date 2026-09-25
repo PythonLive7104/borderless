@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useTour } from "../../context/TourContext";
 import { authApi, type NotificationPrefs } from "../../lib/api";
@@ -41,7 +42,10 @@ export default function Settings() {
   const { user, refreshUser } = useAuth();
   const { current } = useWorkspace();
   const { startTour } = useTour();
-  const [tab, setTab] = useState<Tab>("Profile");
+  const [params] = useSearchParams();
+  // Deep-link support: the nav bell sends ?tab=notify here.
+  const initialTab: Tab = params.get("tab") === "notify" ? "Notify API" : "Profile";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [toast, setToast] = useState("");
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2500); };
   const initials = ((user?.first_name?.[0] || "") + (user?.last_name?.[0] || "")).toUpperCase() || (user?.email?.[0] || "?").toUpperCase();

@@ -605,6 +605,7 @@ export const notifyApi = {
   deleteChannel: (id: number) =>
     request(`/notifications/channels/${id}/`, { method: "DELETE" }),
   feed: (orgId: number) => http.get<NotifyFeed>(`/notifications/feed/?organization=${orgId}`),
+  unreadCount: (orgId: number) => http.get<{ unread: number }>(`/notifications/unread-count/?organization=${orgId}`),
   markRead: (orgId: number, ids?: number[]) =>
     http.post<{ marked: number }>("/notifications/feed/read/",
       { organization: orgId, ...(ids ? { ids } : {}) }),

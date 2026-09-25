@@ -3,6 +3,7 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import Logo from "../marketing/Logo";
 import Button from "../ui/Button";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
+import NotifyBell from "./NotifyBell";
 import HelpChat from "./HelpChat";
 import AccessGate from "./AccessGate";
 import CommandPalette from "./CommandPalette";
@@ -120,6 +121,7 @@ export default function DashboardLayout() {
               </button>
             </div>
             <div className="flex items-center gap-3 text-sm">
+              <NotifyBell />
               {user?.is_staff && <Link to="/admin" className="rounded-lg bg-navy-900 px-3 py-1.5 font-semibold text-white hover:opacity-90">Admin</Link>}
               <span className="hidden text-fg-muted sm:block">{user?.email}</span>
               <Button variant="outline" onClick={logout}>Sign out</Button>

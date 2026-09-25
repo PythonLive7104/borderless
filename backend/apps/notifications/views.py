@@ -88,6 +88,18 @@ class FeedView(views.APIView):
         })
 
 
+class UnreadCountView(views.APIView):
+    """Just the number, for the nav bell — cheap enough to poll."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        org_id = _org_from_request(request)
+        if org_id is None or int(org_id) not in set(_member_org_ids(request.user)):
+            return Response({"unread": 0})
+        return Response({"unread": Notification.objects.filter(
+            channel__organization_id=org_id, read=False).count()})
+
+
 class MarkReadView(views.APIView):
     """Mark some or all of the workspace's notifications read."""
     permission_classes = [IsAuthenticated, HasWorkspaceAccess]
