@@ -25,10 +25,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // (timeout, 5xx). Only a definitive 401 (invalid session) should log the
     // user out — everything else is retried so a blip doesn't sign them out.
     for (let attempt = 0; attempt < 3; attempt++) {
+      const ctrl = new AbortController();
+      const timeoutId = window.setTimeout(() => ctrl.abort(), 2500);
       try {
-        setUser(await authApi.me());
+        const result = await authApi.me(ctrl.signal);
+        setUser(result);
         return;
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          setUser(null);
+          return;
+        }
         if (e instanceof ApiError && e.status === 401) {
           setUser(null); tokens.clear(); return;
         }
@@ -36,6 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Out of retries on a transient error: keep the tokens so the next
         // navigation can recover, but we can't confirm the user right now.
         setUser(null); return;
+      } finally {
+        window.clearTimeout(timeoutId);
       }
     }
   }

@@ -44,6 +44,32 @@ async function raw(path: string, opts: RequestInit & { auth?: boolean } = {}): P
   return fetch(`/api${path}`, { ...opts, headers });
 }
 
+async function timeoutFetch<T>(promise: Promise<T>, signal: AbortSignal, timeoutMs = 2500): Promise<T> {
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+  return await new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      signal.throwIfAborted?.();
+      reject(new DOMException("Timed out", "TimeoutError"));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+
+    signal.addEventListener("abort", () => {
+      window.clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
 // Single-flight refresh: many requests can 401 at once (e.g. on a hard
 // refresh that fires several calls in parallel). We coalesce them into ONE
 // refresh call and share its result, so we never stampede the endpoint.
@@ -76,11 +102,11 @@ function refreshAccess(): Promise<boolean> {
 }
 
 async function request<T = any>(path: string, opts: RequestInit & { auth?: boolean } = {}): Promise<T> {
-  let res = await raw(path, opts);
+  let res = await raw(path, { ...opts, signal: opts.signal });
   // transparent refresh on 401
   if (res.status === 401 && tokens.refresh && opts.auth !== false) {
     if (await refreshAccess()) {
-      res = await raw(path, opts);
+      res = await raw(path, { ...opts, signal: opts.signal });
     }
   }
   const text = await res.text();
@@ -104,11 +130,11 @@ async function request<T = any>(path: string, opts: RequestInit & { auth?: boole
 const ACCESS_EXPIRED_RE = /access period has ended/i;
 
 export const http = {
-  get: <T = any>(p: string) => request<T>(p),
-  post: <T = any>(p: string, body?: any, auth = true) =>
-    request<T>(p, { method: "POST", body: body ? JSON.stringify(body) : undefined, auth }),
-  patch: <T = any>(p: string, body?: any) => request<T>(p, { method: "PATCH", body: JSON.stringify(body) }),
-  del: <T = any>(p: string) => request<T>(p, { method: "DELETE" }),
+  get: <T = any>(p: string, signal?: AbortSignal) => request<T>(p, { signal }),
+  post: <T = any>(p: string, body?: any, auth = true, signal?: AbortSignal) =>
+    request<T>(p, { method: "POST", body: body ? JSON.stringify(body) : undefined, auth, signal }),
+  patch: <T = any>(p: string, body?: any, signal?: AbortSignal) => request<T>(p, { method: "PATCH", body: JSON.stringify(body), signal }),
+  del: <T = any>(p: string, signal?: AbortSignal) => request<T>(p, { method: "DELETE", signal }),
 };
 
 // ---- typed auth calls ----
@@ -116,18 +142,18 @@ export interface NotificationPrefs { email: boolean; high_risk: boolean; usage: 
 export interface User { id: number; email: string; first_name: string; last_name: string; is_verified: boolean; is_staff: boolean; timezone: string; language: string; notification_prefs: NotificationPrefs; }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    http.post<{ access: string; refresh: string }>("/auth/token/", { email, password }, false),
-  register: (payload: { first_name: string; last_name: string; email: string; password: string }) =>
-    http.post<User>("/auth/register/", payload, false),
-  me: () => http.get<User>("/auth/me/"),
-  forgotPassword: (email: string) => http.post("/auth/password/forgot/", { email }, false),
-  resetPassword: (token: string, password: string) => http.post("/auth/password/reset/", { token, password }, false),
-  verifyEmail: (token: string) => http.post("/auth/email/verify/", { token }, false),
-  resendVerification: () => http.post<{ detail: string }>("/auth/email/resend/", {}),
-  updateProfile: (patch: Partial<User>) => http.patch<User>("/auth/me/", patch),
-  changePassword: (current_password: string, new_password: string) =>
-    http.post("/auth/password/change/", { current_password, new_password }),
+  login: (email: string, password: string, signal?: AbortSignal) =>
+    http.post<{ access: string; refresh: string }>("/auth/token/", { email, password }, false, signal),
+  register: (payload: { first_name: string; last_name: string; email: string; password: string }, signal?: AbortSignal) =>
+    http.post<User>("/auth/register/", payload, false, signal),
+  me: (signal?: AbortSignal) => http.get<User>("/auth/me/", signal),
+  forgotPassword: (email: string, signal?: AbortSignal) => http.post("/auth/password/forgot/", { email }, false, signal),
+  resetPassword: (token: string, password: string, signal?: AbortSignal) => http.post("/auth/password/reset/", { token, password }, false, signal),
+  verifyEmail: (token: string, signal?: AbortSignal) => http.post("/auth/email/verify/", { token }, false, signal),
+  resendVerification: (signal?: AbortSignal) => http.post<{ detail: string }>("/auth/email/resend/", {}, true, signal),
+  updateProfile: (patch: Partial<User>, signal?: AbortSignal) => http.patch<User>("/auth/me/", patch, signal),
+  changePassword: (current_password: string, new_password: string, signal?: AbortSignal) =>
+    http.post("/auth/password/change/", { current_password, new_password }, true, signal),
 };
 
 // ---- organizations ----
@@ -136,18 +162,18 @@ export interface Organization { id: number; name: string; slug: string; role: Ro
 export interface Member { id: number; email: string; first_name: string; last_name: string; role: Role; created_at: string; }
 
 export const orgApi = {
-  list: () => http.get<{ results: Organization[] } | Organization[]>("/organizations/"),
-  create: (name: string) => http.post<Organization>("/organizations/", { name }),
-  update: (id: number, patch: Partial<Organization>) => http.patch<Organization>(`/organizations/${id}/`, patch),
-  members: (orgId: number) => http.get<{ results: Member[] }>(`/organizations/${orgId}/members/`),
-  invite: (orgId: number, email: string, role: Role) =>
-    http.post(`/organizations/${orgId}/invitations/`, { email, role }),
-  changeRole: (orgId: number, memberId: number, role: Role) =>
-    http.patch(`/organizations/${orgId}/members/${memberId}/`, { role }),
-  removeMember: (orgId: number, memberId: number) =>
-    http.del(`/organizations/${orgId}/members/${memberId}/`),
-  acceptInvite: (token: string) => http.post("/organizations/invitations/accept/", { token }),
-  invitations: (orgId: number) => http.get<{ results: Invitation[] } | Invitation[]>(`/organizations/${orgId}/invitations/`),
+  list: (signal?: AbortSignal) => http.get<{ results: Organization[] } | Organization[]>("/organizations/", signal),
+  create: (name: string, signal?: AbortSignal) => http.post<Organization>("/organizations/", { name }, true, signal),
+  update: (id: number, patch: Partial<Organization>, signal?: AbortSignal) => http.patch<Organization>(`/organizations/${id}/`, patch, signal),
+  members: (orgId: number, signal?: AbortSignal) => http.get<{ results: Member[] }>(`/organizations/${orgId}/members/`, signal),
+  invite: (orgId: number, email: string, role: Role, signal?: AbortSignal) =>
+    http.post(`/organizations/${orgId}/invitations/`, { email, role }, true, signal),
+  changeRole: (orgId: number, memberId: number, role: Role, signal?: AbortSignal) =>
+    http.patch(`/organizations/${orgId}/members/${memberId}/`, { role }, signal),
+  removeMember: (orgId: number, memberId: number, signal?: AbortSignal) =>
+    http.del(`/organizations/${orgId}/members/${memberId}/`, signal),
+  acceptInvite: (token: string, signal?: AbortSignal) => http.post("/organizations/invitations/accept/", { token }, true, signal),
+  invitations: (orgId: number, signal?: AbortSignal) => http.get<{ results: Invitation[] } | Invitation[]>(`/organizations/${orgId}/invitations/`, signal),
 };
 export interface Invitation { id: number; email: string; role: Role; created_at: string; accepted_at: string | null; pending: boolean; }
 

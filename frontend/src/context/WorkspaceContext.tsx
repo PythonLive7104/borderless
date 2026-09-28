@@ -24,12 +24,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   async function reload() {
     if (!user) { setOrgs([]); setLoading(false); return; }
     setLoading(true);
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 2500);
     try {
-      const res = await orgApi.list();
+      const res = await orgApi.list(ctrl.signal);
       const list = Array.isArray(res) ? res : res.results;
       setOrgs(list);
       setCurrentId((prev) => (list.find((o) => o.id === prev) ? prev : list[0]?.id ?? null));
-    } finally { setLoading(false); }
+    } catch {
+      setOrgs([]);
+    } finally {
+      window.clearTimeout(timer);
+      setLoading(false);
+    }
   }
 
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [user]);
