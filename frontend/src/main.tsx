@@ -2,9 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { initAnalytics } from "./lib/analytics";
+import { initAnalytics, storedConsent } from "./lib/analytics";
 
-initAnalytics(); // Google tag (no-op unless VITE_GA_ID / VITE_GADS_ID set)
+if (storedConsent() === "granted") initAnalytics();
 const root = document.getElementById("root")!;
 const app = (
   <React.StrictMode>

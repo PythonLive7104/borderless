@@ -42,22 +42,19 @@ export function storedConsent(): "granted" | "denied" | null {
   }
 }
 
-/** Load the Google tag once, in the browser, only if an id is configured. */
+/** Load the Google tag once, in the browser, only if an id is configured and
+ *  the visitor has consented. */
 export function initAnalytics() {
   if (started || typeof window === "undefined") return;
   const primary = GA_ID || GADS_ID;
   if (!primary) return;
+  if (storedConsent() !== "granted") return;
   started = true;
 
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() { window.dataLayer!.push(arguments); };
 
-  // Consent defaults MUST be set before the tag loads, or the first hits go out
-  // under the wrong assumption and cannot be taken back. Default to denied for
-  // everyone rather than geo-gating: it's the safer default under UK GDPR and
-  // PECR, and it keeps one code path instead of two.
-  const prior = storedConsent();
-  const state = prior === "granted" ? "granted" : "denied";
+  const state = "granted";
   push("consent", "default", {
     ad_storage: state,
     ad_user_data: state,
@@ -80,8 +77,14 @@ export function initAnalytics() {
 /** Record the visitor's choice and tell Google about it. */
 export function setConsent(granted: boolean) {
   try { localStorage.setItem(CONSENT_KEY, granted ? "granted" : "denied"); } catch { /* ignore */ }
-  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
-  const state = granted ? "granted" : "denied";
+  if (!granted) return;
+
+  if (typeof window === "undefined") return;
+  if (!window.gtag) {
+    initAnalytics();
+    return;
+  }
+  const state = "granted";
   window.gtag("consent", "update", {
     ad_storage: state,
     ad_user_data: state,
