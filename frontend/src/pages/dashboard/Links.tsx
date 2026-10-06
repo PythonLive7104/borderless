@@ -466,7 +466,7 @@ export default function Links() {
         or nothing). Destinations are <b>scanned for malware/phishing</b> and unsafe links are auto-disabled.
       </PageNote>
 
-      <HelpVideo id="63562736a0f84abcb8a88c2a811d0b18"
+      <HelpVideo name="redirection" minutes="2 min"
         title="How to create and protect a redirect" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

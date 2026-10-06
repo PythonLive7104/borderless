@@ -134,7 +134,7 @@ export default function TrafficRules() {
   return (
     <div>
       <PageNote id="traffic-rules">Rules act for you automatically. Example: “if a visitor is on mobile from Nigeria → block”. Pick what to check and what should happen. Rules run top to bottom and the <b>first match wins</b>. Use <b>IP allow/deny</b> to hard-block or always-allow specific addresses.</PageNote>
-      <HelpVideo id="d4bee6dfb1a4450ca558a2e44e7b352f"
+      <HelpVideo name="traffic-rules" minutes="4 min"
         title="How to set up a Traffic Rule" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

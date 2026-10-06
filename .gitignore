@@ -36,3 +36,10 @@ celerybeat-schedule*
 .vscode/
 *.swp
 pgdata/
+
+# --- Walkthrough video masters ---
+# Raw screen recordings, kept out of the repo: what ships is the encoded set in
+# frontend/public/videos/, produced from here by frontend/scripts/encode-videos.sh.
+# Committing both would carry the same footage twice, the masters being the
+# larger copy. Keep these in cloud storage so a walkthrough can be re-encoded.
+/videos/

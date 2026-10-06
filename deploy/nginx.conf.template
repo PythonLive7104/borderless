@@ -77,6 +77,18 @@ server {
         add_header Cache-Control "public, immutable";
         include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
     }
+    # Walkthrough videos. These need their own location for the 404: the
+    # catch-all below ends in `/_shell.html`, so a missing or misspelled video
+    # would answer 200 with the SPA shell, and the <video> element would report
+    # only a generic decode failure with no hint that the file isn't there.
+    # Filenames are stable (no content hash), so a month rather than /assets/'s
+    # immutable year — long enough that nobody re-downloads megabytes on a
+    # second visit, short enough that a re-recorded walkthrough rolls out.
+    location /videos/ {
+        root /usr/share/nginx/html; expires 30d;
+        add_header Cache-Control "public";
+        include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
+    }
     # Marketing routes resolve to their own pre-rendered index.html, reached by
     # naming index.html directly rather than via $uri/. The difference matters:
     # $uri/ makes nginx 301 "/pricing" -> "/pricing/", but the sitemap and every

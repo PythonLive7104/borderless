@@ -30,8 +30,9 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 # loading scripts from embed.tawk.to. It also needs style-src and font-src —
 # with those missing the widget connects (the visitor appears in the Tawk
 # dashboard) but never paints, which looks like the chat button vanishing.
-# frame-src carries Loom, which hosts the in-app walkthrough videos —
-# without it the player renders as an empty box with nothing to explain why.
+# The walkthrough videos used to be Loom embeds and needed a frame-src entry;
+# they are now plain <video> files served from our own /videos/, covered by the
+# media-src 'self' at the end of this line. Nothing to add for them here.
 # 'unsafe-inline' is required for both script and style: the Tawk widget
 # injects inline script at runtime, and the challenge/decoy pages the engine
 # serves are self-contained with inline <style>. img-src allows any https so
@@ -43,4 +44,4 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 # so listing that host under connect-src alone is not enough — it has to be in
 # script-src too. Verify in DevTools > Network: a (blocked:csp) row under the
 # gtag script means a conversion that will never arrive in Google Ads.
-add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https://tawk.to https://*.tawk.to; style-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to; script-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google-analytics.com; connect-src 'self' https://tawk.to https://*.tawk.to wss://tawk.to wss://*.tawk.to https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://stats.g.doubleclick.net; frame-src 'self' https://tawk.to https://*.tawk.to https://www.loom.com https://td.doubleclick.net https://www.googletagmanager.com; worker-src 'self' blob:; media-src 'self' https://tawk.to https://*.tawk.to" always;
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https://tawk.to https://*.tawk.to; style-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to; script-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google-analytics.com; connect-src 'self' https://tawk.to https://*.tawk.to wss://tawk.to wss://*.tawk.to https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://stats.g.doubleclick.net; frame-src 'self' https://tawk.to https://*.tawk.to https://td.doubleclick.net https://www.googletagmanager.com; worker-src 'self' blob:; media-src 'self' https://tawk.to https://*.tawk.to" always;

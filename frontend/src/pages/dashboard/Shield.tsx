@@ -329,7 +329,7 @@ export default function Shield() {
         <b>ready to paste</b> — your site ID is already in it, so there's <b>no key and nothing to edit</b>.
       </PageNote>
 
-      <HelpVideo id="9fc48277f5d3408a9595600d77f9bfa0"
+      <HelpVideo name="shield" minutes="2 min"
         title="How to set up the server-side Shield" />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
