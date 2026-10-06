@@ -160,8 +160,9 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
               <Button onClick={() => buy()} disabled={busy}>
                 {busy ? "Starting…" : `Get another private domain · $${price}/mo`}
               </Button>
-              {priv.available === 0 && <span className="text-xs text-fg-dim">None in stock right now — tell us the one you want and we'll register it.</span>}
-              <RequestDomain variant="ghost" className="!px-0 text-xs" />
+              {/* The button above opens the picker, which is where asking for a
+                  specific name lives — so this stays a plain statement. */}
+              {priv.available === 0 && <span className="text-xs text-fg-dim">None in stock right now — ask and we'll source one.</span>}
               {msg && <span className="text-xs text-red-600">{msg}</span>}
             </div>
           )}
@@ -174,8 +175,8 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
               Shared domains work well, but you're on them alongside other customers. A private
               domain is used by you and nobody else{perDomainCap > 0 ? ` — and adds ${perDomainCap} more redirects on top of your shared domain` : " — and gives you a full set of redirects on your plan"}.{" "}
               {priv.available > 0
-                ? <><b>{priv.available}</b> available right now — or tell us the exact name you want and we'll register it within {SOURCING_HOURS} hours.</>
-                : <>None in stock at the moment — tell us the name you want and we'll register it within {SOURCING_HOURS} hours.</>}
+                ? <><b>{priv.available}</b> available right now.</>
+                : <>None in stock at the moment — ask and we&apos;ll source one.</>}
             </p>
           </div>
           {canManage && (
@@ -183,10 +184,6 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
               <Button onClick={() => buy()} disabled={busy} className={busy ? "" : "cta-glow"}>
                 {busy ? "Starting…" : `Get a private domain · $${price}/mo`}
               </Button>
-              {/* Secondary on purpose. Someone with a name already in mind is
-                  further along than a browser, but they are the smaller group —
-                  giving this equal weight would compete with the paid CTA. */}
-              <RequestDomain variant="ghost" className="!px-0 text-xs" />
               {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
             </div>
           )}

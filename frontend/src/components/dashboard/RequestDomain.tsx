@@ -19,6 +19,10 @@ export const SOURCING_HOURS = 6;
  * wall: the copy said "ask and we'll source one" without saying where to ask,
  * so the only path was to leave the dashboard and find the contact page.
  *
+ * Used only inside the domain picker, deliberately. The picker is the first
+ * place anyone can know the list disappoints them, and keeping it off the card
+ * leaves that card a single paid CTA with nothing competing against it.
+ *
  * This posts to the same public contact endpoint as the marketing form, so the
  * request lands in the one inbox and admin list the team already works from
  * (apps/support). No new backend, no second place to check — and because that
@@ -87,7 +91,7 @@ export default function RequestDomain({ label, variant = "outline", className }:
   return (
     <>
       <Button variant={variant} className={className} onClick={() => setOpen(true)}>
-        {label ?? "Want a different domain? Ask us →"}
+        {label ?? "Ask for a specific domain"}
       </Button>
 
       <Modal open={open} onClose={close} title="Tell us the domain you want">
