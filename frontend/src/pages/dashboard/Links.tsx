@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import HelpVideo from "../../components/dashboard/HelpVideo";
 import CustomDomainPanel from "../../components/dashboard/CustomDomainPanel";
+import RequestDomain, { SOURCING_HOURS } from "../../components/dashboard/RequestDomain";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { linkApi, websiteApi, billingApi, type ChallengeStyle, type PrivateDomains, type ShortDomain, type ShortLink, type BotAction, type Website, type Subscription } from "../../lib/api";
 import { useLivePoll } from "../../lib/useLivePoll";
@@ -159,7 +160,8 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
               <Button onClick={() => buy()} disabled={busy}>
                 {busy ? "Starting…" : `Get another private domain · $${price}/mo`}
               </Button>
-              {priv.available === 0 && <span className="text-xs text-fg-dim">None in stock right now — ask and we'll source one.</span>}
+              {priv.available === 0 && <span className="text-xs text-fg-dim">None in stock right now — tell us the one you want and we'll register it.</span>}
+              <RequestDomain variant="ghost" className="!px-0 text-xs" />
               {msg && <span className="text-xs text-red-600">{msg}</span>}
             </div>
           )}
@@ -172,8 +174,8 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
               Shared domains work well, but you're on them alongside other customers. A private
               domain is used by you and nobody else{perDomainCap > 0 ? ` — and adds ${perDomainCap} more redirects on top of your shared domain` : " — and gives you a full set of redirects on your plan"}.{" "}
               {priv.available > 0
-                ? <><b>{priv.available}</b> available right now.</>
-                : <>None in stock at the moment — ask and we'll source one.</>}
+                ? <><b>{priv.available}</b> available right now — or tell us the exact name you want and we'll register it within {SOURCING_HOURS} hours.</>
+                : <>None in stock at the moment — tell us the name you want and we'll register it within {SOURCING_HOURS} hours.</>}
             </p>
           </div>
           {canManage && (
@@ -181,6 +183,10 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
               <Button onClick={() => buy()} disabled={busy} className={busy ? "" : "cta-glow"}>
                 {busy ? "Starting…" : `Get a private domain · $${price}/mo`}
               </Button>
+              {/* Secondary on purpose. Someone with a name already in mind is
+                  further along than a browser, but they are the smaller group —
+                  giving this equal weight would compete with the paid CTA. */}
+              <RequestDomain variant="ghost" className="!px-0 text-xs" />
               {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
             </div>
           )}
@@ -198,9 +204,15 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
         </p>
 
         {stock.length === 0 ? (
-          <p className="mt-4 text-sm text-fg-muted">
-            None in stock right now. Ask us and we&apos;ll source one — you won&apos;t be charged until it&apos;s ready.
-          </p>
+          <div className="mt-4">
+            <p className="text-sm text-fg-muted">
+              None in stock right now — but tell us the name you want and we&apos;ll register it for
+              you, normally within {SOURCING_HOURS} hours. You won&apos;t be charged until it&apos;s ready.
+            </p>
+            <div className="mt-3">
+              <RequestDomain variant="primary" label="Tell us the domain you want →" />
+            </div>
+          </div>
         ) : (
           <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
             {stock.map((d) => (
@@ -223,6 +235,18 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
                 </span>
               </label>
             ))}
+          </div>
+        )}
+
+        {/* The exit for someone who has read the list and wants none of it. It
+            belongs here, next to the list that just disappointed them, rather
+            than only on the card they have already clicked past. */}
+        {stock.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-soft px-3 py-2.5">
+            <span className="text-xs text-fg-muted">
+              None of these? We&apos;ll register the exact name you want, usually within {SOURCING_HOURS} hours.
+            </span>
+            <RequestDomain variant="outline" label="Ask for a specific domain" className="!py-1.5 text-xs" />
           </div>
         )}
 
