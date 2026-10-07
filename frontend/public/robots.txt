@@ -2,6 +2,13 @@
 # The marketing site is open to crawlers. Everything behind a login, the API,
 # and the bot-handling pages are not: they are per-visitor responses with no
 # search value, and indexing a decoy page would be actively misleading.
+#
+# /login and /signup are deliberately NOT listed. They are linked from every
+# page, so disallowing them only made Search Console report them as "blocked by
+# robots.txt" forever — a block it can never validate away, because nothing is
+# broken. Keeping them crawlable lets Google read the <meta name="robots"
+# content="noindex"> that the SPA shell already serves, which is what actually
+# keeps a page out of the index. A page has to be crawlable to be told noindex.
 
 User-agent: *
 Allow: /$
@@ -9,8 +16,6 @@ Disallow: /dashboard/
 Disallow: /admin/
 Disallow: /api/
 Disallow: /l/
-Disallow: /login
-Disallow: /signup
 Disallow: /reset-password/
 Disallow: /verify-email
 Disallow: /accept-invite

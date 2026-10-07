@@ -5,18 +5,21 @@
 resolver 127.0.0.11 valid=10s ipv6=off;
 
 # Port 80: serve the ACME (Let's Encrypt) challenge, redirect everything else to HTTPS.
+# The redirect targets ${DOMAIN} rather than $host on purpose: $host preserved
+# the "www." a visitor typed, so http://www/x took two hops to reach the canonical
+# URL and Googlebot saw www as a live host of its own.
 server {
     listen 80;
     server_name ${DOMAIN} www.${DOMAIN};
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
-    location / { return 301 https://$host$request_uri; }
+    location / { return 301 https://${DOMAIN}$request_uri; }
 }
 
 # Port 443: TLS terminates here; serve the SPA and reverse-proxy the app.
 server {
     listen 443 ssl;
     http2 on;
-    server_name ${DOMAIN} www.${DOMAIN};
+    server_name ${DOMAIN};
     client_max_body_size 2m;
 
     ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
@@ -89,6 +92,28 @@ server {
         add_header Cache-Control "public";
         include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
     }
+    # Client-rendered routes (dashboard, auth, abuse) have no pre-rendered file,
+    # so they must answer 200 with the blank SPA shell — NOT the landing page, so
+    # a hard refresh doesn't flash the landing markup before React routes to the
+    # real page. They are listed by name because the catch-all below now answers
+    # a real 404 for anything it cannot resolve, and without this these routes
+    # would 404 on a hard refresh.
+    #
+    # /admin is matched exactly rather than folded into the regex: a regex
+    # location outranks a prefix one, so "admin" inside the regex would steal
+    # /admin/ from the Django proxy above and take the Django admin offline.
+    # The shell carries <meta name="robots" content="noindex">, which is what
+    # keeps these out of the index now that they are crawlable.
+    #
+    # KEEP IN SYNC with frontend/src/AppRoutes.tsx: this is every top-level route
+    # there that scripts/prerender.mjs does NOT pre-render. A new client-only
+    # route added there and not added here will 404 on a hard refresh.
+    location ~ ^/(dashboard|login|signup|forgot-password|reset-password|verify-email|accept-invite|abuse)(/|$) {
+        root /usr/share/nginx/html;
+        try_files /_shell.html =404;
+    }
+    location = /admin { root /usr/share/nginx/html; try_files /_shell.html =404; }
+
     # Marketing routes resolve to their own pre-rendered index.html, reached by
     # naming index.html directly rather than via $uri/. The difference matters:
     # $uri/ makes nginx 301 "/pricing" -> "/pricing/", but the sitemap and every
@@ -96,8 +121,69 @@ server {
     # for every page, landing on a URL whose canonical pointed back at that
     # redirect, and indexing none of it. $uri/index.html serves the page at the
     # canonical URL with a plain 200.
-    # Everything else (dashboard/admin/auth — not pre-rendered) falls back to the
-    # blank SPA shell, NOT the landing page, so a hard refresh doesn't flash the
-    # landing markup before React routes to the real page.
-    location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/index.html /_shell.html; }
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # One page, one URL. "/pricing/" used to serve the same bytes as
+        # "/pricing" with a 200, so every page had a slashed twin for Google to
+        # crawl and file as a duplicate. Collapse it onto the unslashed, apex
+        # form the sitemap and the canonical tags already use. "$uri" is the
+        # normalised path, and "^(.+)/$" cannot match "/" itself — the capture
+        # needs at least one character ahead of the slash — so the homepage is
+        # left alone. `if` is safe here: `return` is one of the two directives
+        # it is actually reliable with.
+        if ($uri ~ "^(.+)/$") { return 301 https://${DOMAIN}$1$is_args$args; }
+
+        # A URL the site does not have has to say so. This used to fall back to
+        # /_shell.html, which answered 200 for every typo, dead inbound link and
+        # probe — a soft 404, which Google reports against the site and which
+        # manufactures an unlimited supply of duplicate URLs all serving the same
+        # shell. The routes that genuinely need the shell are matched above;
+        # anything still unresolved here is really missing.
+        try_files $uri $uri/index.html =404;
+    }
+
+    # Branded 404 body, served with a real 404 status (it is noindex,nofollow
+    # itself, and robots.txt keeps it out of the index at its own URL). Upstream
+    # 404s from the proxied locations are untouched: proxy_intercept_errors is
+    # off, so they pass through with their own body.
+    #
+    # NOT `internal`: customers can point a traffic rule at /not-found.html as a
+    # block action (frontend ruleFields.tsx), so the decision engine has to be
+    # able to serve it as a direct, externally-reachable response.
+    error_page 404 /not-found.html;
+    location = /not-found.html { root /usr/share/nginx/html; }
+}
+
+# Port 443, www: one host serves the site, and it is the bare domain. This block
+# used to be folded into the one above via `server_name ${DOMAIN} www.${DOMAIN}`,
+# which answered 200 on both — so every page existed at two URLs, Google crawled
+# both, and the www copy landed in Search Console as "alternate page with proper
+# canonical tag". The canonical tag was being obeyed; it just should never have
+# had a second URL to resolve. The certificate covers both names, so the
+# handshake completes here and the redirect is what the client actually sees.
+# It is placed last on purpose: the first :443 block is nginx's default server
+# for an unmatched Host, and that should stay the apex, as it was before.
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name www.${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1h;
+
+    # Empty unless ORIGIN_CLOUDFLARE_ONLY is set (deploy/originlock.sh).
+    include /etc/nginx/originlock.inc;
+    include /etc/nginx/security-headers.inc;
+
+    # Renewal has to keep working on this name too: the cert covers www, so
+    # certbot may be challenged here, and a 301 would fail the challenge.
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://${DOMAIN}$request_uri; }
 }
