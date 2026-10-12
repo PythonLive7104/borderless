@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useLivePoll } from "../../lib/useLivePoll";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar,
@@ -14,6 +15,7 @@ import { analyticsApi, type Overview as OverviewT } from "../../lib/api";
 import RangeTabs from "../../components/dashboard/RangeTabs";
 import StatCard from "../../components/dashboard/StatCard";
 import NoData from "../../components/dashboard/NoData";
+import LiveScore from "../../components/marketing/LiveScore";
 
 const CLASS_COLORS: Record<string, string> = {
   human: "#16a34a", suspicious: "#d97706", bot: "#ea580c", fraud: "#dc2626",
@@ -79,7 +81,25 @@ export default function Overview() {
           )}
 
           {!hasData ? (
-            <div className="card shadow-soft mt-6"><NoData msg="No traffic in this range yet. Install your tracking snippet to start receiving data." /></div>
+            /* A brand-new workspace has no traffic yet, and an empty dashboard
+               on day one is where trials die — the product looks broken when it
+               is simply waiting. Scoring the user's own visit proves the engine
+               works before any of their traffic arrives. */
+            <div className="mt-6 grid gap-5 lg:grid-cols-[1.1fr_1fr]">
+              <div className="card shadow-soft grid place-items-center p-8 text-center">
+                <div>
+                  <h3 className="font-bold">Waiting for your first visitor</h3>
+                  <p className="mx-auto mt-2 max-w-sm text-sm text-fg-muted">
+                    Add your tracking snippet and open a page on your site — traffic shows up here within seconds.
+                  </p>
+                  <Link to="/dashboard/websites"
+                    className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                    Get my snippet →
+                  </Link>
+                </div>
+              </div>
+              <LiveScore ctaTo="/dashboard/scanner" ctaLabel="Scan my website →" />
+            </div>
           ) : (
             <div className="mt-6 grid gap-5 lg:grid-cols-2">
               <Panel title="Visitors over time">

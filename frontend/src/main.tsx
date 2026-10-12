@@ -3,8 +3,10 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { initAnalytics, storedConsent } from "./lib/analytics";
+import { initSelfTracker } from "./lib/selfTracker";
 
 if (storedConsent() === "granted") initAnalytics();
+initSelfTracker(); // we run our own bot protection on trynobot.com
 const root = document.getElementById("root")!;
 const app = (
   <React.StrictMode>

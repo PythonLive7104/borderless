@@ -107,6 +107,7 @@ func main() {
 	mux.HandleFunc("/bl.js", serveTracker)
 	mux.HandleFunc("/v1/collect", h.collect)
 	mux.HandleFunc("/v1/decide", h.decide)
+	mux.HandleFunc("/v1/preview", h.preview)
 	mux.HandleFunc("/v1/guard", h.guard)
 	mux.HandleFunc("/v1/edge-click", h.edgeClick)
 	mux.HandleFunc("/v1/challenge", h.challenge)

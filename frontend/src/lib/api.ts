@@ -600,6 +600,42 @@ export const botCheckApi = {
     http.post<{ ok: boolean; error?: string }>("/v1/bot-check/lead/", p, false),
 };
 
+// ---- live visitor preview (the "score me" demo) ----
+// Served by the Go engine at the ORIGIN ROOT, not under /api like Django's
+// endpoints — so it deliberately bypasses the http client's /api prefix.
+export interface PreviewSignal { code: string; label: string; good: boolean; }
+export interface PreviewVisitor {
+  ip: string; country: string; device: string;
+  browser: string; browser_version: string; os: string; os_version: string;
+  language: string; connection: string; isp: string; asn: string;
+  is_vpn: boolean; is_proxy: boolean; is_datacenter: boolean;
+  is_crawler: boolean; crawler_kind: string; has_ja3: boolean;
+}
+export interface PreviewResult {
+  score: number;
+  classification: "human" | "suspicious" | "bot" | "fraud";
+  confidence: number;
+  signals: PreviewSignal[];
+  visitor: PreviewVisitor;
+  took_ms: number;
+}
+
+export const previewApi = {
+  /** Score the current visitor. `fp`/`bh` are optional client signals; without
+   *  a fingerprint the engine correctly treats the caller as "no JS", so the
+   *  panel always sends one. */
+  me: async (body?: { fp?: unknown; bh?: unknown }, signal?: AbortSignal): Promise<PreviewResult> => {
+    const res = await fetch("/v1/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+      signal,
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return res.json();
+  },
+};
+
 export const contactApi = {
   send: (p: { name: string; email: string; company?: string; message: string }) =>
     http.post<{ ok: boolean; error?: string }>("/v1/contact/", p, false),

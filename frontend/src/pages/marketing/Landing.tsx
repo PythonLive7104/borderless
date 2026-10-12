@@ -1,5 +1,6 @@
 import { useSeo } from "../../lib/seo";
 import { useCta } from "../../lib/useCta";
+import LiveScore from "../../components/marketing/LiveScore";
 import { useReveal } from "../../lib/useReveal";
 import Button from "../../components/ui/Button";
 import { Section, SectionHead } from "../../components/ui/Section";
@@ -106,6 +107,17 @@ export default function Landing() {
           <div id="demo" className="fade-up lg:pl-4"><DashboardPreview /></div>
         </div>
       </section>
+
+      {/* LIVE SCORE — the product demonstrating itself on the reader.
+          Placed immediately after the hero because it is the fastest proof we
+          have that any of the claims above are real: no signup, no input, ~2s. */}
+      <Section className="!py-14">
+        <div className="mx-auto max-w-2xl">
+          <SectionHead eyebrow="Live" title="See it work on yourself"
+            sub="You are a visitor. Here's exactly what our engine sees — scored in real time, nothing stored." />
+          <div className="mt-8"><LiveScore /></div>
+        </div>
+      </Section>
 
       {/* LOGO STRIP */}
       <div className="border-b border-line bg-white"><LogoStrip /></div>
