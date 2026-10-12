@@ -203,7 +203,13 @@ export const websiteApi = {
   remove: (id: number) => http.del(`/websites/${id}/`),
   verify: (id: number) => http.post<{ status: WebsiteStatus; live_state: WebsiteState; installed: boolean; snippet_state?: "found" | "missing" | "unreachable" | "no_url"; checked_url?: string; message: string; last_event_at: string | null }>(`/websites/${id}/verify/`),
   checkSafeBrowsing: (id: number) => http.post<{ enabled: boolean; flagged?: boolean; threats?: string[]; checked_at?: string | null; message: string }>(`/websites/${id}/check-safebrowsing/`),
-  verifyShield: (id: number) => http.post<{ active: boolean; last_check_at: string | null; message: string }>(`/websites/${id}/verify-shield/`),
+  /** `expecting` says which install the user is looking at: the server-side
+   *  Shield, or the browser tracker (the only option on a static host). Without
+   *  it a correct single-HTML install is reported as a failure. */
+  verifyShield: (id: number, expecting: "server" | "browser" = "server") =>
+    http.post<{ active: boolean; mode: "server" | "browser" | "none"; server_active: boolean;
+                browser_active: boolean; last_check_at: string | null; message: string }>(
+      `/websites/${id}/verify-shield/`, { expecting }),
 };
 
 // ---- short links ----

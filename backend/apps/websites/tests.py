@@ -270,3 +270,83 @@ class StrictModeTest(TestCase):
         self.assertEqual(r.status_code, 403, r.content)
         self.site.refresh_from_db()
         self.assertFalse(self.site.strict_mode)
+
+
+class VerifyShieldTest(TestCase):
+    """Verification has to recognise BOTH installs.
+
+    Regression: it only looked for type='server_check', which the server-side
+    Shield emits. The browser install — the only option for a plain .html file
+    on a host that runs no code — emits pageviews and never produces one. So
+    anyone who correctly followed the "Single HTML file" instructions was told
+    their install had failed, and the suggested fix (install the server-side
+    Shield) was something a static host cannot do.
+    """
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        self.user = get_user_model().objects.create_user(
+            username="owner@shield.example", email="owner@shield.example",
+            password="testpass123")
+        self.org = create_workspace(self.user, "Shield Co")
+        self.site = Website.objects.create(organization=self.org, name="s",
+                                           domain="shield.example")
+        self.c = APIClient()
+        self.c.force_authenticate(user=self.user)
+
+    def _event(self, type_):
+        from apps.traffic.models import Visitor, Session, TrafficEvent
+        v = Visitor.objects.create(website=self.site, visitor_id=f"v-{type_}")
+        s = Session.objects.create(website=self.site, visitor=v, session_id=f"s-{type_}")
+        return TrafficEvent.objects.create(website=self.site, visitor=v, session=s,
+                                           type=type_, created_at=timezone.now())
+
+    def _verify(self, expecting):
+        r = self.c.post(f"/api/websites/{self.site.id}/verify-shield/",
+                        {"expecting": expecting}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        return r.json()
+
+    def test_single_html_install_is_reported_as_working(self):
+        # THE regression. Tracker events only, user is on the Single HTML tab.
+        self._event("pageview")
+        body = self._verify("browser")
+        self.assertTrue(body["active"], "a correct single-HTML install was reported as failed")
+        self.assertEqual(body["mode"], "browser")
+        self.assertNotIn("Shield snippet", body["message"],
+                         "told a static-host user to install something they cannot install")
+
+    def test_server_install_still_verifies(self):
+        self._event("server_check")
+        body = self._verify("server")
+        self.assertTrue(body["active"])
+        self.assertEqual(body["mode"], "server")
+
+    def test_a_failed_server_install_is_not_papered_over(self):
+        # Tracker working but they were aiming for the server-side Shield: that
+        # is a real failure and must still read as one, or they would believe
+        # they had protection they do not have.
+        self._event("pageview")
+        body = self._verify("server")
+        self.assertFalse(body["active"])
+        self.assertTrue(body["browser_active"])
+        self.assertFalse(body["server_active"])
+
+    def test_server_checks_satisfy_the_browser_question_too(self):
+        # A server-side install is strictly stronger; don't report it as missing.
+        self._event("server_check")
+        body = self._verify("browser")
+        self.assertTrue(body["active"])
+        self.assertEqual(body["mode"], "server")
+
+    def test_nothing_installed_reads_as_nothing(self):
+        for expecting in ("server", "browser"):
+            body = self._verify(expecting)
+            self.assertFalse(body["active"])
+            self.assertEqual(body["mode"], "none")
+
+    def test_defaults_to_server_when_not_told(self):
+        # Older clients that don't send `expecting` keep the strict behaviour.
+        self._event("pageview")
+        r = self.c.post(f"/api/websites/{self.site.id}/verify-shield/", {}, format="json")
+        self.assertFalse(r.json()["active"])

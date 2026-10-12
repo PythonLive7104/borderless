@@ -149,15 +149,57 @@ class WebsiteViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="verify-shield")
     def verify_shield(self, request, pk=None):
-        """Report server-side Shield status. Active once the site's server/edge has
-        called /v1/decide or /v1/guard (those emit type='server_check' events)."""
+        """Report how this site is protected: server-side, in the browser, or not yet.
+
+        There are two legitimate installs and they look nothing alike here. The
+        server-side Shield calls /v1/decide or /v1/guard and emits
+        type='server_check'. The browser install — the only option for a plain
+        .html file on a host that runs no code — is the tracker, which emits
+        pageviews through /v1/collect and never produces a server_check.
+
+        Reporting only the first meant anyone following the "Single HTML file"
+        instructions was told their install had failed when it was working, with
+        the fix being something they cannot do on a static host. So both are
+        reported, and the caller says which one it was aiming for.
+        """
         w = self.get_object()
         from apps.traffic.models import TrafficEvent
-        ev = TrafficEvent.objects.filter(website=w, type="server_check").order_by("-created_at").first()
-        active = ev is not None
+        events = TrafficEvent.objects.filter(website=w)
+        server_ev = events.filter(type="server_check").order_by("-created_at").first()
+        browser_ev = events.exclude(type="server_check").order_by("-created_at").first()
+
+        # What the caller installed, so the message answers the right question.
+        # Defaults to "server" — the stricter reading, and what every tab other
+        # than the single-HTML one is aiming for.
+        expecting = request.data.get("expecting") or "server"
+
+        if server_ev:
+            mode, message = "server", (
+                "Shield is working — we're receiving server-side checks from your site.")
+        elif browser_ev and expecting == "browser":
+            mode, message = "browser", (
+                "Working — we're checking visitors in the browser. Bots that run a real "
+                "browser are stopped; a scraper that ignores JavaScript still receives your "
+                "HTML. That's the limit of a static host, not a problem with your install.")
+        elif browser_ev:
+            mode, message = "browser", (
+                "Your tracking snippet is working, but no server-side checks have arrived "
+                "yet. If you meant to install the Shield on your server, it isn't running "
+                "— open a page on your site and check again. If your host can't run code, "
+                "use the Single HTML file tab instead; that's the strongest option there.")
+        else:
+            mode, message = "none", (
+                "Nothing has reached us from this site yet. Install a snippet above, then "
+                "open a page on your site and check again.")
+
+        latest = server_ev or browser_ev
         return Response({
-            "active": active,
-            "last_check_at": ev.created_at if ev else None,
-            "message": "Shield is working — we're receiving server-side checks from your site." if active
-                       else "No server-side checks yet. Make sure the Shield snippet (not just the tracking snippet) is installed, then open a page on your site.",
+            # `active` stays "is this install doing what the caller wanted", so the
+            # UI's success/pending styling keeps working unchanged.
+            "active": mode == "server" or (mode == "browser" and expecting == "browser"),
+            "mode": mode,
+            "server_active": server_ev is not None,
+            "browser_active": browser_ev is not None,
+            "last_check_at": latest.created_at if latest else None,
+            "message": message,
         })

@@ -382,7 +382,9 @@ export default function Shield() {
     if (!site) return;
     setVerifying(true); setVerifyMsg(null);
     try {
-      const r = await websiteApi.verifyShield(site.id);
+      // The single-HTML install is the browser tracker, not a server-side
+      // check — verifying it against /v1/decide would always report failure.
+      const r = await websiteApi.verifyShield(site.id, tab === "static" ? "browser" : "server");
       setVerifyMsg({ ok: r.active, text: r.message });
     } catch { setVerifyMsg({ ok: false, text: "Couldn't check right now — please try again." }); }
     finally { setVerifying(false); }
@@ -509,7 +511,11 @@ export default function Shield() {
       <div className="card shadow-soft mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold">Check the Shield is working</div>
-          <div className="text-xs text-fg-muted">Once installed, open any page on your site in a browser, then click Verify — we'll confirm your server is calling the Shield.</div>
+          <div className="text-xs text-fg-muted">
+            {tab === "static"
+              ? "Once installed, open any page on your site in a browser, then click Verify — we'll confirm we're seeing visitors from it."
+              : "Once installed, open any page on your site in a browser, then click Verify — we'll confirm your server is calling the Shield."}
+          </div>
         </div>
         <Button onClick={verifyShield} disabled={verifying || !siteId}>{verifying ? "Checking…" : "Verify Shield"}</Button>
         {verifyMsg && (
