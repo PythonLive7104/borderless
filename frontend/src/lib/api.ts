@@ -186,6 +186,9 @@ export interface Website {
   id: number; organization: number; name: string; domain: string; url: string;
   tracking_id: string; status: WebsiteStatus; live_state: WebsiteState;
   last_event_at: string | null;
+  /** Hide the page until the verdict lands, so a blocked visitor never sees
+   *  content. Emits data-strict="1" in the snippet. */
+  strict_mode: boolean;
   safe_browsing_flagged: boolean; safe_browsing_threats: string[];
   safe_browsing_checked_at: string | null;
   created_at: string; snippet: string;

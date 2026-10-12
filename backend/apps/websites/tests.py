@@ -200,3 +200,73 @@ class SnippetCheckTest(TestCase):
             r = self._verify()
         probe.assert_not_called()
         self.assertTrue(r.json()["installed"])
+
+
+class StrictModeTest(TestCase):
+    """Strict mode is the only protection a plain HTML page on a static host
+    gets, and it is now switchable from the dashboard — so the API has to accept
+    the change and the snippet has to actually reflect it."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="owner@strict.example", email="owner@strict.example",
+            password="testpass123")
+        self.org = create_workspace(self.user, "Strict Co")
+        self.site = Website.objects.create(organization=self.org, name="s",
+                                           domain="strict.example")
+        from rest_framework.test import APIClient
+        self.c = APIClient()
+        self.c.force_authenticate(user=self.user)
+
+    def _snippet(self):
+        from apps.websites.serializers import WebsiteSerializer
+        self.site.refresh_from_db()
+        return WebsiteSerializer(self.site).data["snippet"]
+
+    def test_off_by_default_so_existing_sites_are_unchanged(self):
+        self.assertFalse(self.site.strict_mode)
+        self.assertIn("async", self._snippet())
+        self.assertNotIn("data-strict", self._snippet())
+
+    def test_strict_snippet_drops_async_and_adds_the_flag(self):
+        # async can't hide the page before it paints, which is the whole point.
+        self.site.strict_mode = True
+        self.site.save(update_fields=["strict_mode"])
+        snippet = self._snippet()
+        self.assertIn('data-strict="1"', snippet)
+        self.assertNotIn("async", snippet)
+        self.assertIn(self.site.tracking_id, snippet)
+
+    def test_an_owner_can_turn_it_on_through_the_api(self):
+        # What the new dashboard toggle does.
+        r = self.c.patch(f"/api/websites/{self.site.id}/",
+                              {"strict_mode": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.site.refresh_from_db()
+        self.assertTrue(self.site.strict_mode)
+        self.assertIn('data-strict="1"', r.json()["snippet"])
+
+    def test_it_can_be_turned_back_off(self):
+        self.site.strict_mode = True
+        self.site.save(update_fields=["strict_mode"])
+        r = self.c.patch(f"/api/websites/{self.site.id}/",
+                              {"strict_mode": False}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.site.refresh_from_db()
+        self.assertFalse(self.site.strict_mode)
+
+    def test_an_analyst_cannot_flip_it(self):
+        from rest_framework.test import APIClient
+        from apps.organizations.models import OrganizationMember, Role
+        other = get_user_model().objects.create_user(
+            username="analyst@strict.example", email="analyst@strict.example",
+            password="testpass123")
+        OrganizationMember.objects.create(organization=self.org, user=other,
+                                          role=Role.ANALYST)
+        c = APIClient()
+        c.force_authenticate(user=other)
+        r = c.patch(f"/api/websites/{self.site.id}/",
+                              {"strict_mode": True}, format="json")
+        self.assertEqual(r.status_code, 403, r.content)
+        self.site.refresh_from_db()
+        self.assertFalse(self.site.strict_mode)

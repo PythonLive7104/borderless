@@ -72,6 +72,7 @@ export default function WebsiteDetail() {
   const [copied, setCopied] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [savingStrict, setSavingStrict] = useState(false);
 
   async function load() { setSite(await websiteApi.get(Number(id))); }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -80,6 +81,18 @@ export default function WebsiteDetail() {
     if (!site) return;
     navigator.clipboard?.writeText(site.snippet);
     setCopied(true); setTimeout(() => setCopied(false), 1800);
+  }
+
+  // The snippet itself changes with this setting (strict drops `async`, adds
+  // data-strict), so reload from the server rather than patching it locally —
+  // the server is what decides what the snippet says.
+  async function toggleStrict() {
+    if (!site || savingStrict) return;
+    setSavingStrict(true);
+    try {
+      await websiteApi.update(site.id, { strict_mode: !site.strict_mode });
+      await load();
+    } finally { setSavingStrict(false); }
   }
 
   async function verify() {
@@ -122,6 +135,29 @@ export default function WebsiteDetail() {
             </div>
             <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed text-slate-200"><code>{site.snippet}</code></pre>
           </div>
+
+          {/* Strict mode. Matters most for a plain HTML page on a host that
+              can't run the server-side Shield: this is the only thing standing
+              between a blocked visitor and the content. */}
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-bg-soft p-4">
+            <input type="checkbox" checked={site.strict_mode} onChange={toggleStrict}
+              disabled={savingStrict} className="mt-0.5 h-4 w-4 accent-brand" />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">
+                Hide the page until the visitor is checked
+                {savingStrict && <span className="ml-2 text-xs font-normal text-fg-muted">saving…</span>}
+              </span>
+              <span className="mt-1 block text-xs text-fg-muted">
+                Without this, a blocked visitor sees your content for a moment before the check finishes.
+                With it the page stays blank until the verdict lands — and always reveals after 1.2s, so a
+                slow check can never leave a real visitor staring at nothing.
+                {" "}Turn it on if you can't install the{" "}
+                <Link to="/dashboard/shield" className="font-semibold underline">Shield</Link>{" "}
+                on your server. Note it runs in the browser, so it can't stop a scraper that ignores JavaScript.
+              </span>
+            </span>
+          </label>
+
           <div className="mt-4 flex items-center gap-3">
             <Button onClick={verify}>{verifying ? "Checking…" : "Verify installation"}</Button>
             {verifyMsg && (

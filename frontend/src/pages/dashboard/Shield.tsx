@@ -12,8 +12,9 @@ const HOST = typeof window !== "undefined" ? window.location.hostname : "trynobo
 const ENDPOINT = ORIGIN + "/v1/decide";
 const GUARD = ORIGIN + "/v1/guard";
 
-type Lang = "php" | "cpanel" | "django" | "nginx" | "pages" | "cloudflare" | "node" | "curl";
+type Lang = "static" | "php" | "cpanel" | "django" | "nginx" | "pages" | "cloudflare" | "node" | "curl";
 const TABS: { id: Lang; label: string }[] = [
+  { id: "static", label: "Single HTML file" },
   { id: "cpanel", label: "cPanel / Apache" },
   { id: "php", label: "PHP" },
   { id: "django", label: "Python / Django" },
@@ -27,6 +28,18 @@ const TABS: { id: Lang; label: string }[] = [
 // Plain-English, step-by-step install help for non-technical users — shown when
 // they click "How do I install this?" under the snippet.
 const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
+  static: {
+    title: "Protect a plain HTML page (works on any host — no server needed)",
+    steps: [
+      "Use this when you just upload an .html file and have no way to run code on the server — GitHub Pages, Netlify, Vercel, S3, or any host where you only drop files.",
+      "Open the .html file and paste the line above inside <head>, as early as you can — ideally the first thing after <head>.",
+      "Save and re-upload. Your site ID is already filled in — there's nothing to edit.",
+      "That's it. The page stays hidden until we've checked the visitor; bots get an “Access denied” page instead of your content, and a Redirect rule sends them wherever you chose.",
+      "IMPORTANT — what this can and can't do: it runs in the visitor's browser, so it stops automation that drives a real browser (headless Chrome, Puppeteer, Selenium — most paid-click fraud). It does NOT stop a scraper that ignores JavaScript: your HTML is already sent before we can check anything, so curl and python-requests still receive it.",
+      "If the content must never reach a bot at all, you need a host that runs code — any cPanel plan does. Use the cPanel / Apache tab instead; it shields .html files without renaming them.",
+      "On cPanel but told PHP isn't allowed? Then this tab is still your best option.",
+    ],
+  },
   cpanel: {
     title: "Install on a cPanel / Apache site (most shared hosting)",
     steps: [
@@ -108,7 +121,7 @@ const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
     steps: [
       "This is a command to run in a TERMINAL to check the shield answers. Do NOT put it on your site or in a file.",
       "Run it as-is (your site ID is already filled in) and you should get back a JSON reply with an \"action\".",
-      "To actually protect your site, use one of the other tabs (cPanel, PHP, nginx, Cloudflare Pages, Cloudflare Worker or Node).",
+      "To actually protect your site, use one of the other tabs — Single HTML file if you just upload an .html, otherwise cPanel, PHP, nginx, Cloudflare Pages, Cloudflare Worker or Node.",
     ],
   },
 };
@@ -116,6 +129,8 @@ const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
 function snippets(site: string): Record<Lang, string> {
   const S = site || "YOUR_SITE_ID";
   return {
+    static: `<!-- TryNoBot shield for a plain HTML page. Paste inside <head>, as early as possible. -->
+<script src="${ORIGIN}/bl.js" data-site-id="${S}" data-strict="1"></script>`,
     php: `<?php
 // TryNoBot server-side shield — paste at the VERY TOP of your page,
 // before any HTML is sent. Turns bad visitors away before the page loads.
