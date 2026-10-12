@@ -28,6 +28,10 @@ ARG VITE_GADS_LEAD_LABEL=""
 ENV VITE_GADS_LEAD_LABEL=$VITE_GADS_LEAD_LABEL
 ARG VITE_GADS_PURCHASE_LABEL=""
 ENV VITE_GADS_PURCHASE_LABEL=$VITE_GADS_PURCHASE_LABEL
+# Our own tracking ID, so trynobot.com is protected by TryNoBot and the live
+# score panel gets fingerprint/behaviour signals. Empty = tracker doesn't load.
+ARG VITE_SELF_SITE_ID=""
+ENV VITE_SELF_SITE_ID=$VITE_SELF_SITE_ID
 RUN npm run build
 
 FROM nginx:1.27-alpine
