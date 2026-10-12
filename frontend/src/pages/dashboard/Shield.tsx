@@ -12,12 +12,13 @@ const HOST = typeof window !== "undefined" ? window.location.hostname : "trynobo
 const ENDPOINT = ORIGIN + "/v1/decide";
 const GUARD = ORIGIN + "/v1/guard";
 
-type Lang = "php" | "cpanel" | "django" | "nginx" | "cloudflare" | "node" | "curl";
+type Lang = "php" | "cpanel" | "django" | "nginx" | "pages" | "cloudflare" | "node" | "curl";
 const TABS: { id: Lang; label: string }[] = [
   { id: "cpanel", label: "cPanel / Apache" },
   { id: "php", label: "PHP" },
   { id: "django", label: "Python / Django" },
   { id: "nginx", label: "nginx (VPS)" },
+  { id: "pages", label: "Cloudflare Pages" },
   { id: "cloudflare", label: "Cloudflare Worker" },
   { id: "node", label: "Node / Express" },
   { id: "curl", label: "Test (cURL)" },
@@ -56,7 +57,7 @@ const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
       "Save the snippet as trynobot_shield.py inside one of your Django apps (next to views.py). Your site ID is already in it.",
       "In settings.py, add \"yourapp.trynobot_shield.TryNoBotShield\" to the TOP of MIDDLEWARE.",
       "Restart your app (e.g. sudo systemctl restart gunicorn).",
-      "Note: this only guards pages Django serves. If your pages are a static React build served by nginx, use the nginx or Cloudflare tab.",
+      "Note: this only guards pages Django serves. If your pages are a static React build served by nginx, use the nginx tab — or the Cloudflare Pages / Cloudflare Worker tab if Cloudflare serves them.",
     ],
   },
   nginx: {
@@ -74,9 +75,21 @@ const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
       "Want blocked bots sent to a page (not a plain 'Access denied')? Don't touch nginx — just add a Redirect rule in Traffic Rules and pick a ready-made page. The shield sends them there automatically.",
     ],
   },
-  cloudflare: {
-    title: "Install as a Cloudflare Worker (if your site is on Cloudflare)",
+  pages: {
+    title: "Install on a site hosted on Cloudflare Pages",
     steps: [
+      "This is the one to use if Cloudflare HOSTS your pages (Workers & Pages → your project is a Pages project). Use the Cloudflare Worker tab only when your pages live on a server somewhere else and Cloudflare is just in front of it.",
+      "In your site's code, create a folder called functions at the top level — beside your index.html (or beside package.json if you build with Vite/Next/Astro). The name must be exactly functions.",
+      "Inside it, create a file named _middleware.js (note the leading underscore) and paste the whole snippet above. Your site ID is already filled in — there's nothing to edit.",
+      "Commit and push. Pages rebuilds and picks up the functions folder automatically — there is no Worker to create and no Route to add.",
+      "Not deploying from Git? Include the functions folder in the folder you drag into Cloudflare Pages → Create → Upload assets.",
+      "Then open a page on your site and click Verify Shield below.",
+    ],
+  },
+  cloudflare: {
+    title: "Install as a Cloudflare Worker (Cloudflare in FRONT of your own server)",
+    steps: [
+      "Use this tab only when your pages are served by your own server/host and Cloudflare sits in front of it as a proxy. If Cloudflare Pages hosts the site itself, use the Cloudflare Pages tab instead — a Worker route on the same hostname fights the Pages project and the last line loops back into itself.",
       "In the Cloudflare dashboard, go to Workers & Pages → Create → Worker.",
       "Replace the sample code with the snippet and Deploy — your site ID is already filled in.",
       "Go to your Worker → Settings → Triggers → Add a Route like example.com/* so it runs on your site.",
@@ -95,7 +108,7 @@ const HINTS: Record<Lang, { title: string; steps: string[]; dev?: boolean }> = {
     steps: [
       "This is a command to run in a TERMINAL to check the shield answers. Do NOT put it on your site or in a file.",
       "Run it as-is (your site ID is already filled in) and you should get back a JSON reply with an \"action\".",
-      "To actually protect your site, use one of the other tabs (cPanel, PHP, nginx, Cloudflare or Node).",
+      "To actually protect your site, use one of the other tabs (cPanel, PHP, nginx, Cloudflare Pages, Cloudflare Worker or Node).",
     ],
   },
 };
@@ -239,6 +252,47 @@ server {
     }
 }
 # Save, then:  sudo nginx -t  &&  sudo systemctl reload nginx`,
+    pages: `// TryNoBot shield as Cloudflare Pages middleware.
+// Save as functions/_middleware.js at the top level of your site, then deploy.
+// No Worker to create, no Route to add — Pages picks this up on its own.
+export async function onRequest(context) {
+  const { request, next } = context;
+
+  // Only check real page loads. Without this every image, CSS and font file
+  // costs a check too — and that burst from one visitor looks like abnormal
+  // request rate, which would score a real person as a bot.
+  const dest = request.headers.get("Sec-Fetch-Dest");
+  const wantsHtml = (request.headers.get("Accept") || "").includes("text/html");
+  if (request.method !== "GET" || (dest && dest !== "document") || !wantsHtml) {
+    return next();
+  }
+
+  const url = new URL(request.url);
+  const cf = request.cf || {};
+  let d = { action: "allow" };
+  try {
+    const r = await fetch("${ENDPOINT}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        site_id: "${S}",
+        ip: request.headers.get("CF-Connecting-IP") || "",
+        ua: request.headers.get("User-Agent") || "",
+        country: cf.country || "",
+        referrer: request.headers.get("Referer") || "",
+        path: url.pathname,
+        // Only present with Cloudflare Bot Management; harmless when it isn't.
+        ja3: (cf.botManagement && cf.botManagement.ja3Hash) || "",
+      }),
+      signal: AbortSignal.timeout(1500),
+    });
+    d = await r.json();
+  } catch (e) { /* fail open — never block your own site on our error */ }
+
+  if (d.action === "block") return new Response("Access denied", { status: 403 });
+  if (d.action === "redirect" && d.redirect) return Response.redirect(d.redirect, 302);
+  return next(); // allow — serve the page. (next(), NOT fetch(request), which would loop.)
+}`,
     cloudflare: `// TryNoBot shield as a Cloudflare Worker — runs at the edge, before your origin.
 export default {
   async fetch(request, env, ctx) {
