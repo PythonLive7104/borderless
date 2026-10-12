@@ -42,13 +42,21 @@ def revoke_org(organization_id) -> int:
     """Withdraw everything the Go engine reads for this org. Returns keys removed."""
     from apps.integrations.models import APIKey
     from apps.links.models import ShortLink
+    from apps.links.sync import unpublish_link
     removed = 0
     try:
         c = _r()
         for tid in _site_ids(organization_id):
             removed += c.delete(f"rules:{tid}", f"ipfilter:{tid}", f"site:{tid}")
-        for slug in ShortLink.objects.filter(organization_id=organization_id).values_list("slug", flat=True):
-            removed += c.delete(f"shortlink:{slug}")
+        # Links are keyed by host AND slug ("shortlink:{host}:{slug}"); deleting
+        # the bare slug hit only the retired un-hosted key, so revocation was a
+        # no-op and an expired workspace's links kept redirecting. unpublish_link
+        # is the one helper that clears the hosted key, the legacy key and the
+        # Cloudflare edge mirror — the edge would otherwise keep serving too.
+        for link in (ShortLink.objects.filter(organization_id=organization_id)
+                     .select_related("domain")):
+            unpublish_link(link.slug, link.host())
+            removed += 1
         for kh in APIKey.objects.filter(organization_id=organization_id, revoked=False).values_list("key_hash", flat=True):
             removed += c.delete(f"apikey:{kh}")
     except Exception:

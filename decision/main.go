@@ -823,6 +823,16 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// THE anti-cloaking chokepoint. Applied last, after every gate, rule and
+	// check above, because each of them can independently turn a crawler away.
+	// Guarding only `isBot` (where verifiedCrawler was first consulted) covers
+	// the risk-score path and nothing else: the country gate, the device/OS
+	// gate, the risk ceiling, the rules, the challenge — and above all
+	// block_datacenter, which matches EVERY crawler there is, since Googlebot
+	// and AdsBot all run from datacenter ranges. Any of those could serve a
+	// reviewer a decoy while a human got the destination, which is cloaking.
+	mode, dest = enforceCrawlerPolicy(verifiedCrawler, mode, dest, link.Destination)
+
 	sigJSON, _ := json.Marshal(result.Signals)
 	go h.st.EmitTraffic(context.Background(), map[string]any{
 		// org travels alongside site_id: a redirect with no website still has an
@@ -866,6 +876,29 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 		// and that has no business sitting in the click log.
 		http.Redirect(w, r, out, http.StatusFound)
 	}
+}
+
+// enforceCrawlerPolicy applies the one rule that keeps this a traffic-quality
+// product rather than a cloaker: a forward-confirmed search or ad-review
+// crawler is served exactly what a human is served.
+//
+// Verification is the hard part and lives in internal/crawler (forward-confirmed
+// reverse DNS — a spoofed "Googlebot" user-agent never gets here). By the time
+// a decision reaches this function the question is already settled, so the rule
+// itself is one line. Keeping it as a named function is the point: the
+// invariant has one home, it can be tested exhaustively against every outcome
+// the engine can produce, and a new gate added upstream cannot quietly escape
+// it as long as this stays the last word.
+//
+// It returns the real destination as well as the mode, because several paths
+// rewrite `dest` on their way to turning a visitor away (a rule's redirect
+// target, a decoy URL); restoring the mode without the destination would send
+// the crawler to the wrong place.
+func enforceCrawlerPolicy(verified bool, mode, dest, destination string) (string, string) {
+	if !verified {
+		return mode, dest
+	}
+	return "allow", destination
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

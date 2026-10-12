@@ -662,3 +662,59 @@ class AdClickMeterTest(TestCase):
         self.assertEqual(ad["limit"], 2_500)   # trial/weekly interval
         self.assertEqual(ad["remaining"], 2_499)
         self.assertEqual(ad["level"], "ok")
+
+
+class RevokeWithdrawsShortLinksTest(TestCase):
+    """Revoking an expired workspace must actually stop its short links.
+
+    Regression: revoke_org deleted "shortlink:{slug}", but links are published
+    under "shortlink:{host}:{slug}" — a slug is only meaningful together with
+    its host, because two workspaces on different domains can share one. The
+    delete therefore hit a retired key and the engine kept serving the link, so
+    an expired workspace's redirects went on working indefinitely. The
+    Cloudflare edge mirror was never cleared either.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from apps.links.models import ShortDomain, ShortLink
+        user = get_user_model().objects.create_user(
+            username="owner@revoke.example", email="owner@revoke.example",
+            password="testpass123")
+        self.org = create_workspace(user, "Revoke Co")
+        self.domain = ShortDomain.objects.create(
+            host="nobot.link", is_shared=True, active=True,
+            verified_at=timezone.now())
+        self.link = ShortLink.objects.create(
+            organization=self.org, domain=self.domain, slug="promo",
+            destination_url="https://example.com/offer")
+
+    def test_revoke_withdraws_the_link_by_host_and_slug(self):
+        from apps.billing.entitlements import revoke_org
+        with patch("apps.links.sync.unpublish_link") as unpublish, \
+             patch("apps.billing.entitlements._r"):
+            revoke_org(self.org.id)
+        # The host-aware helper is the only thing that knows every key a link
+        # lives under (hosted, legacy, and the Cloudflare edge mirror).
+        unpublish.assert_called_once_with("promo", "nobot.link")
+
+    def test_a_link_on_a_retired_domain_is_still_withdrawn(self):
+        # The domain going unusable must not strand the link published.
+        from apps.billing.entitlements import revoke_org
+        self.domain.active = False
+        self.domain.save(update_fields=["active"])
+        with patch("apps.links.sync.unpublish_link") as unpublish, \
+             patch("apps.billing.entitlements._r"):
+            revoke_org(self.org.id)
+        unpublish.assert_called_once_with("promo", "nobot.link")
+
+    def test_the_bare_slug_key_is_not_what_gets_deleted(self):
+        # Guards the exact shape of the bug: if someone reverts to deleting the
+        # un-hosted key directly, this fails.
+        from apps.billing.entitlements import revoke_org
+        with patch("apps.links.sync.unpublish_link"), \
+             patch("apps.billing.entitlements._r") as r:
+            revoke_org(self.org.id)
+            deleted = [c.args[0] for c in r.return_value.delete.call_args_list if c.args]
+        self.assertNotIn("shortlink:promo", deleted,
+                         "revoke_org is deleting the retired un-hosted key again")
