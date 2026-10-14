@@ -60,6 +60,6 @@ class Migration(migrations.Migration):
         migrations.AddIndex(
             model_name="testimonial",
             index=models.Index(fields=["status", "featured"],
-                               name="testimonial_status_feat_idx"),
+                               name="testimonial_status_f3ec67_idx"),
         ),
     ]

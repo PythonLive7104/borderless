@@ -274,7 +274,11 @@ class MonthlyIntervalTest(TestCase):
         self.assertEqual(Subscription.objects.get(organization_id=self.org).interval, "weekly")
 
     def test_bad_interval_is_rejected(self):
-        r = self._checkout("basic", "yearly")
+        # Deliberately a value we will never sell. This test used to pass
+        # "yearly", which stopped being invalid the day yearly billing shipped —
+        # so it failed for the right reason and is now pinned to something that
+        # cannot quietly become a real interval later.
+        r = self._checkout("basic", "fortnightly")
         self.assertEqual(r.status_code, 400)
         self.assertIn("weekly", r.json()["detail"])
 
