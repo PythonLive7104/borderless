@@ -44,4 +44,16 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 # so listing that host under connect-src alone is not enough — it has to be in
 # script-src too. Verify in DevTools > Network: a (blocked:csp) row under the
 # gtag script means a conversion that will never arrive in Google Ads.
-add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https://tawk.to https://*.tawk.to; style-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to; script-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google-analytics.com; connect-src 'self' https://tawk.to https://*.tawk.to wss://tawk.to wss://*.tawk.to https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://stats.g.doubleclick.net; frame-src 'self' https://tawk.to https://*.tawk.to https://td.doubleclick.net https://www.googletagmanager.com; worker-src 'self' blob:; media-src 'self' https://tawk.to https://*.tawk.to" always;
+#
+# ad.doubleclick.net was added after Google Ads > Tools > Data manager > Google
+# tag reported "Tag quality: Urgent — your website's security settings are
+# blocking measurement", naming connect-src and ad.doubleclick.net on / and
+# /dashboard/links. That page is the fastest way to find the NEXT missing host:
+# it reports what Google actually attempted and we actually refused, which no
+# amount of reading this line will tell you. Check it after any CSP change.
+#
+# The doubleclick hosts are deliberately listed one by one rather than as
+# *.doubleclick.net. If a third turns up, prefer widening connect-src to the
+# wildcard over adding a fourth — connect-src cannot execute code, so the
+# trade is cheap, whereas script-src should stay explicit.
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https://tawk.to https://*.tawk.to; style-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to; script-src 'self' 'unsafe-inline' https://tawk.to https://*.tawk.to https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google-analytics.com; connect-src 'self' https://tawk.to https://*.tawk.to wss://tawk.to wss://*.tawk.to https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://stats.g.doubleclick.net https://ad.doubleclick.net; frame-src 'self' https://tawk.to https://*.tawk.to https://td.doubleclick.net https://www.googletagmanager.com; worker-src 'self' blob:; media-src 'self' https://tawk.to https://*.tawk.to" always;
