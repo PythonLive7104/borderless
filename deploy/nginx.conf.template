@@ -114,6 +114,17 @@ server {
     }
     location = /admin { root /usr/share/nginx/html; try_files /_shell.html =404; }
 
+    # /api is the marketing page about our REST API, and it collides with the
+    # "location /api/" proxy above. Unslashed "/api" does not match that prefix,
+    # so it fell through to "location /", where resolving the directory sent a
+    # 301 to "/api/" — which DOES match the proxy, reaches Django, and 404s.
+    # The page was therefore unreachable, while robots.txt "Disallow: /api/"
+    # stopped Google from ever seeing why. Same exact-match trick as /admin
+    # above, for the same reason: "=" outranks every prefix location, so the
+    # pre-rendered page is served at the canonical URL with a plain 200 and the
+    # Django proxy keeps everything under /api/ to itself.
+    location = /api { root /usr/share/nginx/html; try_files /api/index.html =404; }
+
     # Marketing routes resolve to their own pre-rendered index.html, reached by
     # naming index.html directly rather than via $uri/. The difference matters:
     # $uri/ makes nginx 301 "/pricing" -> "/pricing/", but the sitemap and every
