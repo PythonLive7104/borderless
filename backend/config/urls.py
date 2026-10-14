@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/billing/", include("apps.billing.urls")),
     path("api/admin/", include("apps.staff.urls")),
     path("api/links/", include("apps.links.urls")),
+    path("api/testimonials/", include("apps.testimonials.urls")),
     path("api/v1/conversions/", PublicConversionView.as_view()),
     path("api/v1/bot-check/", BotCheckView.as_view()),
     path("api/v1/bot-check/lead/", BotCheckLeadView.as_view()),

@@ -142,6 +142,31 @@ export const http = {
 export interface NotificationPrefs { email: boolean; high_risk: boolean; usage: boolean; conversions: boolean; }
 export interface User { id: number; email: string; first_name: string; last_name: string; is_verified: boolean; is_staff: boolean; timezone: string; language: string; notification_prefs: NotificationPrefs; }
 
+// ---- testimonials ----
+export interface MyTestimonial {
+  id: number; quote: string; author_name: string; author_role: string;
+  author_company: string; country: string; rating: number; consent: boolean;
+  status: "pending" | "approved" | "rejected"; created_at: string;
+}
+export interface AdminTestimonial extends MyTestimonial {
+  consent_text: string; consent_at: string | null; featured: boolean; sort: number;
+  review_note: string; reviewed_at: string | null;
+  organization_name: string; author_email: string;
+}
+export type TestimonialDraft = Pick<MyTestimonial,
+  "quote" | "author_name" | "author_role" | "author_company" | "country" | "rating" | "consent">;
+
+export const testimonialApi = {
+  mine: (orgId: number, signal?: AbortSignal) =>
+    http.get<{ testimonial: MyTestimonial | null }>(`/testimonials/mine/?organization=${orgId}`, signal),
+  submit: (orgId: number, body: TestimonialDraft, signal?: AbortSignal) =>
+    http.post<MyTestimonial>("/testimonials/mine/", { ...body, organization: orgId }, true, signal),
+  adminList: (status?: string, signal?: AbortSignal) =>
+    http.get<AdminTestimonial[]>(`/testimonials/admin/${status ? `?status=${status}` : ""}`, signal),
+  adminAct: (id: number, body: { action: "approve" | "reject" | "feature"; featured?: boolean; sort?: number; review_note?: string }, signal?: AbortSignal) =>
+    http.patch<AdminTestimonial>(`/testimonials/admin/${id}/`, body, signal),
+};
+
 export const authApi = {
   login: (email: string, password: string, signal?: AbortSignal) =>
     http.post<{ access: string; refresh: string }>("/auth/token/", { email, password }, false, signal),

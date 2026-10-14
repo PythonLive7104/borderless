@@ -8,6 +8,7 @@ import {
 import PageNote from "../../components/dashboard/PageNote";
 import GetStarted from "../../components/dashboard/GetStarted";
 import WhatsNew from "../../components/dashboard/WhatsNew";
+import TestimonialPrompt from "../../components/dashboard/TestimonialPrompt";
 import FunnelReport from "../../components/dashboard/FunnelReport";
 import WebsitePicker from "../../components/dashboard/WebsitePicker";
 import { useWorkspace } from "../../context/WorkspaceContext";
@@ -51,6 +52,7 @@ export default function Overview() {
     <div>
       {current && <GetStarted orgId={current.id} />}
       <WhatsNew />
+      <TestimonialPrompt />
       <PageNote id="overview">This is your <b>control center</b>. It shows how many people visit your sites and how many are real vs. bots. A higher <b>Traffic quality</b> is better — it means most visitors are genuine. Use the date buttons on the right to change the time period.</PageNote>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

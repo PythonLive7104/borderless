@@ -202,3 +202,53 @@ export function blogPosting(a: ArticleSpec) {
 export function graph(...nodes: object[]): string {
   return serialize({ "@context": "https://schema.org", "@graph": nodes });
 }
+
+export interface ReviewSpec {
+  quote: string;
+  name: string;
+  rating: number;
+}
+
+/**
+ * Customer reviews, attached to the organisation being reviewed.
+ *
+ *  Only ever called with real, consented, approved testimonials — there is no
+ *  code path that emits this from placeholder data, and `aggregateRating` is
+ *  omitted entirely rather than defaulted when there is nothing to average.
+ *  Invented review markup is among the few things Google issues manual actions
+ *  for, and an answer engine repeating a rating we made up is worse again.
+ */
+export function reviews(items: ReviewSpec[], average: number | null) {
+  if (!items.length) return [];
+  const itemReviewed = {
+    "@type": "Organization",
+    "@id": ORG_ID,
+    name: "TryNoBot",
+    ...(average
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: average,
+            reviewCount: items.length,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+  };
+  return [
+    itemReviewed,
+    ...items.map((r) => ({
+      "@type": "Review",
+      reviewBody: r.quote,
+      author: { "@type": "Person", name: r.name },
+      reviewRating: {
+        "@type": "Rating",
+        ratingValue: r.rating,
+        bestRating: 5,
+        worstRating: 1,
+      },
+      itemReviewed: { "@id": ORG_ID },
+    })),
+  ];
+}

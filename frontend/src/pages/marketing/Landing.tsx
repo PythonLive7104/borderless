@@ -6,6 +6,19 @@ import { useReveal } from "../../lib/useReveal";
 import Button from "../../components/ui/Button";
 import { Section, SectionHead } from "../../components/ui/Section";
 import LogoStrip from "../../components/marketing/LogoStrip";
+import Testimonials from "../../components/marketing/Testimonials";
+import JsonLd from "../../components/marketing/JsonLd";
+import { graph, reviews } from "../../lib/schema";
+import { AVERAGE_RATING, TESTIMONIALS } from "../../data/testimonials";
+
+// Review markup, and only when there are real reviews to mark up. reviews()
+// returns an empty list with none, so this is an empty graph that renders
+// nothing rather than a rating we invented.
+const REVIEW_NODES = reviews(
+  TESTIMONIALS.map((t) => ({ quote: t.quote, name: t.name, rating: t.rating })),
+  AVERAGE_RATING,
+);
+const LANDING_JSONLD = REVIEW_NODES.length ? graph(...REVIEW_NODES) : "";
 import DashboardPreview from "../../components/marketing/DashboardPreview";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
 import { BRAND } from "../../lib/brand";
@@ -102,6 +115,7 @@ export default function Landing() {
   useReveal();
   return (
     <>
+      {LANDING_JSONLD && <JsonLd data={LANDING_JSONLD} />}
       {/* HERO BAND */}
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
@@ -161,6 +175,9 @@ export default function Landing() {
           ))}
         </div>
       </Section>
+
+      {/* TESTIMONIALS — renders nothing until there is a real one to show. */}
+      <Testimonials />
 
       {/* HOW IT WORKS */}
       <Section>

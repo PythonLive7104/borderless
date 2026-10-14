@@ -60,6 +60,7 @@ const AdminOrgs = lazy(() => import("./pages/admin/AdminOrgs"));
 const AdminSubscriptions = lazy(() => import("./pages/admin/AdminSubscriptions"));
 const AdminFraudAlerts = lazy(() => import("./pages/admin/AdminFraudAlerts"));
 const AdminEmail = lazy(() => import("./pages/admin/AdminEmail"));
+const AdminTestimonials = lazy(() => import("./pages/admin/AdminTestimonials"));
 
 const spinner = <div className="grid min-h-screen place-items-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>;
 
@@ -130,6 +131,7 @@ export default function AppRoutes() {
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="fraud-alerts" element={<AdminFraudAlerts />} />
           <Route path="email" element={<AdminEmail />} />
+          <Route path="testimonials" element={<AdminTestimonials />} />
         </Route>
 
         <Route path="*" element={<Landing />} />
