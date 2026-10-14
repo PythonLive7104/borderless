@@ -4,7 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { WorkspaceProvider } from "./context/WorkspaceContext";
 import { DialogProvider } from "./context/DialogContext";
 import AppRoutes from "./AppRoutes";
-import { COMPARISONS } from "./data/comparisons";
+import { COMPARISONS, COMPARISON_CHECKED } from "./data/comparisons";
 import { postsByDate } from "./data/posts";
 
 // Called by the prerender script for each public route.
@@ -30,6 +30,11 @@ export interface PrerenderRoute {
   desc: string;
   /** Sitemap priority. Defaults applied by the prerender script when absent. */
   priority?: string;
+  /** Real last-modified date (YYYY-MM-DD) where the content has one. Pages
+   *  without it fall back to the build date, which is honest for a page that
+   *  genuinely redeploys with every build — but claiming today's date for a
+   *  post written in September teaches Google to ignore the field entirely. */
+  lastmod?: string;
 }
 
 /** Every public route, in one place.
@@ -40,6 +45,12 @@ export interface PrerenderRoute {
  *  exactly how a published post ends up missing from the sitemap. Adding a post
  *  to posts.ts now prerenders it and lists it, with no second edit.
  */
+/** COMPARISON_CHECKED is written for humans ("21 September 2026"); the sitemap
+ *  needs ISO. Parsed rather than stored twice so the date on the page and the
+ *  date in the sitemap can never disagree. */
+const COMPARISON_CHECKED_ISO = new Date(COMPARISON_CHECKED + " UTC")
+  .toISOString().slice(0, 10);
+
 export function routes(): PrerenderRoute[] {
   const staticRoutes: PrerenderRoute[] = [
     { path: "/", out: "index.html", priority: "1.0", title: "Stop paying for bot clicks on your ads", desc: "Protect your Google and Microsoft Ads budget: every visitor scored 0-100 in real time, bots and click fraud blocked before they cost you, with the exact signals behind every decision." },
@@ -49,7 +60,7 @@ export function routes(): PrerenderRoute[] {
     { path: "/analytics", out: "analytics/index.html", title: "Traffic analytics", desc: "See traffic quality, sources, conversions and fraud across all your campaigns in one dashboard." },
     { path: "/integrations", out: "integrations/index.html", title: "Integrations", desc: "Connect TryNoBot with your stack via the JavaScript tracker, REST API and webhooks." },
     { path: "/api", out: "api/index.html", title: "API", desc: "Automate everything with the TryNoBot REST API and webhooks." },
-    { path: "/pricing", out: "pricing/index.html", priority: "0.9", title: "Pricing", desc: "10,000 ad clicks and 10 sites protected from $69/month. Start free, no credit card." },
+    { path: "/pricing", out: "pricing/index.html", priority: "0.9", title: "Pricing", desc: "10,000 ad clicks and 10 sites protected from $69/month, or $690/year. Weekly, monthly or yearly — nothing auto-renews. Start free, no credit card." },
     { path: "/compare", out: "compare/index.html", priority: "0.9", title: "Compare TryNoBot with the alternatives", desc: "Honest head-to-head comparisons against ClickCease, Fraud Blocker and ClickPatrol — published prices, included volume, and where each of them wins." },
     { path: "/blog", out: "blog/index.html", priority: "0.8", title: "Blog — ad traffic, bots and click fraud", desc: "Practical writing on ad traffic quality: diagnosing invalid clicks yourself, what datacenter IPs and TLS fingerprints tell you, and what to compare when buying protection." },
     { path: "/bot-check", out: "bot-check/index.html", priority: "0.9", title: "Free bot exposure check", desc: "Scan any website in 10 seconds and see how exposed it is to bots — free, no signup." },
@@ -70,6 +81,7 @@ export function routes(): PrerenderRoute[] {
     title: c.title,
     desc: c.metaDescription,
     priority: "0.8",
+    lastmod: COMPARISON_CHECKED_ISO,
   }));
 
   const blogRoutes: PrerenderRoute[] = postsByDate().map((p) => ({
@@ -78,6 +90,7 @@ export function routes(): PrerenderRoute[] {
     title: p.title,
     desc: p.description,
     priority: "0.7",
+    lastmod: p.date,
   }));
 
   return [...staticRoutes, ...compareRoutes, ...blogRoutes];

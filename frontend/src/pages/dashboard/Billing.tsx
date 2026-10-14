@@ -9,6 +9,7 @@ import PageNote from "../../components/dashboard/PageNote";
 import { ILink, IGlobe, ITarget } from "../../components/ui/icons";
 import { PLAN_ADD, PLAN_BASE, PLAN_ROLLUP } from "../../data/plans";
 import { trackPurchase } from "../../lib/analytics";
+import { INTERVAL_DAYS, INTERVAL_MONTHS, INTERVAL_NOUN, capFor, priceFor, savingBadges } from "../../lib/billing";
 import { feeNote, methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
 
 const statusTone: Record<string, string> = {
@@ -55,15 +56,18 @@ export default function Billing() {
   // Which interval the buy buttons purchase. Defaults to what they're already
   // on, so "Renew" renews like-for-like instead of silently switching them.
   const [interval, setBillingInterval] = useState<BillingInterval>("weekly");
-  const monthly = interval === "monthly";
-  const priceOf = (p: Plan) => (monthly ? p.price_monthly : p.price);
-  // 0 on a monthly cap means "same as weekly" — mirrors Plan.redirects_for().
-  const redirectsOf = (p: Plan) => (monthly && p.max_redirects_monthly ? p.max_redirects_monthly : p.max_redirects);
-  const websitesOf = (p: Plan) => (monthly && p.max_websites_monthly ? p.max_websites_monthly : p.max_websites);
-  // Mirrors Plan.ad_clicks_for() on the server: the cap is stored monthly and a
-  // weekly period gets a quarter of it. 0 stays 0 — unlimited on either.
+  const noun = INTERVAL_NOUN[interval];
+  const days = INTERVAL_DAYS[interval];
+  const priceOf = (p: Plan) => priceFor(p, interval);
+  // 0 on a cap means "same as the interval below" — mirrors Plan._cap_for().
+  const redirectsOf = (p: Plan) =>
+    capFor(interval, p.max_redirects, p.max_redirects_monthly, p.max_redirects_yearly);
+  const websitesOf = (p: Plan) =>
+    capFor(interval, p.max_websites, p.max_websites_monthly, p.max_websites_yearly);
+  // Mirrors Plan.ad_clicks_for() on the server: the cap is stored monthly and
+  // scaled by the period. 0 stays 0 — unlimited on every interval.
   const adClicksOf = (p: Plan) =>
-    !p.monthly_ad_clicks ? 0 : monthly ? p.monthly_ad_clicks : Math.ceil(p.monthly_ad_clicks / 4);
+    !p.monthly_ad_clicks ? 0 : Math.ceil(p.monthly_ad_clicks * INTERVAL_MONTHS[interval]);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -107,9 +111,7 @@ export default function Billing() {
           setSub(s);
           // Report the value so Ads can bid toward revenue rather than toward
           // raw signups — the plan price for the interval actually bought.
-          trackPurchase(
-            s.interval === "monthly" ? s.plan.price_monthly : s.plan.price,
-            s.plan.slug, s.interval);
+          trackPurchase(priceFor(s.plan, s.interval), s.plan.slug, s.interval);
           setPayMsg({ kind: "done", text: `Payment confirmed — you're now on the ${s.plan.name} plan. A receipt has been emailed to you.` });
           clearInterval(iv); clear(); return;
         }
@@ -157,7 +159,7 @@ export default function Billing() {
   return (
     <div>
       <PageNote id="billing">
-        Choose <b>weekly</b> or <b>monthly</b> access — renew when it runs out, and any unused days roll over. Pay{methodPhrase(payMethods)} through our secure hosted checkout (Bachs).
+        Choose <b>weekly</b>, <b>monthly</b> or <b>yearly</b> access — renew when it runs out, and any unused days roll over. Pay{methodPhrase(payMethods)} through our secure hosted checkout (Bachs).
       </PageNote>
       <h1 className="text-2xl font-extrabold tracking-tight">Billing</h1>
       <p className="mt-1 text-sm text-fg-muted">
@@ -184,7 +186,7 @@ export default function Billing() {
             <span className="rounded-full bg-bg-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-muted">{sub.interval}</span>
           </div>
           <div className="mt-1 text-sm text-fg-muted">
-            ${sub.interval === "monthly" ? sub.plan.price_monthly : sub.plan.price}/{sub.interval === "monthly" ? "month" : "week"} · {daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} of access left` : "renew when it runs out"}
+            ${priceFor(sub.plan, sub.interval).toLocaleString()}/{INTERVAL_NOUN[sub.interval]} · {daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} of access left` : "renew when it runs out"}
             {sub.period_end && ` · access through ${new Date(sub.period_end).toLocaleDateString()}`}
           </div>
         </div>
@@ -193,7 +195,7 @@ export default function Billing() {
 
       {/* pricing tiers */}
       <div className="mt-8 flex justify-center">
-        <IntervalToggle value={interval} onChange={setBillingInterval} savings="Save up to 46%" />
+        <IntervalToggle value={interval} onChange={setBillingInterval} savings={savingBadges(plans)} />
       </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
         {plans.map((p) => {
@@ -206,10 +208,10 @@ export default function Billing() {
               )}
               <h3 className="text-lg font-bold">{p.name}</h3>
               <div className="mt-1 flex items-end gap-1">
-                <span className="text-3xl font-extrabold">${priceOf(p)}</span>
-                <span className="pb-1 text-sm text-fg-dim">/{monthly ? "month" : "week"}</span>
+                <span className="text-3xl font-extrabold">${priceOf(p).toLocaleString()}</span>
+                <span className="pb-1 text-sm text-fg-dim">/{noun}</span>
               </div>
-              <div className="mt-0.5 text-xs text-fg-dim">{monthly ? "30" : "7"} days of access</div>
+              <div className="mt-0.5 text-xs text-fg-dim">{days} days of access</div>
 
               {/* Ad clicks first — it's what the plan is sold on and what the
                   pricing page leads with, so the two pages agree. */}
@@ -233,7 +235,7 @@ export default function Billing() {
               {isCurrent ? (
                 <div className="mt-5">
                   {canManage ? (
-                    <Button className="w-full" onClick={() => { setErr(""); setTarget(p); }}>Renew {p.name} ({monthly ? "month" : "week"})</Button>
+                    <Button className="w-full" onClick={() => { setErr(""); setTarget(p); }}>Renew {p.name} ({noun})</Button>
                   ) : (
                     <div className="rounded-full bg-bg-mute py-2 text-center text-sm font-semibold text-fg-muted">Current plan</div>
                   )}
@@ -241,7 +243,7 @@ export default function Billing() {
                 </div>
               ) : canManage ? (
                 <Button onClick={() => { setErr(""); setTarget(p); }} variant={p.price > sub.plan.price ? "primary" : "outline"}  /* tier order, not interval */ className="mt-5 w-full">
-                  {onPaidPlan ? "Switch to" : "Get"} {p.name} ({monthly ? "month" : "week"})
+                  {onPaidPlan ? "Switch to" : "Get"} {p.name} ({noun})
                 </Button>
               ) : <div className="mt-5 text-center text-xs text-fg-dim">Ask an admin to change plans</div>}
             </div>
@@ -254,13 +256,13 @@ export default function Billing() {
         {target && sub && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">
-              {isCurrentPlan(target) ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target)}/{monthly ? "month" : "week"}</b>
+              {isCurrentPlan(target) ? "Renew" : "Move to"} the <b>{target.name}</b> plan at <b>${priceOf(target).toLocaleString()}/{noun}</b>
               {" "}({redirectsOf(target) || "∞"} redirects, {websitesOf(target) || "∞"} domains).
             </p>
             <p className="rounded-lg bg-bg-soft px-3 py-2 text-xs text-fg-muted">
               You'll be taken to our secure hosted checkout (Bachs) to pay{methodPhrase(payMethods)}
               {feeNote(payMethods) && <>, plus {feeNote(payMethods)}</>}. Access starts as
-              soon as payment succeeds, for {monthly ? 30 : 7} days. Any days you have left are added on top, so you never lose time.
+              soon as payment succeeds, for {days} days. Any days you have left are added on top, so you never lose time.
             </p>
             {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
             <div className="flex gap-2">

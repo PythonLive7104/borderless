@@ -65,7 +65,7 @@ const clickpatrol = byName("ClickPatrol");
 
 /** Rows every comparison shares, so our own column can't drift between pages. */
 const OURS = {
-  price: "$69/month, billed monthly — no annual lock-in required",
+  price: "$69/month billed monthly, or $690/year — annual is an option, never a requirement",
   volume: "10,000 ad clicks/month",
   sites: "10 websites",
   tls: "JA3 + JA4 TLS fingerprinting on every request",
@@ -118,7 +118,7 @@ export const COMPARISONS: Comparison[] = [
         them: "Automatic IP exclusion push to Google Ads",
       },
       {
-        label: "Billing", us: "Monthly or weekly, cancel anytime",
+        label: "Billing", us: "Weekly, monthly or yearly, cancel anytime",
         them: "Best rate requires annual billing; check the current cancellation terms before signing",
       },
       { label: "Trial", us: OURS.trial, them: "7-day free trial" },
@@ -134,7 +134,7 @@ export const COMPARISONS: Comparison[] = [
       "JA3/JA4 TLS fingerprinting catches automation that presents a clean IP and a convincing user-agent",
       "A server-side Shield stops bots that never execute JavaScript, which a tag-only product cannot see",
       "Every score comes with the signals behind it, so you can argue with it",
-      "Monthly billing at the list price — no annual commitment to avoid a penalty rate",
+      "Monthly billing at the list price — annual is offered and discounted, but never required to avoid a penalty rate",
     ],
     faq: [
       {

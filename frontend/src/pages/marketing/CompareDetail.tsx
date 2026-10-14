@@ -6,6 +6,8 @@ import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
 import { COMPARISON_CHECKED, comparisonBySlug, COMPARISONS } from "../../data/comparisons";
 import { IArrow, ICheck } from "../../components/ui/icons";
+import JsonLd from "../../components/marketing/JsonLd";
+import { breadcrumbs, faqPage, graph } from "../../lib/schema";
 
 /** One head-to-head comparison.
  *
@@ -38,8 +40,24 @@ export default function CompareDetail() {
 
   const others = COMPARISONS.filter((o) => o.slug !== c.slug);
 
+  // The verdict is prepended as a question because "is X better than Y" is the
+  // exact phrasing answer engines are asked, and the verdict is already written
+  // as a direct answer to it.
+  const jsonLd = graph(
+    faqPage([
+      { q: `Should I choose TryNoBot or ${c.name}?`, a: c.verdict },
+      ...c.faq.map((f) => ({ q: f.q, a: f.a })),
+    ]),
+    breadcrumbs([
+      { name: "Home", path: "/" },
+      { name: "Compare", path: "/compare" },
+      { name: `vs ${c.name}`, path: `/compare/${c.slug}` },
+    ]),
+  );
+
   return (
     <>
+      <JsonLd data={jsonLd} />
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
         <div className="container-page relative py-16">

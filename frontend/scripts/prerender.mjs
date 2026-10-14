@@ -81,7 +81,7 @@ const urls = ROUTES.filter((r) => !failed.includes(r.path)).map((r) => {
   // with releases. Claiming weekly for a post written in September invites
   // Google to discount the whole file's hints.
   const changefreq = r.path.startsWith("/blog/") || r.path.startsWith("/compare/") ? "monthly" : "weekly";
-  return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${today}</lastmod>\n` +
+  return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${r.lastmod || today}</lastmod>\n` +
          `    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 }).join("\n");
 fs.writeFileSync(path.join(dist, "sitemap.xml"),

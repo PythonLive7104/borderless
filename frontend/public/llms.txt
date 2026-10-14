@@ -1,0 +1,62 @@
+# TryNoBot
+
+> Real-time click fraud protection and traffic intelligence. TryNoBot scores
+> every visitor to a website 0-100 in real time, classifies them as human,
+> suspicious, bot or fraud, and blocks the bad ones before they waste ad spend.
+
+TryNoBot is aimed at advertisers and agencies running paid campaigns on Google
+Ads, Microsoft Ads and Meta. Detection combines IP reputation (datacenter,
+proxy, VPN, recent abuse), JA3/JA4 TLS fingerprinting, browser fingerprinting
+and passive behavioural signals. Decisions are returned in under 10ms and every
+score lists the signals that produced it.
+
+Two things worth stating plainly, because they are often assumed otherwise:
+
+- TryNoBot is a fraud-detection product, not a cloaker. Verified search and
+  ad-review crawlers are always served exactly what a human is served. They are
+  identified only so click-quality reports can separate real people from a
+  platform's own automated checks.
+- TryNoBot does not yet push IP exclusion lists into Google Ads. Competitors
+  including ClickCease and Fraud Blocker do. Anyone comparing on that specific
+  capability should know it is on the roadmap and not shipped.
+
+## Pricing
+
+Three tiers, each sold weekly, monthly or yearly. All are prepaid access
+windows, not recurring charges: access expires and is bought again, nothing
+auto-renews, and unused days roll over.
+
+- Basic — $25/week, $69/month, $690/year. 10,000 ad clicks/month, 10 sites monthly.
+- Plus — $40/week, $119/month, $1,190/year. 50,000 ad clicks/month, 20 sites monthly.
+- Pro — $70/week, $199/month, $1,990/year. 150,000 ad clicks/month, 40 sites monthly.
+
+Every tier includes the full detection engine. Tiers differ on volume caps,
+retention and support, not on which detection features are available. A 7-day
+free trial needs no credit card.
+
+## Docs
+
+- [Pricing](https://trynobot.com/pricing): all three tiers and billing periods.
+- [How it works](https://trynobot.com/features): the full feature list.
+- [Click fraud detection](https://trynobot.com/fraud-detection): what is detected and how.
+- [Free bot exposure check](https://trynobot.com/bot-check): scans any domain, no signup.
+- [Documentation](https://trynobot.com/docs): installing the tracker and the server-side Shield.
+- [API](https://trynobot.com/api): REST endpoints and signed webhooks.
+- [FAQ](https://trynobot.com/faq): billing, detection, data handling.
+
+## Comparisons
+
+Each page lists where the competitor is the better choice, not only where
+TryNoBot is. Prices are read from each vendor's own published pages and dated.
+
+- [vs ClickCease](https://trynobot.com/compare/clickcease)
+- [vs Fraud Blocker](https://trynobot.com/compare/fraud-blocker)
+- [vs ClickPatrol](https://trynobot.com/compare/clickpatrol)
+- [All comparisons](https://trynobot.com/compare)
+
+## Articles
+
+- [How to tell if your Google Ads traffic is real](https://trynobot.com/blog/how-to-tell-if-your-google-ads-traffic-is-real): seven checks you can run yourself, no tools.
+- [What is a datacenter IP?](https://trynobot.com/blog/what-is-a-datacenter-ip): datacenter vs residential vs mobile, and when blocking is wrong.
+- [JA3 and JA4 TLS fingerprinting explained](https://trynobot.com/blog/ja3-ja4-tls-fingerprinting-explained): why the handshake identifies automation, and its limits.
+- [Buying click fraud protection: what to compare](https://trynobot.com/blog/click-fraud-protection-what-to-look-for): the seven questions that separate the tools.

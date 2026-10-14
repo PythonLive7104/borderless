@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.billing.models import Subscription
+from apps.billing.models import INTERVAL_DAYS, Plan, Subscription
 from apps.organizations.models import create_workspace
 
 
@@ -718,3 +718,69 @@ class RevokeWithdrawsShortLinksTest(TestCase):
             deleted = [c.args[0] for c in r.return_value.delete.call_args_list if c.args]
         self.assertNotIn("shortlink:promo", deleted,
                          "revoke_org is deleting the retired un-hosted key again")
+
+
+class YearlyIntervalTest(TestCase):
+    """The third interval: pricing, caps and the Bachs product mapping."""
+
+    def setUp(self):
+        self.basic = Plan.objects.get(slug="basic")
+        self.pro = Plan.objects.get(slug="pro")
+
+    def test_seeded_yearly_prices(self):
+        self.assertEqual(self.basic.price_yearly, 690)
+        self.assertEqual(Plan.objects.get(slug="plus").price_yearly, 1190)
+        self.assertEqual(self.pro.price_yearly, 1990)
+
+    def test_yearly_is_cheaper_than_twelve_months(self):
+        """The whole proposition. If this ever inverts, the annual plan is a
+        worse deal than paying monthly and nobody should be sold it."""
+        for plan in Plan.objects.filter(price_yearly__gt=0):
+            with self.subTest(plan=plan.slug):
+                self.assertLess(plan.price_yearly, plan.price_monthly * 12)
+
+    def test_price_for_resolves_each_interval(self):
+        self.assertEqual(self.basic.price_for("weekly"), self.basic.price)
+        self.assertEqual(self.basic.price_for("monthly"), self.basic.price_monthly)
+        self.assertEqual(self.basic.price_for("yearly"), self.basic.price_yearly)
+
+    def test_caps_grow_with_the_window(self):
+        for plan in Plan.objects.all():
+            with self.subTest(plan=plan.slug):
+                self.assertGreaterEqual(plan.redirects_for("yearly"), plan.redirects_for("monthly"))
+                self.assertGreaterEqual(plan.websites_for("yearly"), plan.websites_for("monthly"))
+
+    def test_unset_yearly_cap_inherits_monthly_not_weekly(self):
+        """The cascade's whole point: a tier that doesn't set a yearly cap must
+        not silently drop its customers back to the weekly allowance."""
+        p = Plan(max_redirects=2, max_redirects_monthly=5, max_redirects_yearly=0)
+        self.assertEqual(p.redirects_for("yearly"), 5)
+        p2 = Plan(max_websites=5, max_websites_monthly=0, max_websites_yearly=0)
+        self.assertEqual(p2.websites_for("yearly"), 5)
+
+    def test_ad_clicks_scale_by_period(self):
+        p = Plan(monthly_ad_clicks=10_000)
+        self.assertEqual(p.ad_clicks_for("weekly"), 2_500)
+        self.assertEqual(p.ad_clicks_for("monthly"), 10_000)
+        self.assertEqual(p.ad_clicks_for("yearly"), 120_000)
+
+    def test_unlimited_stays_unlimited_on_yearly(self):
+        self.assertEqual(Plan(monthly_ad_clicks=0).ad_clicks_for("yearly"), 0)
+
+    def test_yearly_period_is_365_days(self):
+        self.assertEqual(INTERVAL_DAYS["yearly"], 365)
+
+    @override_settings(BACHS_PRODUCTS_YEARLY={"basic": "prod_year"},
+                       BACHS_PRODUCTS_MONTHLY={"basic": "prod_month"},
+                       BACHS_PRODUCTS={"basic": "prod_week"})
+    def test_product_for_never_falls_back_between_intervals(self):
+        """Billing an annual signup against the monthly product would charge the
+        wrong amount, so a missing yearly product must resolve to empty (which
+        blocks checkout) rather than to the monthly one."""
+        self.assertEqual(self.basic.product_for("yearly"), "prod_year")
+        with override_settings(BACHS_PRODUCTS_YEARLY={"basic": ""}):
+            self.assertEqual(self.basic.product_for("yearly"), "")
+
+    def test_offers_follows_the_yearly_price(self):
+        self.assertTrue(self.basic.offers("yearly"))
+        self.assertFalse(Plan(price=0, price_monthly=0, price_yearly=0).offers("yearly"))

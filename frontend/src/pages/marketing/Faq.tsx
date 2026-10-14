@@ -16,6 +16,7 @@ const QA = [
   ["What data do you collect?", "Only the traffic signals needed to score visits. Sensitive fields can be masked in the UI, retention is configurable, and data deletion is supported."],
   ["Can I use the API and webhooks?", "Yes. Create API keys, call the REST endpoints, and subscribe to signed webhooks for events like traffic.classified and conversion.created."],
   ["Is there a free trial?", "Every plan includes a 7-day free trial with no credit card required."],
+  ["How does billing work — weekly, monthly or yearly?", "All three are prepaid access windows rather than recurring charges: you buy a period, and when it runs out access stops until you buy another. Nothing auto-renews and there is nothing to cancel. Basic is $25/week, $69/month or $690/year; Plus is $40/week, $119/month or $1,190/year; Pro is $70/week, $199/month or $1,990/year. Each longer period costs less per day and includes a larger allowance of ad clicks, redirect links and protected domains — yearly is twelve months of access for ten months of money. Unused days always roll over when you buy again, so renewing early or switching period never loses you time."],
 ];
 
 // FAQPage structured data. Rendered into the markup (not injected via effect)

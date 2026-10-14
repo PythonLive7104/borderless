@@ -1,3 +1,4 @@
+import math
 from datetime import timedelta
 from django.db import models
 from django.utils import timezone
@@ -5,17 +6,26 @@ from apps.organizations.models import Organization
 
 TRIAL_DAYS = 7
 
-# Billing intervals. Both are prepaid access windows, not recurring charges:
-# access simply expires at period_end and has to be bought again.
-WEEKLY, MONTHLY = "weekly", "monthly"
+# Billing intervals. All three are prepaid access windows, not recurring
+# charges: access simply expires at period_end and has to be bought again.
+WEEKLY, MONTHLY, YEARLY = "weekly", "monthly", "yearly"
 PERIOD_DAYS = 7           # weekly billing — kept as the module-level default
 MONTHLY_PERIOD_DAYS = 30
-INTERVAL_DAYS = {WEEKLY: PERIOD_DAYS, MONTHLY: MONTHLY_PERIOD_DAYS}
+YEARLY_PERIOD_DAYS = 365
+INTERVAL_DAYS = {WEEKLY: PERIOD_DAYS, MONTHLY: MONTHLY_PERIOD_DAYS,
+                 YEARLY: YEARLY_PERIOD_DAYS}
+
+# How many months of allowance one period of each interval buys. Caps are
+# stored per month (see monthly_ad_clicks), so this is the multiplier that
+# converts them. Weekly is a quarter of a month by the same four-weeks-to-a-
+# month convention the pricing toggle uses.
+INTERVAL_MONTHS = {WEEKLY: 0.25, MONTHLY: 1, YEARLY: 12}
 
 
 class Interval(models.TextChoices):
     WEEKLY = WEEKLY, "Weekly"
     MONTHLY = MONTHLY, "Monthly"
+    YEARLY = YEARLY, "Yearly"
 
 
 class Plan(models.Model):
@@ -23,6 +33,7 @@ class Plan(models.Model):
     name = models.CharField(max_length=60)
     price = models.IntegerField(help_text="USD per week")
     price_monthly = models.IntegerField(default=0, help_text="USD per month (0 = monthly not offered)")
+    price_yearly = models.IntegerField(default=0, help_text="USD per year (0 = yearly not offered)")
     monthly_events = models.BigIntegerField(help_text="Metered event limit per period")
     # The meter customers are sold on and compare against rivals, who all
     # price in "ad clicks protected". Events stay as the technical backstop:
@@ -39,9 +50,11 @@ class Plan(models.Model):
     team_members = models.IntegerField(default=3, help_text="0 = unlimited")
     max_websites = models.IntegerField(default=0, help_text="Domains cap on WEEKLY billing (0 = unlimited)")
     max_websites_monthly = models.IntegerField(default=0, help_text="Domains cap on MONTHLY billing (0 = same as weekly)")
+    max_websites_yearly = models.IntegerField(default=0, help_text="Domains cap on YEARLY billing (0 = same as monthly)")
     max_campaigns = models.IntegerField(default=0, help_text="0 = unlimited")
     max_redirects = models.IntegerField(default=0, help_text="Redirect cap on WEEKLY billing (0 = unlimited)")
     max_redirects_monthly = models.IntegerField(default=0, help_text="Redirect cap on MONTHLY billing (0 = same as weekly)")
+    max_redirects_yearly = models.IntegerField(default=0, help_text="Redirect cap on YEARLY billing (0 = same as monthly)")
     sort = models.IntegerField(default=0)
     # Maps this plan to a product created in the Bachs dashboard. Checkout uses
     # it. Each interval is a separate Bachs product with its own price.
@@ -49,6 +62,8 @@ class Plan(models.Model):
                                         help_text="Bachs product for the WEEKLY price.")
     bachs_product_id_monthly = models.CharField(max_length=80, blank=True, default="",
                                                 help_text="Bachs product for the MONTHLY price.")
+    bachs_product_id_yearly = models.CharField(max_length=80, blank=True, default="",
+                                               help_text="Bachs product for the YEARLY price.")
 
     class Meta:
         ordering = ["sort"]
@@ -56,41 +71,59 @@ class Plan(models.Model):
     def __str__(self):
         return f"{self.name} (${self.price}/wk)"
 
-    def redirects_for(self, interval: str) -> int:
-        """Redirect cap for this tier on that interval.
+    def _cap_for(self, interval: str, weekly: int, monthly: int, yearly: int) -> int:
+        """Resolve a per-interval cap, falling back down the ladder.
 
-        Monthly buys a bigger allowance, not just a longer window, so the caps
-        are per-interval like the price. 0 on the monthly field means "same as
-        weekly", so a tier that doesn't differentiate needs no second value.
+        A longer window buys a bigger allowance, not just more time, so caps
+        are per-interval like the price. 0 means "same as the interval below",
+        so a tier that doesn't differentiate needs no extra value — and a
+        yearly cap left unset inherits the monthly one rather than silently
+        dropping to the weekly figure.
         """
-        if interval == MONTHLY and self.max_redirects_monthly:
-            return self.max_redirects_monthly
-        return self.max_redirects
+        if interval == YEARLY:
+            return yearly or monthly or weekly
+        if interval == MONTHLY:
+            return monthly or weekly
+        return weekly
+
+    def redirects_for(self, interval: str) -> int:
+        return self._cap_for(interval, self.max_redirects,
+                             self.max_redirects_monthly, self.max_redirects_yearly)
 
     def websites_for(self, interval: str) -> int:
-        if interval == MONTHLY and self.max_websites_monthly:
-            return self.max_websites_monthly
-        return self.max_websites
+        return self._cap_for(interval, self.max_websites,
+                             self.max_websites_monthly, self.max_websites_yearly)
 
     def ad_clicks_for(self, interval: str) -> int:
         """Included ad clicks for one period of `interval`.
 
-        The cap is stored monthly; a weekly period gets a quarter of it, which
-        is the same 4-weeks-to-a-month comparison the pricing toggle makes.
-        0 stays 0 — unlimited is unlimited on either interval.
+        The cap is stored monthly and scaled by INTERVAL_MONTHS. 0 stays 0 —
+        unlimited is unlimited on every interval. Rounded up, never down: a
+        rounding error should never shrink what somebody paid for.
         """
         if not self.monthly_ad_clicks:
             return 0
-        if interval == MONTHLY:
-            return self.monthly_ad_clicks
-        return -(-self.monthly_ad_clicks // 4)  # ceil, never round a cap down
+        months = INTERVAL_MONTHS.get(interval, INTERVAL_MONTHS[WEEKLY])
+        return math.ceil(self.monthly_ad_clicks * months)
 
     def price_for(self, interval: str) -> int:
-        return self.price_monthly if interval == MONTHLY else self.price
+        if interval == YEARLY:
+            return self.price_yearly
+        if interval == MONTHLY:
+            return self.price_monthly
+        return self.price
 
     def product_for(self, interval: str) -> str:
-        """Bachs product id for this tier + interval, DB field first then env."""
+        """Bachs product id for this tier + interval, DB field first then env.
+
+        No fallback between intervals on purpose: billing an annual signup
+        against the monthly product would charge the wrong amount, which is a
+        worse failure than refusing the checkout.
+        """
         from django.conf import settings
+        if interval == YEARLY:
+            return (self.bachs_product_id_yearly
+                    or settings.BACHS_PRODUCTS_YEARLY.get(self.slug, ""))
         if interval == MONTHLY:
             return (self.bachs_product_id_monthly
                     or settings.BACHS_PRODUCTS_MONTHLY.get(self.slug, ""))

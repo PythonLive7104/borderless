@@ -7,6 +7,23 @@ import { Section, SectionHead } from "../../components/ui/Section";
 import ComparisonTable from "../../components/marketing/ComparisonTable";
 import { COMPARISONS } from "../../data/comparisons";
 import { IArrow } from "../../components/ui/icons";
+import JsonLd from "../../components/marketing/JsonLd";
+import { abs, breadcrumbs, graph } from "../../lib/schema";
+
+const COMPARE_JSONLD = graph(
+  {
+    "@type": "CollectionPage",
+    name: "Compare TryNoBot with the alternatives",
+    url: abs("/compare"),
+    hasPart: COMPARISONS.map((c) => ({
+      "@type": "WebPage",
+      name: c.title,
+      url: abs(`/compare/${c.slug}`),
+      description: c.metaDescription,
+    })),
+  },
+  breadcrumbs([{ name: "Home", path: "/" }, { name: "Compare", path: "/compare" }]),
+);
 
 /** Comparison hub: the entry point for "<competitor> alternative" searches,
  *  and the page the individual comparisons link back to. */
@@ -19,6 +36,7 @@ export default function Compare() {
 
   return (
     <>
+      <JsonLd data={COMPARE_JSONLD} />
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
         <div className="container-page relative py-16 text-center">

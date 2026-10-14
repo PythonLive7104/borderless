@@ -66,7 +66,7 @@ class ChangePlanView(views.APIView):
             return Response({"detail": "Unknown plan."}, status=400)
         interval = (request.data.get("interval") or "").lower() or None
         if interval and interval not in INTERVAL_DAYS:
-            return Response({"detail": "Interval must be 'weekly' or 'monthly'."}, status=400)
+            return Response({"detail": "Interval must be 'weekly', 'monthly' or 'yearly'."}, status=400)
         sub = _get_subscription(org_id)
         sub.start_period(plan, interval)  # rollover-aware; payment stubbed for the MVP
         sub.save(update_fields=["plan", "status", "interval", "period_start", "period_end",
@@ -161,7 +161,10 @@ from django.core.mail import send_mail
 
 from . import bachs
 from .entitlements import restore_org
-from .models import INTERVAL_DAYS, MONTHLY, WEEKLY
+from .models import INTERVAL_DAYS, MONTHLY, WEEKLY, YEARLY
+
+# What one period is called in prose, for receipts and notification copy.
+INTERVAL_NOUN = {WEEKLY: "week", MONTHLY: "month", YEARLY: "year"}
 
 
 def _notify_activation(sub, plan):
@@ -176,7 +179,7 @@ def _notify_activation(sub, plan):
         f"Your {plan.name} plan is active",
         (
             f"Thanks for subscribing to {settings.BRAND_NAME}.\n\n"
-            f"Plan: {plan.name} (${plan.price_for(sub.interval)}/{'month' if sub.interval == MONTHLY else 'week'})\n"
+            f"Plan: {plan.name} (${plan.price_for(sub.interval)}/{INTERVAL_NOUN.get(sub.interval, 'week')})\n"
             f"Included: {plan.redirects_for(sub.interval) or '∞'} redirects, "
             f"{plan.websites_for(sub.interval) or '∞'} domains.\n"
             f"Access through: {end:%b %d, %Y} ({sub.period_days}-day access; unused days roll over when you renew)\n\n"
@@ -270,7 +273,7 @@ class CheckoutView(views.APIView):
 
         interval = (request.data.get("interval") or WEEKLY).lower()
         if interval not in INTERVAL_DAYS:
-            return Response({"detail": "Interval must be 'weekly' or 'monthly'."}, status=400)
+            return Response({"detail": "Interval must be 'weekly', 'monthly' or 'yearly'."}, status=400)
         if not plan.offers(interval):
             return Response({"detail": f"{plan.name} isn't available on {interval} billing."}, status=400)
 

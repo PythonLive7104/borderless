@@ -6,6 +6,31 @@ import Badge from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Section";
 import { postsByDate } from "../../data/posts";
 import { IArrow } from "../../components/ui/icons";
+import JsonLd from "../../components/marketing/JsonLd";
+import { abs, breadcrumbs, graph, ORG_ID } from "../../lib/schema";
+
+const BLOG_JSONLD = graph(
+  {
+    "@type": "Blog",
+    "@id": abs("/blog") + "#blog",
+    name: "TryNoBot Blog",
+    url: abs("/blog"),
+    description:
+      "Practical writing on ad traffic quality: diagnosing invalid clicks yourself, what datacenter IPs and TLS fingerprints tell you, and what to compare when buying click-fraud protection.",
+    publisher: { "@id": ORG_ID },
+    blogPost: postsByDate().map((p) => ({
+      "@type": "BlogPosting",
+      "@id": `${abs(`/blog/${p.slug}`)}#article`,
+      headline: p.title,
+      description: p.description,
+      url: abs(`/blog/${p.slug}`),
+      datePublished: p.date,
+      articleSection: p.tag,
+      author: { "@id": ORG_ID },
+    })),
+  },
+  breadcrumbs([{ name: "Home", path: "/" }, { name: "Blog", path: "/blog" }]),
+);
 
 const fmt = (iso: string) =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
@@ -22,6 +47,7 @@ export default function Blog() {
 
   return (
     <>
+      <JsonLd data={BLOG_JSONLD} />
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
         <div className="container-page relative py-16 text-center">

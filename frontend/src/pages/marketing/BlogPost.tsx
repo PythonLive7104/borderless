@@ -5,6 +5,22 @@ import Button from "../../components/ui/Button";
 import { Section } from "../../components/ui/Section";
 import { postBySlug, postsByDate, type Block } from "../../data/posts";
 import { IArrow } from "../../components/ui/icons";
+import JsonLd from "../../components/marketing/JsonLd";
+import { blogPosting, breadcrumbs, graph } from "../../lib/schema";
+
+/** Rough word count from the post's own blocks, for articleBody length signals.
+ *  Derived rather than stored so it can never drift from the text. */
+function wordsIn(post: { blocks: Block[] }): number {
+  const text = post.blocks.map((b) => {
+    switch (b.kind) {
+      case "p": case "h2": case "h3": case "note": return b.text;
+      case "ul": case "ol": return b.items.join(" ");
+      case "code": return b.code;
+      case "table": return b.rows.flat().join(" ");
+    }
+  }).join(" ");
+  return text.split(/\s+/).filter(Boolean).length;
+}
 
 const fmt = (iso: string) =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
@@ -106,8 +122,25 @@ export default function BlogPost() {
 
   const more = postsByDate().filter((p) => p.slug !== post.slug).slice(0, 2);
 
+  const jsonLd = graph(
+    blogPosting({
+      headline: post.title,
+      description: post.description,
+      path: `/blog/${post.slug}`,
+      datePublished: post.date,
+      section: post.tag,
+      wordCount: wordsIn(post),
+    }),
+    breadcrumbs([
+      { name: "Home", path: "/" },
+      { name: "Blog", path: "/blog" },
+      { name: post.title, path: `/blog/${post.slug}` },
+    ]),
+  );
+
   return (
     <>
+      <JsonLd data={jsonLd} />
       <article className="container-page py-14">
         <div className="mx-auto max-w-2xl">
           <Link to="/blog" className="text-sm font-semibold text-brand hover:underline">

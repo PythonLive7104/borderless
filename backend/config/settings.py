@@ -259,6 +259,12 @@ BACHS_PRODUCTS = {
 PRIVATE_DOMAIN_PRICE = int(os.getenv("PRIVATE_DOMAIN_PRICE", "10"))  # per 30 days
 BACHS_PRODUCT_PRIVATE_DOMAIN = os.getenv("BACHS_PRODUCT_PRIVATE_DOMAIN", "")
 
+BACHS_PRODUCTS_YEARLY = {
+    "basic": os.getenv("BACHS_PRODUCT_BASIC_YEARLY", ""),
+    "plus": os.getenv("BACHS_PRODUCT_PLUS_YEARLY", ""),
+    "pro": os.getenv("BACHS_PRODUCT_PRO_YEARLY", ""),
+}
+
 BACHS_PRODUCTS_MONTHLY = {
     "basic": os.getenv("BACHS_PRODUCT_BASIC_MONTHLY", ""),
     "plus": os.getenv("BACHS_PRODUCT_PLUS_MONTHLY", ""),

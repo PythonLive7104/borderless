@@ -10,18 +10,22 @@ import { Section, SectionHead } from "../../components/ui/Section";
 import { ICheck } from "../../components/ui/icons";
 import { PLAN_ADD, PLAN_BASE, PLAN_ROLLUP } from "../../data/plans";
 import ComparisonTable from "../../components/marketing/ComparisonTable";
+import JsonLd from "../../components/marketing/JsonLd";
+import { breadcrumbs, graph, softwareApplication } from "../../lib/schema";
 import PaymentMethods from "../../components/marketing/PaymentMethods";
 import { feeLine, feeNote, usePaymentMethods } from "../../lib/usePaymentMethods";
 
 type Group = { label?: string; items: string[]; added?: boolean };
 type Plan = {
-  name: string; price: number; priceMonthly: number; tag: string; cta: string;
-  // Monthly buys a bigger allowance as well as a longer window.
+  name: string; price: number; priceMonthly: number; priceYearly: number;
+  tag: string; cta: string;
+  // Each longer window buys a bigger allowance as well as more time.
   redirectsMonthly: string; domainsMonthly: string;
+  redirectsYearly: string; domainsYearly: string;
   highlight?: boolean; ribbon?: string; warning?: string;
   redirects: string; domains: string; access: string;
-  /** Paid ad clicks included per MONTH. Weekly shows a quarter of it,
-   *  matching Plan.ad_clicks_for() on the server. */
+  /** Paid ad clicks included per MONTH. Weekly shows a quarter and yearly
+   *  twelve times, matching Plan.ad_clicks_for() on the server. */
   adClicks: number;
   groups: Group[];
 };
@@ -29,19 +33,19 @@ type Plan = {
 
 const PLANS: Plan[] = [
   {
-    name: "Basic", price: 25, priceMonthly: 69, tag: "Smart redirects with bot detection, for solo buyers",
-    cta: "Get Basic", adClicks: 10000, redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", access: "7 days of access",
+    name: "Basic", price: 25, priceMonthly: 69, priceYearly: 690, tag: "Smart redirects with bot detection, for solo buyers",
+    cta: "Get Basic", adClicks: 10000, redirects: "2", domains: "5", redirectsMonthly: "5", domainsMonthly: "10", redirectsYearly: "10", domainsYearly: "20", access: "7 days of access",
     groups: [{ items: PLAN_BASE }],
   },
   {
-    name: "Plus", price: 40, priceMonthly: 119, tag: "More links & domains for growing campaigns",
-    cta: "Get Plus", highlight: true, adClicks: 50000, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", access: "7 days of access",
+    name: "Plus", price: 40, priceMonthly: 119, priceYearly: 1190, tag: "More links & domains for growing campaigns",
+    cta: "Get Plus", highlight: true, adClicks: 50000, redirects: "5", domains: "10", redirectsMonthly: "10", domainsMonthly: "20", redirectsYearly: "20", domainsYearly: "40", access: "7 days of access",
     groups: [{ items: PLAN_BASE },
              { label: `${PLAN_ROLLUP.plus}, plus:`, items: PLAN_ADD.plus, added: true }],
   },
   {
-    name: "Pro", price: 70, priceMonthly: 199, tag: "Top limits & dedicated support for agencies",
-    cta: "Get Pro", ribbon: "TOP VALUE", adClicks: 150000, redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", access: "7 days of access",
+    name: "Pro", price: 70, priceMonthly: 199, priceYearly: 1990, tag: "Top limits & dedicated support for agencies",
+    cta: "Get Pro", ribbon: "TOP VALUE", adClicks: 150000, redirects: "10", domains: "20", redirectsMonthly: "20", domainsMonthly: "40", redirectsYearly: "40", domainsYearly: "80", access: "7 days of access",
     groups: [
       { items: PLAN_BASE },
       { label: `${PLAN_ROLLUP.pro}, plus:`, items: PLAN_ADD.pro, added: true },
@@ -105,21 +109,74 @@ function PlusDivider() {
   );
 }
 
-/** The best monthly-vs-weekly saving across the tiers, as the badge text.
- *  Derived rather than hand-written: the old badge said "up to 46%", which was
- *  a number someone would have had to remember to update on every reprice. */
-function maxSaving(plans: Plan[]): string {
-  const best = Math.max(...plans.map((p) => 1 - p.priceMonthly / (p.price * 4)));
-  return `Save up to ${Math.floor(best * 100)}%`;
+/** What one tier costs and includes on a given interval.
+ *
+ *  Replaces the old `monthly` boolean. With three intervals a boolean silently
+ *  made "not monthly" mean weekly, so adding yearly would have shown weekly
+ *  prices under a yearly heading — the kind of bug that charges people the
+ *  wrong amount rather than merely looking wrong.
+ */
+function forInterval(p: Plan, interval: BillingInterval) {
+  if (interval === "yearly") {
+    return {
+      price: p.priceYearly, noun: "year", access: "365 days of access",
+      redirects: p.redirectsYearly, domains: p.domainsYearly,
+      adClicks: p.adClicks * 12,
+      // Against twelve months bought one at a time, which is the comparison an
+      // annual buyer is actually making.
+      saving: p.priceMonthly * 12 - p.priceYearly, savingUnit: "yr", versus: "monthly",
+    };
+  }
+  if (interval === "monthly") {
+    return {
+      price: p.priceMonthly, noun: "month", access: "30 days of access",
+      redirects: p.redirectsMonthly, domains: p.domainsMonthly,
+      adClicks: p.adClicks,
+      saving: p.price * 4 - p.priceMonthly, savingUnit: "mo", versus: "weekly",
+    };
+  }
+  return {
+    price: p.price, noun: "week", access: p.access,
+    redirects: p.redirects, domains: p.domains,
+    adClicks: Math.ceil(p.adClicks / 4),
+    saving: 0, savingUnit: "wk", versus: "",
+  };
 }
+
+/** Badge copy per interval: the best saving any tier achieves on it.
+ *  Derived rather than hand-written — the old badge said "up to 46%", a number
+ *  someone would have had to remember to update on every reprice. */
+function savingBadges(plans: Plan[]): Partial<Record<BillingInterval, string>> {
+  const pct = (f: (p: Plan) => number) =>
+    Math.floor(Math.max(...plans.map(f)) * 100);
+  return {
+    monthly: `Save up to ${pct((p) => 1 - p.priceMonthly / (p.price * 4))}%`,
+    yearly: `Save up to ${pct((p) => 1 - p.priceYearly / (p.priceMonthly * 12))}%`,
+  };
+}
+
+// Every tier on every interval, so "what does TryNoBot cost" has one answer
+// with real numbers behind it rather than a range scraped out of the page.
+const PRICING_JSONLD = graph(
+  softwareApplication(
+    PLANS.flatMap((p) => [
+      { name: `${p.name} (weekly)`, price: p.price, duration: "P7D",
+        description: `${p.redirects} redirects, ${p.domains} sites, ${Math.ceil(p.adClicks / 4).toLocaleString()} ad clicks` },
+      { name: `${p.name} (monthly)`, price: p.priceMonthly, duration: "P1M",
+        description: `${p.redirectsMonthly} redirects, ${p.domainsMonthly} sites, ${p.adClicks.toLocaleString()} ad clicks` },
+      { name: `${p.name} (yearly)`, price: p.priceYearly, duration: "P1Y",
+        description: `${p.redirectsYearly} redirects, ${p.domainsYearly} sites, ${(p.adClicks * 12).toLocaleString()} ad clicks` },
+    ]),
+  ),
+  breadcrumbs([{ name: "Home", path: "/" }, { name: "Pricing", path: "/pricing" }]),
+);
 
 export default function Pricing() {
   const cta = useCta();
-  useSeo("Pricing", "10,000 ad clicks protected from $69/month — real-time bot and click-fraud detection, with TLS fingerprinting and a shared bot network.");
+  useSeo("Pricing", "10,000 ad clicks and 10 sites protected from $69/month, or $690/year. Weekly, monthly or yearly — nothing auto-renews. Start free, no credit card.");
   // Highest-intent step before signup, and the audience worth remarketing to.
   useEffect(() => { trackPricingView(); }, []);
-  const [interval, setInterval] = useState<BillingInterval>("weekly");
-  const monthly = interval === "monthly";
+  const [interval, setInterval] = useState<BillingInterval>("monthly");
   // Any fee the buyer pays on top is disclosed next to the price rather than
   // sprung at checkout. Empty while the fee is absorbed merchant-side, which
   // is the current setting — see PAYMENT_FEE_PCT in settings.
@@ -127,13 +184,14 @@ export default function Pricing() {
   const fee = feeNote(payMethods);
   return (
     <>
+      <JsonLd data={PRICING_JSONLD} />
       <section className="hero-band relative overflow-hidden">
         <div className="binary-grid absolute inset-0 opacity-70" />
         <div className="container-page relative py-16 text-center">
-          <Badge tone="light">Simple, weekly pricing</Badge>
+          <Badge tone="light">Simple, prepaid pricing</Badge>
           <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Tariffs & payment</h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-300">
-            Weekly or monthly access — renew when it runs out, and unused days roll over. No auto-charge, cancel by simply not renewing.
+            Weekly, monthly or yearly access — renew when it runs out, and unused days roll over. No auto-charge, cancel by simply not renewing.
             {fee && <> All prices are in USD, plus {fee} at checkout.</>}
           </p>
         </div>
@@ -147,10 +205,12 @@ export default function Pricing() {
 
       <Section className="!pt-20">
         <div className="mb-10 flex justify-center">
-          <IntervalToggle value={interval} onChange={setInterval} savings={maxSaving(PLANS)} />
+          <IntervalToggle value={interval} onChange={setInterval} savings={savingBadges(PLANS)} />
         </div>
         <div className="grid items-stretch gap-6 lg:grid-cols-3">
-          {PLANS.map((p) => (
+          {PLANS.map((p) => {
+            const t = forInterval(p, interval);
+            return (
             <div key={p.name}
               className={`card relative flex flex-col p-7 ${
                 p.ribbon ? "overflow-hidden" : ""
@@ -171,19 +231,19 @@ export default function Pricing() {
               <p className="mt-1 text-sm text-fg-muted">{p.tag}</p>
               <div className="mt-5 flex items-end gap-1">
                 <span className="text-4xl font-extrabold tracking-tight">
-                  ${monthly ? p.priceMonthly : p.price}
+                  ${t.price.toLocaleString()}
                 </span>
-                <span className="pb-1 text-sm text-fg-dim">/{monthly ? "month" : "week"}</span>
+                <span className="pb-1 text-sm text-fg-dim">/{t.noun}</span>
               </div>
               <div className="mt-0.5 text-xs text-fg-dim">
-                {monthly ? "30 days of access" : p.access}
-                {monthly && <span className="ml-1 font-semibold text-success">
-                  · save ${p.price * 4 - p.priceMonthly}/mo vs weekly
+                {t.access}
+                {t.saving > 0 && <span className="ml-1 font-semibold text-success">
+                  · save ${t.saving.toLocaleString()}/{t.savingUnit} vs {t.versus}
                 </span>}
               </div>
-              {feeLine(payMethods, monthly ? p.priceMonthly : p.price) && (
+              {feeLine(payMethods, t.price) && (
                 <div className="mt-1 text-xs text-fg-dim">
-                  {feeLine(payMethods, monthly ? p.priceMonthly : p.price)}
+                  {feeLine(payMethods, t.price)}
                 </div>
               )}
 
@@ -205,17 +265,16 @@ export default function Pricing() {
               <div className="border-t border-line pt-5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-fg-dim">Ad clicks protected</span>
-                  <span className="font-semibold">
-                    {(monthly ? p.adClicks : Math.ceil(p.adClicks / 4)).toLocaleString()}
-                  </span>
+                  <span className="font-semibold">{t.adClicks.toLocaleString()}</span>
                 </div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{monthly ? p.redirectsMonthly : p.redirects}</span></div>
-                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Antibot sites</span><span className="font-semibold">{monthly ? p.domainsMonthly : p.domains}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Redirects</span><span className="font-semibold">{t.redirects}</span></div>
+                <div className="mt-1 flex justify-between"><span className="text-fg-dim">Antibot sites</span><span className="font-semibold">{t.domains}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>
               <Button to={cta.pricingHref} variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {cta.authed ? "Manage plan" : p.cta}</Button>
             </div>
-          ))}
+            );
+          })}
         </div>
         <p className="mt-8 text-center text-sm text-fg-dim">
           All plans include SSL, GDPR-friendly data controls, and CSV export. Prices in USD{fee ? `, plus ${fee} at checkout` : ""}.
