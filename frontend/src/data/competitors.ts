@@ -25,12 +25,21 @@ export interface Competitor {
   /** Included volume at the entry tier, with its own unit spelled out. */
   volume: string;
   sites: string;
+  /** Whether the vendor pushes IP exclusion lists into Google Ads for you.
+   *
+   *  Present so the table can show the one column we lose. A comparison in
+   *  which one vendor sweeps every row reads as an advert no matter how
+   *  accurate the numbers are — and this is the capability buyers in this
+   *  category ask about first, so omitting it would be the conspicuous kind
+   *  of omission rather than a harmless one. */
+  adsExclusions: boolean;
   url: string;
 }
 
 export const COMPETITORS: Competitor[] = [
   {
     name: "Fraud Blocker",
+    adsExclusions: true,
     price: 79,
     volume: "5,000 ad clicks",
     sites: "1",
@@ -38,6 +47,7 @@ export const COMPETITORS: Competitor[] = [
   },
   {
     name: "ClickCease",
+    adsExclusions: true,
     price: 99,
     promo: 69,
     volume: "5,000 visits",
@@ -46,6 +56,7 @@ export const COMPETITORS: Competitor[] = [
   },
   {
     name: "ClickPatrol",
+    adsExclusions: true,
     price: 77, // €71 at the time of checking
     volume: "5,000 ad clicks",
     sites: "1 brand",
