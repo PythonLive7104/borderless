@@ -1,4 +1,5 @@
 // Typed API client for the Django DRF backend.
+import { getAttribution } from "./attribution";
 const ACCESS = "bl_access";
 const REFRESH = "bl_refresh";
 
@@ -144,8 +145,12 @@ export interface User { id: number; email: string; first_name: string; last_name
 export const authApi = {
   login: (email: string, password: string, signal?: AbortSignal) =>
     http.post<{ access: string; refresh: string }>("/auth/token/", { email, password }, false, signal),
+  // Attribution is attached here rather than passed down through the signup
+  // form, so every caller gets it and no new call site can forget to. The
+  // server treats it as optional, so a visitor with blocked storage still
+  // registers normally.
   register: (payload: { first_name: string; last_name: string; email: string; password: string }, signal?: AbortSignal) =>
-    http.post<User>("/auth/register/", payload, false, signal),
+    http.post<User>("/auth/register/", { ...payload, attribution: getAttribution() || undefined }, false, signal),
   me: (signal?: AbortSignal) => http.get<User>("/auth/me/", signal),
   forgotPassword: (email: string, signal?: AbortSignal) => http.post("/auth/password/forgot/", { email }, false, signal),
   resetPassword: (token: string, password: string, signal?: AbortSignal) => http.post("/auth/password/reset/", { token, password }, false, signal),
@@ -563,7 +568,7 @@ export interface AdminOverview {
   events_processed: number; conversions: number; websites: number; campaigns: number;
   api_keys: number; subscriptions_by_plan: Record<string, number>;
 }
-export interface AdminUser { id: number; email: string; name: string; is_verified: boolean; is_staff: boolean; orgs: number; date_joined: string; }
+export interface AdminUser { id: number; email: string; name: string; is_verified: boolean; is_staff: boolean; orgs: number; date_joined: string; source: string; paid: boolean; }
 export interface AdminOrg { id: number; name: string; owner: string; members: number; websites: number; plan: string; status: string; created_at: string; }
 export interface AdminSub {
   id: number; organization: string; organization_id: number; owner: string; plan: string; price: number;

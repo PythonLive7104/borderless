@@ -19,6 +19,10 @@ import Contact from "./pages/marketing/Contact";
 import Status from "./pages/marketing/Status";
 import Legal from "./pages/marketing/Legal";
 import ReportAbuse from "./pages/marketing/ReportAbuse";
+import Compare from "./pages/marketing/Compare";
+import CompareDetail from "./pages/marketing/CompareDetail";
+import Blog from "./pages/marketing/Blog";
+import BlogPost from "./pages/marketing/BlogPost";
 // Auth + app + admin are lazy (behind login, no SEO, keeps first load small).
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
@@ -73,6 +77,10 @@ export default function AppRoutes() {
           <Route path="/api" element={<ApiPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/bot-check" element={<BotCheck />} />
+          <Route path="/compare" element={<Compare />} />
+          <Route path="/compare/:slug" element={<CompareDetail />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/faq" element={<Faq />} />
           <Route path="/contact" element={<Contact />} />

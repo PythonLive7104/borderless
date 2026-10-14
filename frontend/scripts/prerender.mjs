@@ -1,7 +1,7 @@
 // Post-build: server-render each public route to static HTML for SEO + fast paint.
 import fs from "node:fs";
 import path from "node:path";
-import { render } from "../dist-server/entry-server.js";
+import { render, routes } from "../dist-server/entry-server.js";
 
 const dist = path.resolve("dist");
 const template = fs.readFileSync(path.join(dist, "index.html"), "utf-8");
@@ -10,37 +10,38 @@ const BRAND = "TryNoBot";
 const ORIGIN = (process.env.SITE_ORIGIN || "https://trynobot.com").replace(/\/$/, "");
 const OG_IMAGE = `${ORIGIN}/og-image.png`;
 
-const routes = [
-  { path: "/", out: "index.html", title: "Real-time traffic intelligence & bot detection", desc: "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot." },
-  { path: "/features", out: "features/index.html", title: "Features", desc: "Real-time scoring, JS + TLS/JA3 fingerprinting, traffic rules, IP allow/deny, A/B testing and more." },
-  { path: "/traffic-intelligence", out: "traffic-intelligence/index.html", title: "Traffic intelligence", desc: "Understand who's really visiting — real users vs bots — with real-time visitor intelligence." },
-  { path: "/fraud-detection", out: "fraud-detection/index.html", title: "Fraud detection", desc: "Detect and block bots, click fraud, proxies and VPNs before they waste your ad budget." },
-  { path: "/analytics", out: "analytics/index.html", title: "Traffic analytics", desc: "See traffic quality, sources, conversions and fraud across all your campaigns in one dashboard." },
-  { path: "/integrations", out: "integrations/index.html", title: "Integrations", desc: "Connect TryNoBot with your stack via the JavaScript tracker, REST API and webhooks." },
-  { path: "/api", out: "api/index.html", title: "API", desc: "Automate everything with the TryNoBot REST API and webhooks." },
-  { path: "/pricing", out: "pricing/index.html", title: "Pricing", desc: "Simple plans for real-time bot and fraud detection. Start free, upgrade as you grow." },
-  { path: "/bot-check", out: "bot-check/index.html", title: "Free bot exposure check", desc: "Scan any website in 10 seconds and see how exposed it is to bots — free, no signup." },
-  { path: "/docs", out: "docs/index.html", title: "Documentation", desc: "Install the tracker, create rules and integrate TryNoBot with your site." },
-  { path: "/faq", out: "faq/index.html", title: "FAQ", desc: "Answers to common questions about TryNoBot's bot detection and pricing." },
-  { path: "/contact", out: "contact/index.html", title: "Contact", desc: "Get in touch with the TryNoBot team." },
-  { path: "/status", out: "status/index.html", title: "Status", desc: "TryNoBot system status." },
-  { path: "/terms", out: "terms/index.html", title: "Terms of Service", desc: "TryNoBot terms of service." },
-  { path: "/privacy", out: "privacy/index.html", title: "Privacy Policy", desc: "How TryNoBot handles your data." },
-  { path: "/report", out: "report/index.html", title: "Report a redirect link", desc: "Report a TryNoBot short link used for phishing, malware or spam. We re-scan the destination immediately and disable confirmed threats." },
-];
+// The route list — including the comparison and blog pages generated from
+// data/comparisons.ts and data/posts.ts — comes from the SSR bundle, so it
+// cannot list a page that doesn't exist or miss one that does.
+const ROUTES = routes();
 
-function withHead(html, title, desc, path) {
-  const full = `${title} · ${BRAND}`;
-  const url = `${ORIGIN}${path === "/" ? "/" : path}`;
-  html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${full}</title>`);
-  html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${desc}">`);
+/** Comparison titles already read "TryNoBot vs X"; suffixing the brand again
+ *  gives "...vs ClickCease · TryNoBot", which wastes the most valuable
+ *  characters in the search result. */
+const fullTitle = (title) => (title.includes(BRAND) ? title : `${title} · ${BRAND}`);
+
+/** Attribute values land inside double-quoted HTML attributes. A description
+ *  containing a quote or an ampersand would otherwise break out of it. */
+function attr(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function withHead(html, title, desc, routePath) {
+  const full = fullTitle(title);
+  const url = `${ORIGIN}${routePath === "/" ? "/" : routePath}`;
+  html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${attr(full)}</title>`);
+  html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${attr(desc)}">`);
   // Replace the shell's page-level tags rather than appending duplicates —
   // two og:title tags is worse than none, and crawlers pick unpredictably.
   html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${url}">`);
   html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${url}">`);
-  html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${full}">`);
-  html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${desc}">`);
-  const tw = `<meta name="twitter:title" content="${full}"><meta name="twitter:description" content="${desc}"><meta name="twitter:image" content="${OG_IMAGE}">`;
+  html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${attr(full)}">`);
+  html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${attr(desc)}">`);
+  const tw = `<meta name="twitter:title" content="${attr(full)}"><meta name="twitter:description" content="${attr(desc)}"><meta name="twitter:image" content="${OG_IMAGE}">`;
   return html.replace("</head>", tw + "</head>");
 }
 
@@ -56,10 +57,11 @@ fs.writeFileSync(
 );
 
 let ok = 0;
-for (const r of routes) {
+const failed = [];
+for (const r of ROUTES) {
   let appHtml = "";
   try { appHtml = render(r.path); }
-  catch (e) { console.error("prerender FAILED for", r.path, "-", e.message); continue; }
+  catch (e) { console.error("prerender FAILED for", r.path, "-", e.message); failed.push(r.path); continue; }
   let out = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
   out = withHead(out, r.title, r.desc, r.path);
   const dest = path.join(dist, r.out);
@@ -67,17 +69,27 @@ for (const r of routes) {
   fs.writeFileSync(dest, out);
   ok++;
 }
+
 // Sitemap from the same route list the pages come from — it cannot list a page
-// that doesn't exist, or miss one that does.
+// that doesn't exist, or miss one that does. A route that failed to render is
+// left out: listing a page we didn't write is worse than not listing it.
 const today = new Date().toISOString().slice(0, 10);
-const urls = routes.map((r) => {
+const urls = ROUTES.filter((r) => !failed.includes(r.path)).map((r) => {
   const loc = `${ORIGIN}${r.path === "/" ? "/" : r.path}`;
-  const priority = r.path === "/" ? "1.0" : r.path === "/pricing" ? "0.9" : "0.7";
+  const priority = r.priority || (r.path === "/" ? "1.0" : "0.7");
+  // Blog posts and comparisons are edited rarely; the rest of the site moves
+  // with releases. Claiming weekly for a post written in September invites
+  // Google to discount the whole file's hints.
+  const changefreq = r.path.startsWith("/blog/") || r.path.startsWith("/compare/") ? "monthly" : "weekly";
   return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${today}</lastmod>\n` +
-         `    <changefreq>weekly</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+         `    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 }).join("\n");
 fs.writeFileSync(path.join(dist, "sitemap.xml"),
   `<?xml version="1.0" encoding="UTF-8"?>\n` +
   `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
 
-console.log(`prerender: wrote ${ok}/${routes.length} pages + sitemap.xml`);
+console.log(`prerender: wrote ${ok}/${ROUTES.length} pages + sitemap.xml`);
+if (failed.length) {
+  console.error(`prerender: ${failed.length} route(s) failed:`, failed.join(", "));
+  process.exitCode = 1; // a half-built site should not ship silently
+}

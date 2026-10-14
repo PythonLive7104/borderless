@@ -12,13 +12,19 @@ export default function AdminUsers() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
-              <tr><th className="px-4 py-3">Email</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Verified</th><th className="px-4 py-3">Staff</th><th className="px-4 py-3">Workspaces</th><th className="px-4 py-3">Joined</th></tr>
+              <tr><th className="px-4 py-3">Email</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Came from</th><th className="px-4 py-3">Verified</th><th className="px-4 py-3">Staff</th><th className="px-4 py-3">Workspaces</th><th className="px-4 py-3">Joined</th></tr>
             </thead>
             <tbody className="divide-y divide-line">
               {rows.map((u) => (
                 <tr key={u.id} className="hover:bg-bg-soft">
                   <td className="px-4 py-3 font-semibold">{u.email}</td>
                   <td className="px-4 py-3">{u.name || "—"}</td>
+                  {/* Paid signups are marked so the cost side of the funnel is
+                      visible here, not just in Google's own reporting. */}
+                  <td className="px-4 py-3 text-fg-muted">
+                    {u.paid && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">Paid</span>}
+                    {u.source || "—"}
+                  </td>
                   <td className="px-4 py-3">{u.is_verified ? "✓" : "—"}</td>
                   <td className="px-4 py-3">{u.is_staff ? <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">Staff</span> : "—"}</td>
                   <td className="px-4 py-3">{u.orgs}</td>

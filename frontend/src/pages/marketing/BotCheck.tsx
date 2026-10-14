@@ -1,5 +1,5 @@
 import { useSeo } from "../../lib/seo";
-import { trackLead } from "../../lib/analytics";
+import { trackLead, trackScan } from "../../lib/analytics";
 import { useCta } from "../../lib/useCta";
 import { useState } from "react";
 import { botCheckApi, type BotCheckResult } from "../../lib/api";
@@ -51,7 +51,7 @@ export default function BotCheck() {
     try {
       const r = await botCheckApi.run(url.trim());
       if (!r.ok) setErr(r.error || "Something went wrong.");
-      else setRes(r);
+      else { setRes(r); trackScan(r.grade); }
     } catch (e: any) {
       setErr(e?.data?.error || "That check couldn't be completed. Please try again.");
     } finally { setBusy(false); }

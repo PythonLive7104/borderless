@@ -4,8 +4,13 @@ import App from "./App";
 import "./index.css";
 import { initAnalytics, storedConsent } from "./lib/analytics";
 import { initSelfTracker } from "./lib/selfTracker";
+import { captureAttribution } from "./lib/attribution";
 
 if (storedConsent() === "granted") initAnalytics();
+// Before React renders, because this is the one moment the gclid is still in
+// the URL. Here rather than in a layout: ads are often pointed straight at
+// /signup, which never mounts the marketing layout.
+captureAttribution();
 initSelfTracker(); // we run our own bot protection on trynobot.com
 const root = document.getElementById("root")!;
 const app = (

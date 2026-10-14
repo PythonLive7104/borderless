@@ -6,26 +6,63 @@ User = get_user_model()
 DEFAULT_PREFS = {"email": True, "high_risk": True, "usage": True, "conversions": False}
 
 
+# Acquisition keys the marketing site is allowed to report at signup. Anything
+# else in the payload is dropped: this is an unauthenticated endpoint, so
+# storing the object as sent would let anyone write arbitrary JSON of any size
+# into a user row.
+ATTRIBUTION_KEYS = frozenset({
+    "gclid", "msclkid", "utm_source", "utm_medium", "utm_campaign",
+    "utm_term", "utm_content", "referrer", "landing_path", "first_seen",
+})
+ATTRIBUTION_MAX_LEN = 200
+
+
+def clean_attribution(raw) -> dict:
+    """Whitelist, stringify and bound a reported first touch."""
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for key in ATTRIBUTION_KEYS:
+        val = raw.get(key)
+        if val is None or isinstance(val, (dict, list, bool)):
+            continue
+        text = str(val).strip()[:ATTRIBUTION_MAX_LEN]
+        if text:
+            out[key] = text
+    return out
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
+    # Optional, and never required: a visitor with blocked storage or an ad
+    # blocker sends nothing here and must still be able to register.
+    attribution = serializers.JSONField(required=False, write_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "password"]
+        fields = ["id", "email", "first_name", "last_name", "password", "attribution"]
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("An account with this email already exists.")
         return value.lower()
 
+    def validate_attribution(self, value):
+        return clean_attribution(value)
+
     def create(self, validated_data):
         email = validated_data["email"]
-        return User.objects.create_user(
+        user = User.objects.create_user(
             username=email, email=email, password=validated_data["password"],
             first_name=validated_data.get("first_name", ""), last_name=validated_data.get("last_name", ""),
         )
+        attribution = validated_data.get("attribution") or {}
+        if attribution:
+            user.attribution = attribution
+            user.save(update_fields=["attribution"])
+        return user
 
 
 class UserSerializer(serializers.ModelSerializer):

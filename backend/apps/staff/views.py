@@ -46,6 +46,10 @@ class AdminUsersView(views.APIView):
             "id": u.id, "email": u.email, "name": f"{u.first_name} {u.last_name}".strip(),
             "is_verified": u.is_verified, "is_staff": u.is_staff,
             "orgs": u.orgs, "date_joined": u.date_joined,
+            # Which ad, campaign or channel produced this signup. Shown in the
+            # staff user list so paid acquisition can be judged against the
+            # accounts it actually produced rather than against raw signups.
+            "source": u.acquisition_source, "paid": u.is_paid_acquisition,
         } for u in users])
 
 

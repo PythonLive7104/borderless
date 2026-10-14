@@ -6,7 +6,7 @@ import { companyLine } from "../../lib/company";
 export default function Footer() {
   return (
     <footer className="border-t border-line bg-bg-soft">
-      <div className="container-page grid gap-10 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+      <div className="container-page grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-fg-muted">{BRAND.tagline}</p>

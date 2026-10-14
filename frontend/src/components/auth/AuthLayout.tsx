@@ -1,11 +1,18 @@
-import { type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { type ReactNode, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import Logo from "../marketing/Logo";
 import { BRAND } from "../../lib/brand";
+import { trackPageView } from "../../lib/analytics";
 
 export default function AuthLayout({ title, subtitle, children, footer }: {
   title: string; subtitle: string; children: ReactNode; footer?: ReactNode;
 }) {
+  const { pathname } = useLocation();
+  // Auth pages are funnel steps, not app pages: without a pageview here the
+  // drop-off between /pricing and the signup form is invisible, and that is
+  // the step most worth fixing when paid traffic isn't converting.
+  useEffect(() => { trackPageView(pathname); }, [pathname]);
+
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* brand panel */}
@@ -15,10 +22,10 @@ export default function AuthLayout({ title, subtitle, children, footer }: {
           <Logo light />
           <div>
             <h2 className="max-w-md text-3xl font-extrabold leading-tight text-white">
-              See every visitor. Score every click. <span className="text-gradient">Protect every campaign.</span>
+              Stop paying for clicks that <span className="text-gradient">were never people.</span>
             </h2>
             <p className="mt-4 max-w-sm text-slate-300">
-              Real-time traffic intelligence, fraud detection and campaign protection for serious media buyers.
+              Real-time scoring, click-fraud detection and campaign protection for advertisers and agencies.
             </p>
             <div className="mt-8 flex gap-6 text-slate-300">
               {[["<10ms", "decision latency"], ["JA3 + JA4", "TLS fingerprinting"], ["0–100", "risk score"]].map(([v, k]) => (

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSeo } from "../../lib/seo";
+import { trackPricingView } from "../../lib/analytics";
 import { useCta } from "../../lib/useCta";
 import IntervalToggle from "../../components/ui/IntervalToggle";
 import type { BillingInterval } from "../../lib/api";
@@ -115,6 +116,8 @@ function maxSaving(plans: Plan[]): string {
 export default function Pricing() {
   const cta = useCta();
   useSeo("Pricing", "10,000 ad clicks protected from $69/month — real-time bot and click-fraud detection, with TLS fingerprinting and a shared bot network.");
+  // Highest-intent step before signup, and the audience worth remarketing to.
+  useEffect(() => { trackPricingView(); }, []);
   const [interval, setInterval] = useState<BillingInterval>("weekly");
   const monthly = interval === "monthly";
   // Any fee the buyer pays on top is disclosed next to the price rather than

@@ -11,7 +11,10 @@ function setMeta(attr: "name" | "property", key: string, content: string) {
 // Sets the document title + description + Open Graph tags for a page.
 export function useSeo(title: string, description: string) {
   useEffect(() => {
-    const full = `${title} · ${BRAND}`;
+    // A title that already names the brand (the comparison pages read
+    // "TryNoBot vs X") must not be suffixed again — the duplicate eats the
+    // characters Google actually shows. Mirrored in scripts/prerender.mjs.
+    const full = title.includes(BRAND) ? title : `${title} · ${BRAND}`;
     document.title = full;
     setMeta("name", "description", description);
     setMeta("property", "og:title", full);

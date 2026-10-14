@@ -123,3 +123,43 @@ export function trackPurchase(value: number, plan: string, interval: string) {
   if (GA_ID) window.gtag("event", "purchase", { currency: "USD", value, items: [{ item_id: plan, item_name: plan, item_category: interval }] });
   conversion(GADS_PURCHASE_LABEL, { currency: "USD", value });
 }
+
+/** A route change in the SPA.
+ *
+ *  GA4's `config` call fires exactly one page_view, on the initial load. Every
+ *  client-side navigation after that is invisible without this — which means
+ *  the whole journey (ad → landing → compare page → pricing → signup) collapses
+ *  into a single pageview on the entry page, and no funnel or landing-page
+ *  report can be trusted. Sent manually, so `send_page_view: false` is NOT set
+ *  on config: the first view still comes from config, and this covers the rest.
+ */
+export function trackPageView(path: string) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  // Any configured tag, not GA4 only: with Google Ads alone, the Ads tag also
+  // fires just once on load, so without this a visitor who browses to /pricing
+  // never enters the remarketing audience for it.
+  if (!GA_ID && !GADS_ID) return;
+  window.gtag("event", "page_view", {
+    page_path: path,
+    page_location: window.location.href,
+    page_title: document.title,
+  });
+}
+
+/** Someone ran the free Bot Check. Not a conversion — it's the top of the
+ *  funnel, and the denominator for the scan → lead rate that decides whether
+ *  the Bot Check landing page is worth bidding on at all. */
+export function trackScan(grade?: string) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (!GA_ID && !GADS_ID) return;
+  window.gtag("event", "bot_check_scan", { grade: grade || "unknown" });
+}
+
+/** A visitor reached the pricing table. The strongest pre-signup intent signal
+ *  we have, and usable as a remarketing audience even when GADS labels aren't
+ *  configured yet. */
+export function trackPricingView() {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (!GA_ID && !GADS_ID) return;
+  window.gtag("event", "view_pricing");
+}

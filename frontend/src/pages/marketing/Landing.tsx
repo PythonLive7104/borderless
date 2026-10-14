@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useSeo } from "../../lib/seo";
 import { useCta } from "../../lib/useCta";
 import LiveScore from "../../components/marketing/LiveScore";
@@ -8,24 +9,30 @@ import LogoStrip from "../../components/marketing/LogoStrip";
 import DashboardPreview from "../../components/marketing/DashboardPreview";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
 import { BRAND } from "../../lib/brand";
-import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock, ILink, IFilter, IKey, IShieldGold, ICheck, IFunnel, IGlobe } from "../../components/ui/icons";
+import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock, IKey, IShieldGold, ICheck, IFunnel } from "../../components/ui/icons";
 
+// Ordered for the buyer the paid campaigns are aimed at: an advertiser who
+// has just worked out that some of their ad spend is buying automation. The
+// first six answer "does this stop that"; the depth comes after.
+//
+// Redirect filtering, deep targeting and private domains are real features and
+// stay on /features and in the docs — but they are not the shop window. Led
+// with, they describe a traffic-shaping tool rather than a fraud-detection one,
+// which is the wrong product to the buyer we want and the wrong signal to the
+// reviewer deciding whether our own ads run.
 const FEATURES = [
+  { icon: IShield, title: "Click Fraud Protection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your Google, Microsoft or Meta ad budget — and remember an IP once it's caught, everywhere." },
+  { icon: IGauge, title: "Explainable Risk Scoring", desc: "Every click gets a transparent 0–100 score with the exact signals that drove it. Never a verdict you can't audit." },
+  { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node. Catches automation that never runs JavaScript." },
+  { icon: IKey, title: "TLS Fingerprinting", desc: "Identify automated clients by their JA3/JA4 TLS signature, not just their user-agent — bots can't hide behind a fresh IP and a borrowed browser string." },
+  { icon: IShieldGold, title: "Live IP Reputation", desc: "Real-time fraud scoring, proxy/VPN and recent-abuse checks on every IP, so a clean-looking address that's already known bad still gets caught." },
   { icon: IRadar, title: "Traffic Intelligence", desc: "See every visitor and session with rich device, network and geo signals in real time." },
-  { icon: IShield, title: "Fraud Detection", desc: "Catch bots, datacenter IPs, proxies and automation before they burn your budget — and remember an IP once it's caught, everywhere." },
-  { icon: IGauge, title: "Risk Scoring", desc: "Every click gets a transparent 0–100 score with the exact signals that drove it." },
+  { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
   { icon: IChart, title: "Campaign Analytics", desc: "Break down quality, sources, geos and devices with fast, filterable reports." },
   { icon: ITarget, title: "Conversion Tracking", desc: "Attribute conversions and revenue back to campaigns and traffic quality." },
-  { icon: IBolt, title: "Real-Time Monitoring", desc: "A live traffic feed with instant classification and rule actions as clicks land." },
-  { icon: IServer, title: "Server-Side Shield", desc: "Block bots before your page even loads — enforce your rules at your server or edge with a drop-in snippet for PHP, Django, nginx, Cloudflare or Node." },
-  { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
-  { icon: ILink, title: "Redirection", desc: "Branded redirect links that score every click — real people reach your page, bots hit a decoy, a 404 or nothing at all." },
-  { icon: IFilter, title: "Deep Targeting Filters", desc: "Filter by connection type, ISP, ASN, device, OS, browser version, language and country — allow only the traffic you actually want." },
-  { icon: IKey, title: "TLS Fingerprinting", desc: "Identify automated clients by their JA3/JA4 TLS signature, not just their user-agent — bots can't hide behind a fresh IP." },
-  { icon: IShieldGold, title: "Live IP Reputation", desc: "Real-time fraud scoring, proxy/VPN and recent-abuse checks on every IP, so a clean-looking address that's already known bad still gets caught." },
   { icon: ICheck, title: "Silent Browser Check", desc: "A split-second, no-click \"checking your browser\" step that catches headless and automated browsers real people never use." },
+  { icon: ILock, title: "Folder Guard", desc: "Lock down sensitive pages like /admin, /wp-login or /downloads so bots and fraud can't reach them at all." },
   { icon: IFunnel, title: "Filtering Funnel", desc: "See exactly how much traffic was checked, how much reached your page, and why the rest was turned away." },
-  { icon: IGlobe, title: "Private Domains", desc: "Rent short domains used by you alone, so another customer's traffic can never affect your reputation." },
 ];
 
 const STEPS = [
@@ -48,16 +55,29 @@ const METRICS = [
   ["4", "Verdicts: human, suspicious, bot, fraud"],
 ];
 
+// Carousel order is the positioning. Slide one has to name the buyer's problem
+// in their words — paying for clicks that were never people — before any claim
+// about how we detect it.
 const SLIDES: Slide[] = [
   {
-    badge: "Real-time traffic intelligence",
-    title: (<>See every visitor.<br />Score every click.<br /><span className="text-gradient">Protect every campaign.</span></>),
+    badge: "Click fraud protection",
+    title: (<>Stop paying for<br />clicks that were<br /><span className="text-gradient">never people.</span></>),
     subtitle: BRAND.subtitle,
+  },
+  {
+    badge: "Explainable risk scoring",
+    title: (<>Know your traffic<br />quality <span className="text-gradient">in real time.</span></>),
+    subtitle: "Every visit is scored 0–100 and classified as Human, Suspicious, Bot or Fraud, with the exact signals that drove the decision — so you can audit it, not just trust it.",
   },
   {
     badge: "Behavioral detection",
     title: (<>Catch bots that pass<br />every <span className="text-gradient">fingerprint check.</span></>),
     subtitle: "We score how real visitors move, scroll and type. Script-driven and synthetic interaction gives automation away — even on a clean IP with a perfect user-agent.",
+  },
+  {
+    badge: "Server-side defense",
+    title: (<>Block bots before<br />your page <span className="text-gradient">even loads.</span></>),
+    subtitle: "A JavaScript tag only sees clients that run JavaScript. The server-side Shield scores the request first — from PHP, Django, Node, nginx or a Cloudflare Worker — so scripted traffic never reaches your landing page.",
   },
   {
     badge: "Network defense",
@@ -70,16 +90,6 @@ const SLIDES: Slide[] = [
     subtitle: "We verify and label Google Ads, AdSense and Bing Ads review bots — and show them the same page real visitors see, never a different one. Your click quality reflects real people, not the platform's own automated checks.",
   },
   {
-    badge: "Fraud detection",
-    title: (<>Stop paying<br />for <span className="text-gradient">bot traffic.</span></>),
-    subtitle: "Detect datacenter IPs, proxies, VPNs and automation before they drain your ad budget — with transparent, explainable scoring.",
-  },
-  {
-    badge: "Explainable risk scoring",
-    title: (<>Know your traffic<br />quality <span className="text-gradient">in real time.</span></>),
-    subtitle: "Every visit is scored 0–100 and classified as Human, Suspicious, Bot or Fraud, with the exact signals that drove the decision.",
-  },
-  {
     badge: "Conversion tracking",
     title: (<>Measure what<br />actually <span className="text-gradient">converts.</span></>),
     subtitle: "Attribute conversions and revenue back to campaigns, sources and traffic quality — and double down on what works.",
@@ -88,7 +98,7 @@ const SLIDES: Slide[] = [
 
 export default function Landing() {
   const cta = useCta();
-  useSeo("Real-time traffic intelligence & bot detection", "Score every visitor, block bots and fraud, and protect your ad campaigns in real time with TryNoBot.");
+  useSeo("Stop paying for bot clicks on your ads", "Protect your Google and Microsoft Ads budget: every visitor scored 0-100 in real time, bots and click fraud blocked before they cost you, with the exact signals behind every decision.");
   useReveal();
   return (
     <>
@@ -174,15 +184,29 @@ export default function Landing() {
           <div className="binary-grid absolute inset-0 opacity-60" />
           <div className="relative">
             <h2 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              Start understanding your traffic today.
+              Find out what you're paying for.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-slate-300">
-              Join marketers and agencies protecting their budgets with real-time traffic intelligence.
+              Run the free exposure check on your site, or start a 7-day trial and watch real clicks
+              get scored. No credit card either way.
             </p>
-            <div className="mt-8 flex justify-center gap-3">
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button to={cta.signupHref} size="lg">{cta.label("Create an account")} <IArrow width={18} /></Button>
-              <Button to="/pricing" variant="light" size="lg">View pricing</Button>
+              <Button to="/bot-check" variant="light" size="lg">Run a free check</Button>
             </div>
+            {/* Internal links to the two surfaces that earn search traffic.
+                Both need to be reachable from the home page to get indexed
+                and to pick up any authority the home page has. */}
+            <p className="mt-6 text-sm text-slate-400">
+              Shopping around?{" "}
+              <Link to="/compare" className="font-semibold text-white underline decoration-white/40 hover:decoration-white">
+                See how we compare
+              </Link>{" "}
+              or{" "}
+              <Link to="/blog" className="font-semibold text-white underline decoration-white/40 hover:decoration-white">
+                read how the detection works
+              </Link>.
+            </p>
           </div>
         </div>
       </Section>
