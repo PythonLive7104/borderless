@@ -4,6 +4,7 @@ import Logo from "./Logo";
 import Button from "../ui/Button";
 import { NAV_LINKS } from "../../lib/brand";
 import { useAuth } from "../../context/AuthContext";
+import ThemeToggle from "../ui/ThemeToggle";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -22,6 +23,7 @@ export default function Navbar() {
           ))}
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
+          <ThemeToggle />
           {user ? (
             <Button to="/dashboard">Go to dashboard</Button>
           ) : (
@@ -31,9 +33,12 @@ export default function Navbar() {
             </>
           )}
         </div>
-        <button className="lg:hidden rounded-lg p-2 text-fg-muted hover:bg-bg-mute" onClick={() => setOpen(!open)} aria-label="Menu">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-        </button>
+        <div className="flex items-center gap-1 lg:hidden">
+          <ThemeToggle />
+          <button className="rounded-lg p-2 text-fg-muted hover:bg-bg-mute" onClick={() => setOpen(!open)} aria-label="Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+        </div>
       </div>
       {open && (
         <div className="border-t border-line lg:hidden">

@@ -144,7 +144,7 @@ export default function TrafficRules() {
         {canManage && tab === "rules" && <Button onClick={openCreate}>+ New rule</Button>}
       </div>
 
-      <div className="mt-5 flex gap-6 border-b border-line">
+      <div className="scroll-x mt-5 flex gap-6 border-b border-line">
         <TabButton id="rules" label="Rules" />
         <TabButton id="ip" label="IP allow / deny" />
       </div>

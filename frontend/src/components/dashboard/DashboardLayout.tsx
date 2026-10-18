@@ -4,6 +4,7 @@ import Logo from "../marketing/Logo";
 import Button from "../ui/Button";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import NotifyBell from "./NotifyBell";
+import ThemeToggle from "../ui/ThemeToggle";
 import HelpChat from "./HelpChat";
 import AccessGate from "./AccessGate";
 import CommandPalette from "./CommandPalette";
@@ -109,8 +110,8 @@ export default function DashboardLayout() {
       <div className="lg:pl-60">
         <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-xl">
           <div className="flex h-16 items-center justify-between gap-3 px-5">
-            <div className="flex items-center gap-3">
-              <button className="rounded-lg p-2 text-fg-muted hover:bg-bg-mute lg:hidden" onClick={() => setOpen(!open)}>
+            <div className="flex min-w-0 items-center gap-3">
+              <button className="shrink-0 rounded-lg p-2 text-fg-muted hover:bg-bg-mute lg:hidden" onClick={() => setOpen(!open)}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
               </button>
               <WorkspaceSwitcher />
@@ -120,11 +121,15 @@ export default function DashboardLayout() {
                 Search <kbd className="rounded border border-line px-1 py-0.5 text-[9px]">⌘K</kbd>
               </button>
             </div>
-            <div className="flex items-center gap-3 text-sm">
+            {/* shrink-0 throughout: on a phone this row was wider than the
+                viewport, which is what let the whole dashboard scroll
+                sideways. The email and the Admin link give way first. */}
+            <div className="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
+              <ThemeToggle />
               <NotifyBell />
-              {user?.is_staff && <Link to="/admin" className="rounded-lg bg-navy-900 px-3 py-1.5 font-semibold text-white hover:opacity-90">Admin</Link>}
-              <span className="hidden text-fg-muted sm:block">{user?.email}</span>
-              <Button variant="outline" onClick={logout}>Sign out</Button>
+              {user?.is_staff && <Link to="/admin" className="hidden shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 font-semibold text-white hover:opacity-90 sm:block">Admin</Link>}
+              <span className="hidden text-fg-muted lg:block">{user?.email}</span>
+              <Button variant="outline" onClick={logout} className="shrink-0">Sign out</Button>
             </div>
           </div>
         </header>

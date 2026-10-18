@@ -1,10 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#0a0f1d" />
+    <!-- Applies the saved theme BEFORE first paint. Inline and synchronous on
+         purpose: anything deferred lets the page paint in the wrong theme and
+         then snap, which is worse than either theme on its own. The markup
+         ships dark, so this only has to act for visitors who chose light. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("tnb_theme");
+          if (t === "light") document.documentElement.setAttribute("data-theme", "light");
+        } catch (e) { /* private mode: keep the default */ }
+      })();
+    </script>
     <meta name="description" content="TryNoBot — See every visitor. Score every click. Protect every campaign. Real-time traffic intelligence, fraud detection and campaign analytics." />
     <title>TryNoBot — Traffic Intelligence & Fraud Detection</title>
     <link rel="canonical" href="https://trynobot.com/" />

@@ -30,6 +30,62 @@
   --radius-xl2: 1.25rem;
 }
 
+/* ---- Dark theme -----------------------------------------------------------
+ *
+ * Dark is the DEFAULT. index.html ships `data-theme="dark"` on <html> so the
+ * pre-rendered pages paint dark on first byte; a tiny inline script flips it to
+ * light only when the visitor previously chose light. Doing it the other way
+ * round — light markup, JS darkens it — gives every visitor a white flash on a
+ * site whose whole brand is a dark hero band.
+ *
+ * The design already speaks in semantic tokens (bg / card / line / fg), so a
+ * theme is mostly a matter of re-pointing those. The two exceptions are handled
+ * below: `bg-white`, which the components use directly in 119 places and which
+ * means "card surface" rather than literally white, and the soft shadow, which
+ * is invisible against a dark background.
+ *
+ * `text-white` is deliberately NOT remapped: it sits on the navy hero bands,
+ * which stay dark in both themes. Overriding --color-white would have caught
+ * both and turned that text unreadable.
+ */
+:root[data-theme="dark"] {
+  --color-bg: #0a0f1d;
+  --color-bg-soft: #0f1627;
+  --color-bg-mute: #19223a;
+  --color-card: #111a2e;
+  --color-line: #222e49;
+  --color-line-soft: #1a2339;
+
+  --color-fg: #e8ecf5;
+  --color-fg-muted: #a6b0c4;
+  --color-fg-dim: #7b8599;
+
+  /* Lifted a step: #2563eb is legible on white but muddy on near-black. */
+  --color-brand: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
+
+/* `bg-white` means "card surface" in this codebase, not the colour white. */
+:root[data-theme="dark"] .bg-white { background-color: var(--color-card); }
+
+/* A shadow cast on near-black is invisible, so dark leans on a hairline
+   highlight instead of a drop shadow to lift a surface off the page. */
+:root[data-theme="dark"] .shadow-soft {
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 10px 30px -18px rgba(0,0,0,.8);
+}
+
+/* The light theme's near-white page background inside the binary grid reads as
+   a seam against the dark hero; soften it in dark. */
+:root[data-theme="dark"] .binary-grid {
+  background-image:
+    linear-gradient(to right, rgba(120,160,255,.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120,160,255,.08) 1px, transparent 1px);
+}
+
 @layer base {
   html { scroll-behavior: smooth; }
   body {
@@ -82,6 +138,18 @@
       linear-gradient(to bottom, rgba(120,160,255,.06) 1px, transparent 1px);
     background-size: 40px 40px;
   }
+  /* A row that scrolls sideways on its own instead of widening the document.
+     Tab strips and metric rows are the usual culprits: five tabs are wider
+     than a phone, and without this the whole page scrolls horizontally and
+     every other element looks broken. Scrollbar hidden because the strip is
+     swipeable and a visible bar under a row of tabs reads as a bug. */
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar { display: none; }
+
   .fade-up { animation: fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px);} to {opacity:1; transform:none;} }
 }

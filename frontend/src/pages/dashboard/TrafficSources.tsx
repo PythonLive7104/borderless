@@ -31,7 +31,7 @@ export default function TrafficSources() {
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : rows.length === 0 ? <div className="card shadow-soft mt-6"><NoData /></div>
        : (
-        <div className="card shadow-soft mt-6 overflow-hidden">
+        <div className="card shadow-soft mt-6 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
               <tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Human</th><th className="px-4 py-3 w-1/3">Quality</th></tr>

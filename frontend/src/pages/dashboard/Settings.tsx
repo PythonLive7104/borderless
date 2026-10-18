@@ -61,8 +61,11 @@ export default function Settings() {
       {/* identity header */}
       <div className="card shadow-soft mt-6 flex flex-wrap items-center gap-4 p-5">
         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand/10 text-lg font-extrabold text-brand">{initials}</div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+        {/* basis-56 so the name block claims a real width before the button is
+            allowed to share the row; without it min-w-0 let it collapse to
+            nothing and the button sat on top of the name badges on a phone. */}
+        <div className="min-w-0 flex-1 basis-56">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-lg font-bold">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || "Your account"}</span>
             {user?.is_verified ? (
               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-emerald-700">Verified</span>
@@ -73,13 +76,13 @@ export default function Settings() {
           </div>
           <div className="truncate text-sm text-fg-muted">{user?.email}</div>
         </div>
-        <Button variant="outline" onClick={startTour}>Take the product tour</Button>
+        <Button variant="outline" onClick={startTour} className="w-full sm:w-auto">Take the product tour</Button>
       </div>
 
-      <div className="mt-6 flex gap-1 border-b border-line">
+      <div className="scroll-x mt-6 flex gap-1 border-b border-line">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition ${tab === t ? "border-brand text-brand" : "border-transparent text-fg-muted hover:text-fg"}`}>{t}</button>
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition ${tab === t ? "border-brand text-brand" : "border-transparent text-fg-muted hover:text-fg"}`}>{t}</button>
         ))}
       </div>
 

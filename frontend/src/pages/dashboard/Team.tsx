@@ -67,7 +67,7 @@ export default function Team() {
 
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div> : (
         <>
-          <div className="card shadow-soft mt-6 overflow-hidden">
+          <div className="card shadow-soft mt-6 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
                 <tr><th className="px-4 py-3">Member</th><th className="px-4 py-3">Role</th><th className="px-4 py-3"></th></tr>

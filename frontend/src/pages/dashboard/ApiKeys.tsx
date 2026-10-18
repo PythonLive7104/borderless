@@ -54,7 +54,7 @@ export default function ApiKeys() {
       {loading ? <div className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand" /></div>
        : keys.length === 0 ? <div className="card shadow-soft mt-6 p-10 text-center"><h2 className="text-lg font-bold">No API keys</h2><p className="mx-auto mt-2 max-w-sm text-sm text-fg-muted">Create a key to start using the REST API.</p></div>
        : (
-        <div className="card shadow-soft mt-6 overflow-hidden">
+        <div className="card shadow-soft mt-6 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-line bg-bg-soft text-left text-xs uppercase tracking-wide text-fg-dim">
               <tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Key</th><th className="px-4 py-3">Last used</th><th className="px-4 py-3">Status</th><th className="px-4 py-3"></th></tr>
