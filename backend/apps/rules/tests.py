@@ -150,3 +150,54 @@ class DeeperSignalFieldsTest(TestCase):
             "conditions": [{"field": "not_a_field", "operator": "eq", "value": "x"}],
         }, format="json")
         self.assertEqual(r.status_code, 400)
+
+
+class RuleActionValidationTest(TestCase):
+    """A rule that cannot carry out its action must be refused at save time.
+
+    These used to save happily and then do nothing, which is worse than an
+    error: the dashboard shows them enabled and the traffic sails through.
+    """
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {
+            "email": "rv@example.com", "password": "testpass123", "first_name": "R"}, format="json")
+        tok = self.c.post("/api/auth/token/", {
+            "email": "rv@example.com", "password": "testpass123"}, format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {tok}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+
+    def _post(self, **over):
+        body = {
+            "organization": self.org, "name": "r", "priority": 100,
+            "action": "redirect", "redirect_url": "https://example.com/blocked",
+            "conditions": [{"field": "is_proxy", "operator": "eq", "value": "1"}],
+        }
+        body.update(over)
+        return self.c.post("/api/rules/", body, format="json")
+
+    def test_redirect_without_a_destination_is_refused(self):
+        r = self._post(redirect_url="")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("redirect_url", r.json())
+
+    def test_redirect_with_only_whitespace_is_refused(self):
+        self.assertEqual(self._post(redirect_url="   ").status_code, 400)
+
+    def test_redirect_with_a_destination_is_accepted(self):
+        self.assertEqual(self._post().status_code, 201)
+
+    def test_tag_without_a_label_is_refused(self):
+        r = self._post(action="tag", redirect_url="", tag="")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("tag", r.json())
+
+    def test_other_actions_need_neither(self):
+        """Block and review act on their own; they must not be caught by the
+        guards above."""
+        for action in ("block", "review", "allow"):
+            with self.subTest(action=action):
+                self.assertEqual(
+                    self._post(action=action, redirect_url="", tag="").status_code, 201)

@@ -191,7 +191,16 @@ def _notify_activation(sub, plan):
     )
 
 
-def _activate(sub, plan, interval=None):
+def _activate(sub, plan, interval=None, paid_ref: str = ""):
+    """Apply a plan to a subscription.
+
+    `paid_ref` is set ONLY by the paths where real money changed hands — the
+    Bachs webhook and the settle-on-return poll — and carries that payment's id.
+    The free-tier and local-development bypasses below call this without it, so
+    they can never trigger a referral payout. Referral credit that could be
+    minted by a $0 activation would be free money, which is exactly the kind of
+    thing a fraud-detection company should not ship.
+    """
     sub.start_period(plan, interval)  # plan + interval, rolling unused days over
     sub.save(update_fields=["plan", "status", "interval", "period_start", "period_end",
                             "pending_plan_slug", "pending_interval"])
@@ -199,6 +208,32 @@ def _activate(sub, plan, interval=None):
     # hourly enforce_access run to start protecting traffic again.
     restore_org(sub.organization_id)
     _notify_activation(sub, plan)
+
+    if paid_ref:
+        _award_referral(sub, plan, interval, paid_ref)
+
+
+def _award_referral(sub, plan, interval, paid_ref: str):
+    """Pay the referrer, if this workspace's owner was referred.
+
+    Isolated and swallowed: a referral payout must never be able to fail an
+    activation the customer has already paid for. The ledger entry is keyed on
+    the payment id, so the webhook and the poll cannot both pay out.
+    """
+    try:
+        owner = getattr(sub.organization, "owner", None)
+        if not owner:
+            return
+        from apps.referrals.service import award_for_payment
+        award_for_payment(
+            owner,
+            source_ref=f"bachs:{paid_ref}",
+            note=f"{plan.name} ({interval or sub.interval})",
+        )
+    except Exception:  # pragma: no cover - defensive
+        import logging
+        logging.getLogger("referrals").exception(
+            "referral payout failed for org=%s ref=%r", sub.organization_id, paid_ref)
 
 
 def settle_pending_checkout(sub) -> bool:
@@ -231,12 +266,54 @@ def settle_pending_checkout(sub) -> bool:
         return False
 
     interval = sub.pending_interval or sub.interval or WEEKLY
-    _activate(sub, plan, interval)     # clears the pending session + interval
+    _activate(sub, plan, interval, paid_ref=sub.bachs_session_id)
     sub.bachs_session_id = ""
     sub.save(update_fields=["bachs_session_id"])
     log.info("settle: org=%s activated %s (%s) from the checkout session",
              sub.organization_id, plan.slug, interval)
     return True
+
+
+class RedeemCreditView(views.APIView):
+    """POST {organization, plan, interval} — buy a period with referral credit.
+
+    Separate from CheckoutView rather than a flag on it: this path takes no
+    payment, creates no Bachs session and has nothing to verify afterwards, so
+    folding it in would mean threading "but not if paying by credit" through
+    every branch of a method that already has several.
+
+    Note what this deliberately does NOT do: award referral credit. Activation
+    here passes no `paid_ref`, so spending credit cannot mint more of it. A
+    chain of users redeeming free periods that each pay their referrer $2 would
+    be a money printer.
+    """
+
+    def post(self, request):
+        org_id = request.data.get("organization")
+        m = _membership(request.user, org_id)
+        if not m or not m.can_manage:
+            return Response({"detail": "Only Owners and Admins can change the plan."}, status=403)
+
+        plan = Plan.objects.filter(slug=request.data.get("plan")).first()
+        if not plan:
+            return Response({"detail": "Unknown plan."}, status=400)
+
+        interval = (request.data.get("interval") or WEEKLY).lower()
+        if interval not in INTERVAL_DAYS:
+            return Response({"detail": "Interval must be 'weekly', 'monthly' or 'yearly'."}, status=400)
+        if not plan.offers(interval):
+            return Response({"detail": f"{plan.name} isn't available on {interval} billing."}, status=400)
+
+        from apps.referrals.service import RedeemError, redeem
+        try:
+            redeem(request.user, plan, interval, org_id)
+        except RedeemError as e:
+            return Response({"detail": str(e)}, status=400)
+
+        sub = _get_subscription(org_id)
+        _activate(sub, plan, interval)
+        return Response({"activated": True, "paid_with_credit": True,
+                         **SubscriptionSerializer(sub).data})
 
 
 class VerifyCheckoutView(views.APIView):
@@ -385,21 +462,26 @@ class BachsWebhookView(views.APIView):
 
     def post(self, request):
         raw = request.body
+        # V2 first: it carries its own timestamp and is what Bachs recommends
+        # for new integrations. The others are accepted for older destinations.
         sig = (
-            request.headers.get("Bachs-Signature")
+            request.headers.get("X-Bachs-Signature-V2")
+            or request.headers.get("Bachs-Signature")
             or request.headers.get("X-Bachs-Signature")
             or request.headers.get("Webhook-Signature")
             or ""
         )
-        if not bachs.verify_signature(raw, sig):
+        ts = request.headers.get("X-Bachs-Timestamp") or ""
+        if not bachs.verify_signature(raw, sig, ts):
             # Logged loudly: a rejected webhook is indistinguishable from one
             # that never arrived, and that ambiguity cost a paying customer
             # their plan. settle_pending_checkout() is the safety net.
             import logging
             logging.getLogger("bachs").error(
                 "bachs webhook REJECTED: signature did not verify "
-                "(header present=%s, secret configured=%s, bytes=%d)",
-                bool(sig), bool(getattr(settings, "BACHS_WEBHOOK_SECRET", "")), len(raw))
+                "(sig header=%s, timestamp header=%s, secret configured=%s, bytes=%d)",
+                bool(sig), bool(ts),
+                bool(getattr(settings, "BACHS_WEBHOOK_SECRET", "")), len(raw))
             return Response({"detail": "Invalid signature."}, status=400)
         try:
             event = json.loads(raw.decode())
@@ -451,7 +533,7 @@ class BachsWebhookView(views.APIView):
             interval = WEEKLY
 
         if sub and plan:
-            _activate(sub, plan, interval)
+            _activate(sub, plan, interval, paid_ref=session_id or sub.bachs_session_id)
             log.info("bachs webhook: activated org=%s plan=%s interval=%s (type=%s)",
                      sub.organization_id, plan.slug, interval, etype)
         else:

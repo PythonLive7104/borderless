@@ -1,5 +1,5 @@
 // Typed API client for the Django DRF backend.
-import { getAttribution } from "./attribution";
+import { getAttribution, getReferralCode } from "./attribution";
 const ACCESS = "bl_access";
 const REFRESH = "bl_refresh";
 
@@ -142,6 +142,33 @@ export const http = {
 export interface NotificationPrefs { email: boolean; high_risk: boolean; usage: boolean; conversions: boolean; }
 export interface User { id: number; email: string; first_name: string; last_name: string; is_verified: boolean; is_staff: boolean; timezone: string; language: string; notification_prefs: NotificationPrefs; }
 
+// ---- referrals ----
+export interface ReferralRow {
+  masked_email: string; joined_at: string; has_paid: boolean; rewards: number;
+}
+export interface ReferralSummary {
+  code: string;
+  balance_cents: number;
+  earned_cents: number;
+  reward_cents: number;
+  referred_count: number;
+  paying_count: number;
+  referrals: ReferralRow[];
+}
+export interface CreditEntryRow {
+  amount_cents: number; kind: "earned" | "redeemed" | "adjustment";
+  note: string; created_at: string;
+}
+
+export const referralApi = {
+  me: (signal?: AbortSignal) => http.get<ReferralSummary>("/referrals/me/", signal),
+  ledger: (signal?: AbortSignal) => http.get<CreditEntryRow[]>("/referrals/ledger/", signal),
+  /** Spend credit on a plan period. No payment provider involved. */
+  redeem: (orgId: number, plan: string, interval: BillingInterval, signal?: AbortSignal) =>
+    http.post<Subscription & { paid_with_credit: boolean }>(
+      "/billing/redeem/", { organization: orgId, plan, interval }, true, signal),
+};
+
 // ---- testimonials ----
 export interface MyTestimonial {
   id: number; quote: string; author_name: string; author_role: string;
@@ -175,7 +202,7 @@ export const authApi = {
   // server treats it as optional, so a visitor with blocked storage still
   // registers normally.
   register: (payload: { first_name: string; last_name: string; email: string; password: string }, signal?: AbortSignal) =>
-    http.post<User>("/auth/register/", { ...payload, attribution: getAttribution() || undefined }, false, signal),
+    http.post<User>("/auth/register/", { ...payload, attribution: getAttribution() || undefined, referral_code: getReferralCode() || undefined }, false, signal),
   me: (signal?: AbortSignal) => http.get<User>("/auth/me/", signal),
   forgotPassword: (email: string, signal?: AbortSignal) => http.post("/auth/password/forgot/", { email }, false, signal),
   resetPassword: (token: string, password: string, signal?: AbortSignal) => http.post("/auth/password/reset/", { token, password }, false, signal),

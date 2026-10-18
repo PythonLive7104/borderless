@@ -45,6 +45,30 @@ class RuleSerializer(serializers.ModelSerializer):
         org = attrs.get("organization") or getattr(self.instance, "organization", None)
         if website and org and website.organization_id != org.id:
             raise serializers.ValidationError({"website": "That website isn't in this workspace."})
+
+        # An action that cannot be carried out is worse than no rule at all: it
+        # LOOKS active in the dashboard and silently does nothing.
+        #
+        # The engine returns the rule's redirect URL and the tracker only acts
+        # on it `if (d.action === 'redirect' && d.redirect)` — so a redirect
+        # rule saved without a URL falls through and shows the page, exactly as
+        # if the visitor had been allowed. On a short link it is worse: the
+        # empty URL fails to override the link's own refusal handling, so the
+        # visitor gets that link's bot_action instead — which is a 404 page
+        # whenever bot_action is "send them to the destination too". That is
+        # the "I set it to redirect to google.com and it just 404s" report.
+        action = attrs.get("action") or getattr(self.instance, "action", "")
+        if action == "redirect":
+            url = attrs.get("redirect_url", getattr(self.instance, "redirect_url", ""))
+            if not (url or "").strip():
+                raise serializers.ValidationError({
+                    "redirect_url": "Choose where to send this traffic — a redirect "
+                                    "rule with no destination does nothing."})
+        if action == "tag":
+            tag = attrs.get("tag", getattr(self.instance, "tag", ""))
+            if not (tag or "").strip():
+                raise serializers.ValidationError({
+                    "tag": "Enter the label to attach."})
         return attrs
 
     def create(self, validated_data):

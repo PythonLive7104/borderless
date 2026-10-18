@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button";
 import { Section, SectionHead } from "../../components/ui/Section";
 import LogoStrip from "../../components/marketing/LogoStrip";
 import Testimonials from "../../components/marketing/Testimonials";
+import ReferralBand from "../../components/marketing/ReferralBand";
 import JsonLd from "../../components/marketing/JsonLd";
 import { graph, reviews } from "../../lib/schema";
 import { AVERAGE_RATING, TESTIMONIALS } from "../../data/testimonials";
@@ -194,6 +195,9 @@ export default function Landing() {
           ))}
         </div>
       </Section>
+
+      {/* REFERRALS — a reason to sign up before you need the product. */}
+      <ReferralBand />
 
       {/* CTA */}
       <Section>

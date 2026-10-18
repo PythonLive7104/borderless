@@ -788,3 +788,97 @@ class YearlyIntervalTest(TestCase):
     def test_offers_follows_the_yearly_price(self):
         self.assertTrue(self.basic.offers("yearly"))
         self.assertFalse(Plan(price=0, price_monthly=0, price_yearly=0).offers("yearly"))
+
+
+@override_settings(BACHS_WEBHOOK_SECRET="whsec_testsecret")
+class BachsSignatureTest(TestCase):
+    """Pins the scheme from docs.bachs.io/guides/webhooks/overview.
+
+    This existed as a guess for months and rejected every live delivery, so the
+    point of these tests is that the next person to touch it finds out at once.
+    """
+
+    BODY = b'{"type":"collection.succeeded","data":{"id":"evt_1"}}'
+
+    def _sig(self, timestamp, body=None, secret="whsec_testsecret"):
+        import hashlib
+        import hmac
+        msg = f"{timestamp}.".encode() + (body if body is not None else self.BODY)
+        return hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
+
+    def _now(self):
+        import time
+        return str(int(time.time()))
+
+    def test_accepts_a_correctly_signed_delivery(self):
+        from apps.billing import bachs
+        ts = self._now()
+        self.assertTrue(bachs.verify_signature(self.BODY, self._sig(ts), ts))
+
+    def test_accepts_the_v2_header_with_its_own_timestamp(self):
+        from apps.billing import bachs
+        ts = self._now()
+        header = f"t={ts},v1={self._sig(ts)}"
+        self.assertTrue(bachs.verify_signature(self.BODY, header))
+
+    def test_accepts_any_matching_v1_during_a_secret_rotation(self):
+        from apps.billing import bachs
+        ts = self._now()
+        header = f"t={ts},v1=deadbeef,v1={self._sig(ts)}"
+        self.assertTrue(bachs.verify_signature(self.BODY, header))
+
+    def test_signing_the_body_alone_is_rejected(self):
+        """The exact bug that rejected eight live payments: no timestamp in the
+        signed message."""
+        import hashlib
+        import hmac
+
+        from apps.billing import bachs
+        ts = self._now()
+        body_only = hmac.new(b"whsec_testsecret", self.BODY, hashlib.sha256).hexdigest()
+        self.assertFalse(bachs.verify_signature(self.BODY, body_only, ts))
+
+    def test_rejects_a_tampered_body(self):
+        from apps.billing import bachs
+        ts = self._now()
+        sig = self._sig(ts)
+        self.assertFalse(bachs.verify_signature(self.BODY + b" ", sig, ts))
+
+    def test_rejects_a_stale_delivery(self):
+        """Replay protection: a validly-signed delivery from last week is not
+        acceptable just because the digest matches."""
+        import time
+
+        from apps.billing import bachs
+        old = str(int(time.time()) - 86_400)
+        self.assertFalse(bachs.verify_signature(self.BODY, self._sig(old), old))
+
+    def test_rejects_a_missing_timestamp(self):
+        from apps.billing import bachs
+        self.assertFalse(bachs.verify_signature(self.BODY, self._sig(self._now()), ""))
+
+    def test_rejects_the_wrong_secret(self):
+        from apps.billing import bachs
+        ts = self._now()
+        self.assertFalse(
+            bachs.verify_signature(self.BODY, self._sig(ts, secret="whsec_other"), ts))
+
+    @override_settings(BACHS_WEBHOOK_SECRET="")
+    def test_rejects_everything_when_no_secret_is_configured(self):
+        from apps.billing import bachs
+        ts = self._now()
+        self.assertFalse(bachs.verify_signature(self.BODY, self._sig(ts), ts))
+
+    def test_the_endpoint_accepts_a_signed_post(self):
+        """End to end through the view, including the header names."""
+        ts = self._now()
+        r = self.client.post(
+            "/api/billing/webhooks/bachs/", data=self.BODY,
+            content_type="application/json",
+            HTTP_X_BACHS_SIGNATURE_V2=f"t={ts},v1={self._sig(ts)}")
+        self.assertEqual(r.status_code, 200)
+
+    def test_the_endpoint_rejects_an_unsigned_post(self):
+        r = self.client.post("/api/billing/webhooks/bachs/", data=self.BODY,
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)

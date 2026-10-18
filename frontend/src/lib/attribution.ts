@@ -108,3 +108,44 @@ export function isPaidClick(): boolean {
   const a = getAttribution();
   return !!(a?.gclid || a?.msclkid || a?.utm_medium === "cpc" || a?.utm_medium === "ppc");
 }
+
+// ---------------------------------------------------------------------------
+// Referral codes
+//
+// Deliberately NOT part of the attribution blob above. That records a FIRST
+// touch and is never overwritten, which is right for "which ad bought this
+// customer" and wrong here: someone who found us through an ad in March and
+// then clicked a friend's referral link in June should earn that friend the
+// credit. So this is last-touch, and stored separately.
+// ---------------------------------------------------------------------------
+
+const REF_KEY = "tnb_ref";
+/** A referral should not still be claimable a year after the link was clicked. */
+const REF_MAX_AGE_DAYS = 60;
+
+/** Record a `?ref=CODE` from the current URL, if there is one. */
+export function captureReferral(): void {
+  if (typeof window === "undefined") return;
+  const code = new URLSearchParams(window.location.search).get("ref");
+  if (!code) return;
+  try {
+    localStorage.setItem(REF_KEY, JSON.stringify({
+      code: code.trim().slice(0, 16).toUpperCase(),
+      at: new Date().toISOString(),
+    }));
+  } catch { /* private mode — the referral is simply not recorded */ }
+}
+
+/** The stored referral code, or "" when there is none or it has expired. */
+export function getReferralCode(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = localStorage.getItem(REF_KEY);
+    if (!raw) return "";
+    const { code, at } = JSON.parse(raw) as { code: string; at: string };
+    if (at && Date.now() - new Date(at).getTime() > REF_MAX_AGE_DAYS * 86400_000) return "";
+    return code || "";
+  } catch {
+    return "";
+  }
+}

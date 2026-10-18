@@ -12,6 +12,7 @@ REST shape: POST /v1/checkout-sessions with product_cart/customer/return_url.
 """
 import hashlib
 import hmac
+import time
 import json
 import urllib.error
 import urllib.parse
@@ -68,26 +69,63 @@ def create_checkout_session(*, product_id, email, return_url, cancel_url, metada
     return _post("/checkout-sessions", payload)
 
 
-def verify_signature(raw_body: bytes, signature_header: str) -> bool:
+#: How far out of date a delivery may be, per the Bachs documentation.
+SIGNATURE_TOLERANCE_SECONDS = 300
+
+
+def verify_signature(raw_body: bytes, signature_header: str,
+                     timestamp_header: str = "") -> bool:
     """Verify a webhook using the per-destination signing secret.
 
-    CONFIRM: assumes HMAC-SHA256 of the raw body, hex-encoded, compared
-    constant-time. Supports both a bare hex digest and a Stripe-style
-    `t=<ts>,v1=<hex>` header. Adjust once we see a real Bachs test event.
+    The scheme, from docs.bachs.io/guides/webhooks/overview:
+
+        message  = f"{timestamp}.{raw_body}"
+        expected = HMAC-SHA256(secret, message).hexdigest()
+
+    The timestamp comes from `X-Bachs-Timestamp`, or from the `t=` field of the
+    `X-Bachs-Signature-V2` header, which has the form `t=<unix>,v1=<hex>`. Any
+    `v1=` value matching is a pass, because the header may carry several during
+    a secret rotation.
+
+    This previously signed the raw body ALONE, with no timestamp. That is why
+    every delivery was rejected with "Invalid signature" — the digest could
+    never match, whatever the secret was. The original docstring said the scheme
+    was assumed from documentation and should be confirmed against a real event;
+    it wasn't, and eight live payments were rejected before anyone noticed.
+    Treat that as the lesson: the settle-on-return poll is the only reason those
+    customers still got their plans.
     """
     secret = getattr(settings, "BACHS_WEBHOOK_SECRET", "") or ""
     if not secret or not signature_header:
         return False
-    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
-    candidates = []
+
+    # Pull the candidate signatures, and the timestamp if it is in the header.
+    candidates, ts_from_header = [], ""
     for part in signature_header.split(","):
         part = part.strip()
         if part.startswith("v1="):
             candidates.append(part[3:])
+        elif part.startswith("t="):
+            ts_from_header = part[2:]
         elif "=" not in part:
             candidates.append(part)
     if not candidates:
         candidates = [signature_header.strip()]
+
+    timestamp = (timestamp_header or ts_from_header or "").strip()
+    if not timestamp:
+        return False
+
+    # Reject replays of an old, validly-signed delivery.
+    try:
+        age = abs(time.time() - int(timestamp))
+    except (TypeError, ValueError):
+        return False
+    if age > SIGNATURE_TOLERANCE_SECONDS:
+        return False
+
+    message = timestamp.encode() + b"." + raw_body
+    expected = hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
     return any(hmac.compare_digest(expected, c) for c in candidates)
 
 def _get(path):

@@ -53,6 +53,7 @@ const UsagePage = lazy(() => import("./pages/dashboard/UsagePage"));
 const Team = lazy(() => import("./pages/dashboard/Team"));
 const Settings = lazy(() => import("./pages/dashboard/Settings"));
 const Reports = lazy(() => import("./pages/dashboard/Reports"));
+const Referrals = lazy(() => import("./pages/dashboard/Referrals"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
@@ -122,6 +123,7 @@ export default function AppRoutes() {
           <Route path="team" element={<Team />} />
           <Route path="settings" element={<Settings />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="referrals" element={<Referrals />} />
         </Route>
 
         <Route path="/admin" element={<RequireStaff><AdminLayout /></RequireStaff>}>

@@ -39,10 +39,16 @@ class RegisterSerializer(serializers.ModelSerializer):
     # Optional, and never required: a visitor with blocked storage or an ad
     # blocker sends nothing here and must still be able to register.
     attribution = serializers.JSONField(required=False, write_only=True)
+    # A friend's referral code, if they arrived through one. Never validated
+    # here: a stale or mistyped code must not be able to block a signup, so it
+    # is attached on a best-effort basis after the account exists.
+    referral_code = serializers.CharField(required=False, allow_blank=True,
+                                          max_length=16, write_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "password", "attribution"]
+        fields = ["id", "email", "first_name", "last_name", "password",
+                  "attribution", "referral_code"]
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
@@ -62,6 +68,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         if attribution:
             user.attribution = attribution
             user.save(update_fields=["attribution"])
+
+        code = (validated_data.get("referral_code") or "").strip()
+        if code:
+            # Best effort by design. An unknown code, a self-referral or a
+            # database hiccup must never cost somebody their account, so this
+            # cannot be allowed to raise out of registration.
+            try:
+                from apps.referrals.service import attach_referral
+                attach_referral(user, code)
+            except Exception:  # pragma: no cover - defensive
+                import logging
+                logging.getLogger("referrals").exception(
+                    "could not attach referral %r for user %s", code, user.id)
         return user
 
 

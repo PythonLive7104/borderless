@@ -10,6 +10,7 @@ import { Section, SectionHead } from "../../components/ui/Section";
 import { ICheck } from "../../components/ui/icons";
 import { PLAN_ADD, PLAN_BASE, PLAN_ROLLUP } from "../../data/plans";
 import ComparisonTable from "../../components/marketing/ComparisonTable";
+import ReferralBand from "../../components/marketing/ReferralBand";
 import JsonLd from "../../components/marketing/JsonLd";
 import { breadcrumbs, graph, softwareApplication } from "../../lib/schema";
 import PaymentMethods from "../../components/marketing/PaymentMethods";
@@ -306,6 +307,8 @@ export default function Pricing() {
           it — a second place to catch fraud, before it ever reaches your site.
         </p>
       </Section>
+
+      <ReferralBand />
 
       <Section className="bg-bg-soft rounded-none">
         <SectionHead eyebrow="FAQ" title="Questions, answered" />

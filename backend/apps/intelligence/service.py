@@ -37,8 +37,17 @@ def _skip(ip: str) -> bool:
         return True
 
 
+#: How long a coarse proxy/datacenter flag is trusted. Must match
+#: intelFlagTTL() in decision/main.go — both services read each other's flags.
+INTEL_FLAG_TTL = 7 * 24 * 3600
+
+
+def intel_flag_key(kind: str, ip: str) -> str:
+    return f"ipintel:flag:{kind}:{ip}"
+
+
 def enrich(ip: str) -> dict:
-    """Look up an IP (cached). Populates ipintel:datacenter / ipintel:proxy sets."""
+    """Look up an IP (cached). Sets the shared ipintel:flag:* keys."""
     if _skip(ip):
         return {}
     r = _r()
@@ -49,10 +58,17 @@ def enrich(ip: str) -> dict:
     else:
         data = _prov().lookup(ip)
         r.setex(ckey, CACHE_TTL, json.dumps(data))
-    # always keep the shared sets populated (idempotent, cheap)
+    # Share the coarse verdict with the Go engine.
+    #
+    # Per-IP keys with a TTL, not members of a permanent set. The sets these
+    # replace had no expiry, so an address stayed flagged forever while the
+    # detailed record beside it expired after a day — and a residential IP that
+    # once hosted a VPN exit went on turning away whichever real customer was
+    # assigned it next. Redis cannot expire a set member individually, so the
+    # membership has to be a key of its own.
     if data:
         if data.get("datacenter"):
-            r.sadd("ipintel:datacenter", ip)
+            r.setex(intel_flag_key("datacenter", ip), INTEL_FLAG_TTL, "1")
         if data.get("proxy") or data.get("vpn"):
-            r.sadd("ipintel:proxy", ip)
+            r.setex(intel_flag_key("proxy", ip), INTEL_FLAG_TTL, "1")
     return data

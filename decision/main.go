@@ -210,7 +210,14 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 
 	// One intel read feeds both the score and the rule fields (the datacenter/
 	// proxy sets used to be checked twice per decision).
+	//
+	// The rules are loaded here rather than just before evaluation because they
+	// decide HOW we fetch intel: a site filtering on VPN/datacenter needs the
+	// answer synchronously, or the first request from an unseen IP is judged
+	// against an empty cache and allowed through.
+	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
 	intel := h.knownIntel(rctx, fp.IP)
+	intel = h.resolveIntel(rctx, fp.IP, intel, ruleSet)
 	h.warmIntel(fp.IP, intel.ISP != "") // fill ISP/ASN/conn for next time, off the hot path
 	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(rctx, fp.IP)
@@ -251,7 +258,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, fpHash)
 	}
 	// --- traffic rules (Phase 8): evaluate after scoring ---
-	ruleSet := rules.Parse(h.st.GetRules(rctx, p.SiteID))
+	// ruleSet was loaded above, before the intel read it governs.
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
@@ -395,8 +402,12 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 	}
 	rate := h.st.RateIncr(ctx, "srate:"+siteID+":"+fp.IP, time.Minute)
 	// One intel read feeds both the risk score and the rule fields — the
-	// datacenter/proxy sets used to be checked twice per decision.
+	// datacenter/proxy sets used to be checked twice per decision. Rules are
+	// loaded first because they decide whether the intel lookup has to be
+	// synchronous; see resolveIntel.
+	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	intel := h.knownIntel(ctx, fp.IP)
+	intel = h.resolveIntel(ctx, fp.IP, intel, ruleSet)
 	h.warmIntel(fp.IP, intel.ISP != "")
 	iprate := h.st.RateIncr(ctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(ctx, fp.IP)
@@ -431,7 +442,6 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 		h.rememberBot(fp.IP)
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, "")
 	}
-	ruleSet := rules.Parse(h.st.GetRules(ctx, siteID))
 	action, tag, redirect := rules.Evaluate(ruleSet, rules.Event{
 		RiskScore: result.Score,
 		Rate:      int(rate),
@@ -1054,6 +1064,83 @@ func ipRateLimit() int64 {
 	return 120
 }
 
+// resolveIntel returns what we know about an IP, looking it up synchronously
+// when the site's own rules depend on the answer.
+//
+// The default path stays cache-plus-background-warm, because most sites don't
+// filter on IP intelligence and shouldn't pay a provider round-trip to find
+// that out. But a site WITH such a rule needs the answer now: judging the first
+// request from an unseen IP against empty intel is what let a VPN visitor
+// through the rule that was meant to stop them.
+//
+// Bounded and fail-open. If the provider is slow or down we proceed with
+// whatever the cache held, exactly as before — a visitor must never be left
+// waiting on a third party.
+func (h *handler) resolveIntel(ctx context.Context, ip string, known ipIntel, ruleSet []rules.Rule) ipIntel {
+	if ip == "" || !rules.NeedsIntel(ruleSet) {
+		return known
+	}
+	// Already answered by the cache: nothing to wait for.
+	if known.ISP != "" || known.flagged() {
+		return known
+	}
+	if !intelProviderConfigured() {
+		return known
+	}
+	lctx, cancel := context.WithTimeout(ctx, intelSyncTimeout())
+	defer cancel()
+	if got := h.lookupIP(lctx, ip); got.ISP != "" || got.flagged() {
+		return got
+	}
+	return known
+}
+
+// IP-intelligence flags, as per-IP keys with a TTL rather than members of a
+// permanent Redis set.
+//
+// They used to be SAdd'd into "ipintel:proxy" / "ipintel:datacenter", which
+// have no expiry — so an address stayed flagged forever while the detailed
+// record beside it expired after 24h. Residential and mobile addresses are
+// reassigned constantly, so an IP that was a VPN exit last month permanently
+// turned away whichever real customer holds it today. That is the "real users
+// sometimes get the decoy" report.
+//
+// A key per IP lets Redis expire them individually, which a set cannot do.
+func intelFlagKey(kind, ip string) string { return "ipintel:flag:" + kind + ":" + ip }
+
+// intelFlagTTL is how long a coarse proxy/datacenter flag is trusted. Long
+// enough to be worth caching across sessions, short enough that a reassigned
+// address clears without anyone intervening.
+func intelFlagTTL() time.Duration {
+	if v := env("IP_INTEL_FLAG_DAYS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * 24 * time.Hour
+		}
+	}
+	return 7 * 24 * time.Hour
+}
+
+func (h *handler) hasIntelFlag(ctx context.Context, kind, ip string) bool {
+	return h.st.GetStr(ctx, intelFlagKey(kind, ip)) != ""
+}
+
+func (h *handler) setIntelFlag(ctx context.Context, kind, ip string) {
+	h.st.SetEx(ctx, intelFlagKey(kind, ip), "1", intelFlagTTL())
+}
+
+// intelSyncTimeout caps how long a decision may wait on the IP-intelligence
+// provider. Deliberately short: the engine advertises single-digit-millisecond
+// decisions, and a rule that cannot be resolved in time falls back to the
+// cached answer rather than holding the page.
+func intelSyncTimeout() time.Duration {
+	if v := env("IP_INTEL_SYNC_MS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Millisecond
+		}
+	}
+	return 1200 * time.Millisecond
+}
+
 // warmIntel enriches an IP's record (ISP/ASN/connection type) in the background
 // when it isn't cached yet, so the hot path never blocks on the provider. The
 // lookup is cache-first and 24h-cached, so a busy IP is fetched at most once a
@@ -1062,8 +1149,18 @@ func (h *handler) warmIntel(ip string, alreadyKnown bool) {
 	if ip == "" || alreadyKnown {
 		return
 	}
-	if env("IPQUALITYSCORE_KEY", "") == "" ||
-		!strings.EqualFold(env("IP_INTEL_PROVIDER", ""), "ipqualityscore") {
+	// Any configured provider, not just IPQualityScore.
+	//
+	// This used to require IP_INTEL_PROVIDER=ipqualityscore AND an IPQS key,
+	// which was written when IPQS was the only provider and never revisited
+	// when proxycheck was added. On a proxycheck deployment it returned here
+	// every time, so the intel cache was never filled from the hot path —
+	// and knownIntel(), which only READS that cache, therefore reported every
+	// visitor as not-proxy. A "Proxy / VPN / Datacenter is Yes" rule could
+	// never match on a website, while short links were unaffected because they
+	// call lookupIP synchronously. That is exactly the shape of the bug that
+	// was reported: VPN traffic sailing past a rule that looked correct.
+	if !intelProviderConfigured() {
 		return
 	}
 	go func() {
@@ -1071,6 +1168,19 @@ func (h *handler) warmIntel(ip string, alreadyKnown bool) {
 		defer cancel()
 		h.lookupIP(ctx, ip)
 	}()
+}
+
+// intelProviderConfigured reports whether a provider AND its key are present.
+// Kept next to lookupIP's dispatch so the two stay in step: every provider
+// added to that switch must be added here, or the warmer silently stops.
+func intelProviderConfigured() bool {
+	switch strings.ToLower(env("IP_INTEL_PROVIDER", "")) {
+	case "ipqualityscore":
+		return env("IPQUALITYSCORE_KEY", "") != ""
+	case "proxycheck":
+		return env("PROXYCHECK_KEY", "") != ""
+	}
+	return false
 }
 
 func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
@@ -1084,10 +1194,10 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	// detail away for any IP we've already flagged.
 	if raw := h.st.GetStr(ctx, key); raw != "" {
 		json.Unmarshal([]byte(raw), &out)
-		if h.st.InSet(ctx, "ipintel:datacenter", ip) {
+		if h.hasIntelFlag(ctx, "datacenter", ip) {
 			out.Datacenter = true
 		}
-		if h.st.InSet(ctx, "ipintel:proxy", ip) {
+		if h.hasIntelFlag(ctx, "proxy", ip) {
 			out.Proxy = true
 		}
 		return out
@@ -1113,10 +1223,10 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		h.st.SetEx(ctx, key, string(b), 24*time.Hour)
 	}
 	if out.Datacenter {
-		h.st.SAdd(ctx, "ipintel:datacenter", ip)
+		h.setIntelFlag(ctx, "datacenter", ip)
 	}
 	if out.Proxy || out.VPN {
-		h.st.SAdd(ctx, "ipintel:proxy", ip)
+		h.setIntelFlag(ctx, "proxy", ip)
 	}
 	return out
 }
@@ -1185,6 +1295,17 @@ func fetchProxycheck(ip string) (ipIntel, bool) {
 		_ = json.Unmarshal(s, &status)
 	}
 	if status != "ok" {
+		// "denied" is what proxycheck returns once the daily query allowance is
+		// spent. Failing open is right — a visitor must never wait on a third
+		// party — but failing open SILENTLY means every VPN sails through and
+		// the dashboard looks identical to a working day. Logged so the cause
+		// is one grep away instead of a fortnight of guessing.
+		var message string
+		if m, okM := raw["message"]; okM {
+			_ = json.Unmarshal(m, &message)
+		}
+		log.Printf("ipintel: proxycheck refused the lookup (status=%q message=%q)"+
+			" — traffic is being allowed through unchecked", status, message)
 		return ipIntel{}, false
 	}
 	rec, okR := raw[ip]
@@ -1246,11 +1367,11 @@ func (h *handler) knownIntel(ctx context.Context, ip string) ipIntel {
 	if raw := h.st.GetStr(ctx, "ipintel:cache:"+ip); raw != "" {
 		json.Unmarshal([]byte(raw), &out)
 	}
-	// The sets can only say "proxy-ish" or "datacenter", never VPN specifically.
-	if h.st.InSet(ctx, "ipintel:datacenter", ip) {
+	// The flags can only say "proxy-ish" or "datacenter", never VPN specifically.
+	if h.hasIntelFlag(ctx, "datacenter", ip) {
 		out.Datacenter = true
 	}
-	if h.st.InSet(ctx, "ipintel:proxy", ip) {
+	if h.hasIntelFlag(ctx, "proxy", ip) {
 		out.Proxy = true
 	}
 	return out

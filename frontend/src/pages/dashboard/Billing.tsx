@@ -10,6 +10,7 @@ import { ILink, IGlobe, ITarget } from "../../components/ui/icons";
 import { PLAN_ADD, PLAN_BASE, PLAN_ROLLUP } from "../../data/plans";
 import { trackPurchase } from "../../lib/analytics";
 import { INTERVAL_DAYS, INTERVAL_MONTHS, INTERVAL_NOUN, capFor, priceFor, savingBadges } from "../../lib/billing";
+import { referralApi } from "../../lib/api";
 import { feeNote, methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
 
 const statusTone: Record<string, string> = {
@@ -70,6 +71,8 @@ export default function Billing() {
     !p.monthly_ad_clicks ? 0 : Math.ceil(p.monthly_ad_clicks * INTERVAL_MONTHS[interval]);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
+  // Referral credit, so the confirm dialog can offer to pay with it.
+  const [creditCents, setCreditCents] = useState(0);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -84,6 +87,9 @@ export default function Billing() {
       const [s, p] = await Promise.all([billingApi.subscription(current.id), billingApi.plans()]);
       if (s.interval) setBillingInterval(s.interval);
       setSub(s); setPlans(p);
+      // Referral credit is a nice-to-have on this page: if it fails to load,
+      // the buy buttons must still work, so it is fetched separately.
+      referralApi.me().then((r) => setCreditCents(r.balance_cents)).catch(() => {});
     } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
@@ -139,6 +145,22 @@ export default function Billing() {
     } catch (e: any) { setErr(e.data?.detail || e.message || "Could not change plan. Please try again."); }
     finally { setBusy(false); }
   }
+  /** Pay for this period with referral credit. No payment provider involved,
+   *  so there is no redirect and nothing to verify on return. */
+  async function doRedeem() {
+    if (!target) return;
+    setBusy(true); setErr("");
+    try {
+      await referralApi.redeem(current!.id, target.slug, interval);
+      setSub(await billingApi.subscription(current!.id));
+      const r = await referralApi.me();
+      setCreditCents(r.balance_cents);
+      setTarget(null);
+    } catch (e: any) {
+      setErr(e.data?.detail || "Could not redeem your credit. Please try again.");
+    } finally { setBusy(false); }
+  }
+
   async function doCancel() {
     setBusy(true); setErr("");
     try {
@@ -264,12 +286,36 @@ export default function Billing() {
               {feeNote(payMethods) && <>, plus {feeNote(payMethods)}</>}. Access starts as
               soon as payment succeeds, for {days} days. Any days you have left are added on top, so you never lose time.
             </p>
+            {/* Referral credit, offered only when it covers the whole price.
+                Partial payment isn't supported: splitting a charge between
+                credit and a hosted checkout session means reconciling two
+                payments for one period, which is a lot of failure modes for a
+                saving of a few dollars. */}
+            {creditCents >= priceOf(target) * 100 && (
+              <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2.5 text-sm">
+                <b className="text-emerald-700">
+                  You have ${(creditCents / 100).toFixed(2)} in referral credit.
+                </b>
+                <div className="mt-0.5 text-xs text-fg-muted">
+                  Enough to cover this {noun} in full — no payment needed.
+                </div>
+              </div>
+            )}
             {err && <div className="rounded-lg bg-danger/5 px-3 py-2 text-sm text-red-600">{err}</div>}
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setTarget(null)} disabled={busy}>Cancel</Button>
-              <Button className="flex-1" onClick={doChange} disabled={busy}>
-                {busy ? "Starting…" : "Continue to payment"}
-              </Button>
+            <div className="flex flex-col gap-2">
+              {creditCents >= priceOf(target) * 100 && (
+                <Button className="w-full" onClick={doRedeem} disabled={busy}>
+                  {busy ? "Applying…" : `Use $${priceOf(target).toLocaleString()} of credit`}
+                </Button>
+              )}
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setTarget(null)} disabled={busy}>Cancel</Button>
+                <Button
+                  variant={creditCents >= priceOf(target) * 100 ? "outline" : "primary"}
+                  className="flex-1" onClick={doChange} disabled={busy}>
+                  {busy ? "Starting…" : "Continue to payment"}
+                </Button>
+              </div>
             </div>
           </div>
         )}

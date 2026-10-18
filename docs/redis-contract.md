@@ -71,6 +71,22 @@ there is no real JA3 unless a header is injected.
 
 ## Shared caches (both read and write)
 
+### `ipintel:flag:{kind}:{ip}` — string "1", TTL 7d
+
+`kind` is `proxy` or `datacenter`. Written by BOTH Django (`apps/intelligence`)
+and the engine, read by both. The coarse verdict, shared so an IP looked up by
+one service is known to the other.
+
+Keys rather than members of an `ipintel:proxy` set, which is what this replaced:
+a set has no per-member expiry, so an address stayed flagged forever while the
+detailed record beside it expired after a day. Residential and mobile addresses
+are reassigned constantly, so a former VPN exit went on turning away whichever
+real customer held it next. The TTL is the whole point — do not "optimise" this
+back into a set.
+
+The TTL lives in two places and they must agree: `intelFlagTTL()` in
+`decision/main.go` and `INTEL_FLAG_TTL` in `apps/intelligence/service.py`.
+
 ### `ipintel:cache:{ip}` — string (JSON), TTL 24h
 
 IP-intelligence results — datacenter / proxy / VPN / ASN / ISP / fraud score.
