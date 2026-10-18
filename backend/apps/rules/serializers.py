@@ -14,7 +14,7 @@ class RuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrafficRule
-        fields = ["id", "organization", "website", "short_link", "name", "priority", "action", "tag", "redirect_url",
+        fields = ["id", "organization", "website", "short_link", "name", "priority", "match", "action", "tag", "redirect_url",
                   "active", "conditions", "created_at"]
         read_only_fields = ["created_at"]
 

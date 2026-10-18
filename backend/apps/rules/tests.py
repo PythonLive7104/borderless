@@ -344,3 +344,51 @@ class BotCoverageBackfillTest(TestCase):
         bot = create_default_rule(self.site, force=True)
         ordered = list(TrafficRule.objects.filter(website=self.site).order_by("priority", "id"))
         self.assertEqual(ordered, [vpn, bot])
+
+
+class RuleMatchModeTest(TestCase):
+    """ANY vs ALL, and the migration guarantee that goes with it."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {
+            "email": "mm@example.com", "password": "testpass123", "first_name": "M"}, format="json")
+        tok = self.c.post("/api/auth/token/", {
+            "email": "mm@example.com", "password": "testpass123"}, format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {tok}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+
+    def _create(self, **over):
+        body = {
+            "organization": self.org, "name": "r", "priority": 100, "action": "block",
+            "conditions": [{"field": "is_proxy", "operator": "eq", "value": "1"},
+                           {"field": "is_bot", "operator": "eq", "value": "1"}],
+        }
+        body.update(over)
+        return self.c.post("/api/rules/", body, format="json")
+
+    def test_match_can_be_set_to_any(self):
+        r = self._create(match="any")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["match"], "any")
+
+    def test_existing_rules_default_to_all(self):
+        """Every rule written before this field existed meant AND. The default
+        has to preserve that, or deployed rules silently widen."""
+        r = self._create()
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["match"], "all")
+
+    def test_match_travels_to_the_engine(self):
+        """The engine reads rules from Redis; a field the sync payload drops is
+        a field the engine will never honour."""
+        import json
+
+        from apps.rules.sync import build_payload
+        self._create(match="any")
+        payload = json.loads(build_payload(self.org))
+        self.assertEqual(payload[0]["match"], "any")
+
+    def test_a_bad_match_value_is_refused(self):
+        self.assertEqual(self._create(match="maybe").status_code, 400)

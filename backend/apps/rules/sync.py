@@ -20,6 +20,9 @@ def _serialize(rules) -> str:
     for r in rules:
         out.append({
             "action": r.action, "tag": r.tag, "redirect_url": r.redirect_url,
+            # Absent on payloads written before this existed; the engine treats
+            # a missing value as "all", which is what those rules meant.
+            "match": r.match,
             "conditions": [{"field": c.field, "operator": c.operator, "value": c.value}
                            for c in r.conditions.all()],
         })

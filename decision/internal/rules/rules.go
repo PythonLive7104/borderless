@@ -13,9 +13,12 @@ type Condition struct {
 }
 
 type Rule struct {
-	Action     string      `json:"action"`
-	Tag        string      `json:"tag"`
-	Redirect   string      `json:"redirect_url"`
+	Action   string `json:"action"`
+	Tag      string `json:"tag"`
+	Redirect string `json:"redirect_url"`
+	// "any" or "all". Empty means "all": rules published before this field
+	// existed are still sitting in Redis, and they meant every condition.
+	Match      string      `json:"match"`
 	Conditions []Condition `json:"conditions"`
 }
 
@@ -50,12 +53,31 @@ func Evaluate(rs []Rule, ev Event) (string, string, string) {
 }
 
 func matches(r Rule, ev Event) bool {
+	// A rule with nothing to test can never be satisfied. Refusing here is what
+	// stops an empty condition list from acting on every visitor.
 	if len(r.Conditions) == 0 {
 		return false
 	}
+
+	// ANY: catch visitors matching any one of these (OR).
+	//
+	// This is what people reach for when they add a second condition — "block
+	// VPNs, and also block bots" — and what they got instead was a rule
+	// demanding both at once, which almost nothing satisfies.
+	if strings.EqualFold(r.Match, "any") {
+		for _, c := range r.Conditions {
+			if condMatch(c, ev) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// ALL (the default, and what every pre-existing rule means): narrow down to
+	// visitors matching every condition.
 	for _, c := range r.Conditions {
 		if !condMatch(c, ev) {
-			return false // all conditions must hold (AND)
+			return false
 		}
 	}
 	return true

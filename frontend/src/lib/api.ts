@@ -380,9 +380,12 @@ export const variantApi = {
 
 // ---- traffic rules ----
 export type RuleAction = "allow" | "redirect" | "block" | "review" | "tag";
+/** How a rule's conditions combine. "all" = AND (narrow), "any" = OR (broaden). */
+export type RuleMatch = "all" | "any";
 export interface RuleCondition { id?: number; field: string; operator: string; value: string; }
 export interface TrafficRule {
   id: number; organization: number; website: number | null; short_link: number | null; name: string; priority: number;
+  match: RuleMatch;
   action: RuleAction; tag: string; redirect_url: string; active: boolean;
   conditions: RuleCondition[]; created_at: string;
 }

@@ -11,6 +11,7 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import { useDialog } from "../../context/DialogContext";
+import type { RuleMatch } from "../../lib/api";
 import {
   ACTIONS, ACTION_META, REDIRECT_ORIGIN, REDIRECT_PRESETS, actionTone,
   fieldLabel, valueLabel, opLabel, opsFor, emptyCond, CondValue,
@@ -29,8 +30,10 @@ export default function TrafficRules() {
   const [presetUrl, setPresetUrl] = useState("");
   const [presetBusy, setPresetBusy] = useState(false);
   const [sites, setSites] = useState<Website[]>([]);
-  const blank = { name: "", priority: "100", action: "review" as RuleAction, tag: "", redirect_url: "", website: "", conditions: [emptyCond()] };
-  const [form, setForm] = useState<{ name: string; priority: string; action: RuleAction; tag: string; redirect_url: string; website: string; conditions: RuleCondition[] }>(blank);
+  // New rules default to ANY: adding a second condition almost always means
+  // "catch this as well", not "and also require this".
+  const blank = { name: "", priority: "100", match: "any" as RuleMatch, action: "review" as RuleAction, tag: "", redirect_url: "", website: "", conditions: [emptyCond()] };
+  const [form, setForm] = useState<{ name: string; priority: string; match: RuleMatch; action: RuleAction; tag: string; redirect_url: string; website: string; conditions: RuleCondition[] }>(blank);
   const canManage = current?.role === "owner" || current?.role === "admin";
   const siteName = (id: number | null) => sites.find((s) => s.id === id)?.name;
 
@@ -67,7 +70,7 @@ export default function TrafficRules() {
   function openEdit(r: TrafficRule) {
     setEditingId(r.id);
     setForm({
-      name: r.name, priority: String(r.priority), action: r.action, tag: r.tag || "",
+      name: r.name, priority: String(r.priority), match: r.match || "all", action: r.action, tag: r.tag || "",
       redirect_url: r.redirect_url || "", website: r.website ? String(r.website) : "",
       conditions: r.conditions.length
         ? r.conditions.map((c) => ({ field: c.field, operator: c.operator, value: c.value }))
@@ -80,7 +83,7 @@ export default function TrafficRules() {
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
     const payload = {
-      name: form.name, priority: Number(form.priority), action: form.action,
+      name: form.name, priority: Number(form.priority), match: form.match, action: form.action,
       tag: form.tag, redirect_url: form.redirect_url, conditions: form.conditions,
       website: form.website ? Number(form.website) : null,
     };
@@ -224,7 +227,14 @@ export default function TrafficRules() {
                 <span className="text-xs font-bold uppercase tracking-wide text-fg-dim">IF</span>
                 {r.conditions.map((c, i) => (
                   <span key={i} className="flex items-center gap-1.5">
-                    {i > 0 && <span className="text-xs font-semibold text-fg-dim">AND</span>}
+                    {/* The list has to show which way the rule actually reads —
+                        an AND rule and an OR rule with the same conditions
+                        behave completely differently. */}
+                    {i > 0 && (
+                      <span className={`text-xs font-bold ${r.match === "any" ? "text-brand" : "text-fg-dim"}`}>
+                        {r.match === "any" ? "OR" : "AND"}
+                      </span>
+                    )}
                     <span className="rounded-lg border border-line bg-bg-soft px-2 py-1 text-xs">
                       <b>{fieldLabel(c.field)}</b> {opLabel(c.operator)} <b>{valueLabel(c.field, c.value)}</b>
                     </span>
@@ -254,15 +264,36 @@ export default function TrafficRules() {
           </label>
 
           <div className="rounded-xl border border-line bg-bg-soft p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-fg-dim">IF all conditions match</span>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-fg-dim">
+                IF
+                <select value={form.match} onChange={(e) => setForm({ ...form, match: e.target.value as RuleMatch })}
+                  className="rounded-lg border border-line bg-card px-2 py-1 text-xs font-bold uppercase tracking-wide text-brand outline-none focus:border-brand">
+                  <option value="any">ANY</option>
+                  <option value="all">ALL</option>
+                </select>
+                of these match
+              </span>
               <button type="button" onClick={addCond} className="text-xs font-semibold text-brand hover:underline">+ condition</button>
             </div>
+            {/* The explanation follows the choice rather than describing one
+                fixed behaviour. The old copy told people that extra conditions
+                made a rule stricter; they added them anyway, because "add
+                condition" reads as "catch more". Now it can. */}
             <p className="mb-2.5 rounded-lg bg-brand/5 px-3 py-2 text-[11px] leading-relaxed text-fg-muted">
-              A visitor must match <b>every</b> condition below for this rule to act. Each condition you add makes the
-              rule <b>stricter</b> — it catches <b>fewer</b> visitors, not more. To cover a lot of traffic, use just
-              one condition (e.g. only <b>Country is United States</b>). Add a second only to narrow it down further
-              (e.g. United States <b>and</b> Bot detected is Yes).
+              {form.match === "any" ? (
+                <>
+                  <b>ANY</b> — a visitor matching <b>any one</b> of the conditions below is acted on. Each condition
+                  you add catches <b>more</b> traffic. Use this to cover several kinds of visitor with one rule
+                  (e.g. <b>Proxy/VPN is Yes</b> or <b>Datacenter is Yes</b> or <b>Bot detected is Yes</b>).
+                </>
+              ) : (
+                <>
+                  <b>ALL</b> — a visitor must match <b>every</b> condition below. Each condition you add makes the
+                  rule <b>stricter</b>, catching <b>fewer</b> visitors. Use this to narrow a rule down
+                  (e.g. <b>Country is United States</b> and <b>Risk score is at least 70</b>).
+                </>
+              )}
             </p>
             <div className="space-y-2">
               {form.conditions.map((c, i) => (

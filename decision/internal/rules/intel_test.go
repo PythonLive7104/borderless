@@ -128,3 +128,61 @@ func TestNotEqualsOnColdIntelDoesNotMatchEveryone(t *testing.T) {
 		t.Fatalf("unresolved intel must not satisfy `is_proxy ne 1`, got %q", action)
 	}
 }
+
+// ANY vs ALL. The customer-visible bug: a rule listing VPN, datacenter and bot
+// conditions was read as "all three at once" and so never fired, when what the
+// customer meant was "any of these".
+func TestMatchAnyFiresOnOneCondition(t *testing.T) {
+	rs := []Rule{{Action: "redirect", Redirect: "https://x.com", Match: "any",
+		Conditions: []Condition{
+			{Field: "is_proxy", Operator: "eq", Value: "1"},
+			{Field: "is_datacenter", Operator: "eq", Value: "1"},
+			{Field: "is_bot", Operator: "eq", Value: "1"},
+		}}}
+
+	// Only the proxy signal is present — under ANY that is enough.
+	if a, _, _ := Evaluate(rs, Event{Fields: map[string]string{"is_proxy": "1"}}); a != "redirect" {
+		t.Fatalf("ANY should fire on a single matching condition, got %q", a)
+	}
+	// Nothing matches — it must not fire.
+	if a, _, _ := Evaluate(rs, Event{Fields: map[string]string{"is_proxy": "0"}}); a != "allow" {
+		t.Fatalf("ANY with nothing matching should not fire, got %q", a)
+	}
+}
+
+func TestMatchAllStillRequiresEveryCondition(t *testing.T) {
+	rs := []Rule{{Action: "redirect", Redirect: "https://x.com", Match: "all",
+		Conditions: []Condition{
+			{Field: "is_proxy", Operator: "eq", Value: "1"},
+			{Field: "country", Operator: "eq", Value: "US"},
+		}}}
+	if a, _, _ := Evaluate(rs, Event{Fields: map[string]string{"is_proxy": "1"}}); a != "allow" {
+		t.Fatalf("ALL must not fire with a condition unmet, got %q", a)
+	}
+	full := Event{Fields: map[string]string{"is_proxy": "1", "country": "us"}}
+	if a, _, _ := Evaluate(rs, full); a != "redirect" {
+		t.Fatalf("ALL should fire when every condition holds, got %q", a)
+	}
+}
+
+// Rules published before the field existed are still in Redis with no "match".
+// They were written as AND and must keep behaving that way.
+func TestMissingMatchDefaultsToAll(t *testing.T) {
+	rs := []Rule{{Action: "block", Conditions: []Condition{
+		{Field: "is_proxy", Operator: "eq", Value: "1"},
+		{Field: "country", Operator: "eq", Value: "US"},
+	}}}
+	if a, _, _ := Evaluate(rs, Event{Fields: map[string]string{"is_proxy": "1"}}); a != "allow" {
+		t.Fatal("an absent match value must behave as ALL, not ANY")
+	}
+}
+
+func TestMatchValueIsCaseInsensitive(t *testing.T) {
+	rs := []Rule{{Action: "block", Match: "ANY", Conditions: []Condition{
+		{Field: "is_proxy", Operator: "eq", Value: "1"},
+		{Field: "country", Operator: "eq", Value: "US"},
+	}}}
+	if a, _, _ := Evaluate(rs, Event{Fields: map[string]string{"is_proxy": "1"}}); a != "block" {
+		t.Fatal("match should be compared case-insensitively")
+	}
+}

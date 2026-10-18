@@ -44,6 +44,21 @@ class TrafficRule(models.Model):
                                    null=True, blank=True, related_name="rules",
                                    help_text="Which redirect this rule applies to. Empty = not a redirect rule.")
     name = models.CharField(max_length=120)
+
+    class Match(models.TextChoices):
+        ALL = "all", "ALL conditions must match"
+        ANY = "any", "ANY condition may match"
+
+    # How multiple conditions combine.
+    #
+    # Defaults to ALL so that every rule written before this field existed keeps
+    # behaving exactly as it did. New rules are created as ANY by the dashboard,
+    # because that is what people mean when they add a second condition: a
+    # customer adding "VPN or Tor" and "Bot detected" to a VPN rule was trying
+    # to catch BOTH kinds of visitor, and instead built a rule that could only
+    # fire on a visitor who was somehow all three at once — so it never fired.
+    match = models.CharField(max_length=3, choices=Match.choices, default=Match.ALL,
+                             help_text="Whether ALL conditions must hold, or ANY one of them.")
     priority = models.IntegerField(default=100, help_text="Lower runs first; first match wins")
     action = models.CharField(max_length=8, choices=Action.choices, default=Action.REVIEW)
     tag = models.CharField(max_length=60, blank=True, help_text="Label applied when action = Tag")
