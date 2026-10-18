@@ -6,6 +6,15 @@ import Button from "../../components/ui/Button";
 
 const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
+function ShareButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="rounded-full border border-line bg-bg-soft px-3.5 py-1.5 text-sm font-semibold text-fg-muted transition hover:border-brand/50 hover:text-brand">
+      {label}
+    </button>
+  );
+}
+
 export default function Referrals() {
   const [data, setData] = useState<ReferralSummary | null>(null);
   const [ledger, setLedger] = useState<CreditEntryRow[]>([]);
@@ -31,6 +40,28 @@ export default function Referrals() {
 
   const link = `${window.location.origin}/?ref=${data.code}`;
   const reward = usd(data.reward_cents);
+
+  // Written for the person receiving it, not for us: it says what the product
+  // does and why they'd care, and leads with the problem rather than the
+  // referral. A message that reads like an ad is one nobody forwards.
+  const message =
+    `I use TryNoBot to stop bots and click fraud burning my ad budget — it scores every `
+    + `visitor in real time and blocks the fake ones before they cost you. `
+    + `Free to try, no card needed: ${link}`;
+
+  const share = (href: string) => window.open(href, "_blank", "noopener,noreferrer");
+  const enc = encodeURIComponent;
+
+  /** The OS share sheet, where there is one. On a phone this is the whole
+   *  feature — it reaches WhatsApp, Telegram, Signal and everything else the
+   *  person already has, which no list of buttons can match. */
+  const canNativeShare = typeof navigator !== "undefined" && "share" in navigator;
+  async function nativeShare() {
+    try {
+      await (navigator as Navigator & { share: (d: ShareData) => Promise<void> })
+        .share({ title: "TryNoBot", text: message, url: link });
+    } catch { /* dismissed — not an error */ }
+  }
 
   async function copy(text: string, what: string) {
     try {
@@ -87,6 +118,31 @@ export default function Referrals() {
               {data.code}
             </button>
             {copied === "code" && <span className="text-xs text-success">Copied</span>}
+          </div>
+
+          {/* Share. The message is pre-written because "here's your link, go
+              write something" is where most referral programmes quietly die. */}
+          <div className="mt-5 border-t border-line pt-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-fg-dim">Share it</div>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {canNativeShare && (
+                <button onClick={nativeShare}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-600">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                  Share
+                </button>
+              )}
+              <ShareButton label="WhatsApp" onClick={() => share(`https://wa.me/?text=${enc(message)}`)} />
+              <ShareButton label="Telegram" onClick={() => share(`https://t.me/share/url?url=${enc(link)}&text=${enc(message)}`)} />
+              <ShareButton label="X" onClick={() => share(`https://twitter.com/intent/tweet?text=${enc(message)}`)} />
+              <ShareButton label="LinkedIn" onClick={() => share(`https://www.linkedin.com/sharing/share-offsite/?url=${enc(link)}`)} />
+              <ShareButton label="Facebook" onClick={() => share(`https://www.facebook.com/sharer/sharer.php?u=${enc(link)}`)} />
+              <ShareButton label="Email" onClick={() => { window.location.href = `mailto:?subject=${enc("Worth a look if you run ads")}&body=${enc(message)}`; }} />
+              <ShareButton label={copied === "msg" ? "Copied" : "Copy message"} onClick={() => copy(message, "msg")} />
+            </div>
+            <p className="mt-3 rounded-lg bg-bg-soft px-3 py-2 text-xs leading-relaxed text-fg-muted">
+              {message}
+            </p>
           </div>
         </div>
       </div>
