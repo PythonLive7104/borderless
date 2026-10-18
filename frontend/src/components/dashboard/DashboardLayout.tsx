@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import Logo from "../marketing/Logo";
-import Button from "../ui/Button";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import NotifyBell from "./NotifyBell";
 import ThemeToggle from "../ui/ThemeToggle";
@@ -129,17 +128,14 @@ export default function DashboardLayout() {
               <NotifyBell />
               {user?.is_staff && <Link to="/admin" className="hidden shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 font-semibold text-white hover:opacity-90 sm:block">Admin</Link>}
               <span className="hidden text-fg-muted lg:block">{user?.email}</span>
-              {/* Two elements rather than one Button with overridden padding:
-                  the label is the widest thing in this row and was pushing
-                  Sign out off a phone screen entirely. Swapping the whole
-                  control avoids fighting Button's own padding utilities, which
-                  have the same specificity and so cannot be reliably beaten
-                  from a className. */}
-              <Button variant="outline" onClick={logout} className="hidden shrink-0 sm:inline-flex">
-                Sign out
-              </Button>
+              {/* One icon control at every width, rather than a labelled button
+                  that swaps for an icon on small screens. The swap needed the
+                  breakpoint on a wrapper, because Button hard-codes inline-flex
+                  and a `hidden` passed through className has equal specificity
+                  — so it lost and both rendered at once. A single control has
+                  no such failure mode, and the icon is understood anyway. */}
               <button type="button" onClick={logout} aria-label="Sign out" title="Sign out"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-fg-muted transition hover:border-brand/50 hover:text-fg sm:hidden">
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-fg-muted transition hover:border-brand/50 hover:text-fg">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />

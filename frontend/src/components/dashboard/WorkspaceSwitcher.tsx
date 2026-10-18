@@ -16,12 +16,16 @@ export default function WorkspaceSwitcher() {
       {/* min-w-0 + truncate: the workspace name was a bare text node with no
           width constraint, so on a phone it wrapped to two lines, grew the
           button, and shoved the bell and Sign out off the right edge. */}
+      {/* On a phone this is deliberately an avatar + chevron, not a truncated
+          name. Shrinking the label to nothing left the control looking broken
+          and pushed its chevron into the theme toggle; dropping the label
+          outright reads as an intentional compact control. */}
       <button onClick={() => setOpen(!open)}
-        className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-sm font-semibold whitespace-nowrap hover:border-brand/40">
+        className="flex w-auto min-w-0 items-center gap-1.5 rounded-xl border border-line bg-card px-2 py-2 text-sm font-semibold whitespace-nowrap hover:border-brand/40 sm:gap-2 sm:px-3">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-gradient-to-tr from-brand to-violet text-xs font-bold text-white">
           {current.name.charAt(0).toUpperCase()}
         </span>
-        <span className="truncate">{current.name}</span>
+        <span className="hidden truncate sm:inline">{current.name}</span>
         {/* The role badge is the first thing to go when space is tight — it is
             reference information, not navigation. */}
         <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase sm:inline ${roleTone[current.role]}`}>{current.role}</span>
