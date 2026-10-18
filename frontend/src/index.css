@@ -78,6 +78,51 @@
   box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 10px 30px -18px rgba(0,0,0,.8);
 }
 
+/* Status tints in dark.
+ *
+ * The success / warning / danger callouts are written with Tailwind's literal
+ * palette (bg-emerald-50 + text-emerald-700 and friends) rather than tokens.
+ * Those are a light-theme pairing: a 50-weight background is nearly white, so
+ * on a dark page each one becomes a bright slab, and the 700-weight text on it
+ * is unreadable the moment the background is darkened.
+ *
+ * Both halves therefore have to move together — background down, text up —
+ * which is why these are paired here rather than fixed one call site at a time.
+ * Scoped to dark only; the light theme keeps Tailwind's own values untouched.
+ */
+:root[data-theme="dark"] {
+  --tint-emerald: 34 197 94;
+  --tint-amber: 245 158 11;
+  --tint-red: 239 68 68;
+  --tint-orange: 249 115 22;
+}
+:root[data-theme="dark"] .bg-emerald-50 { background-color: rgb(var(--tint-emerald) / .12); }
+:root[data-theme="dark"] .bg-amber-50,
+:root[data-theme="dark"] .bg-amber-100 { background-color: rgb(var(--tint-amber) / .12); }
+:root[data-theme="dark"] .bg-red-50 { background-color: rgb(var(--tint-red) / .12); }
+:root[data-theme="dark"] .bg-orange-50,
+:root[data-theme="dark"] .bg-orange-100 { background-color: rgb(var(--tint-orange) / .12); }
+
+/* Text lifted to the light end of each hue so it reads on the tint above and
+   on the page background generally — these colours are also used as bare text
+   (form errors, status words) with no tinted panel behind them. */
+:root[data-theme="dark"] .text-emerald-600,
+:root[data-theme="dark"] .text-emerald-700,
+:root[data-theme="dark"] .text-emerald-800 { color: #4ade80; }
+:root[data-theme="dark"] .text-amber-600,
+:root[data-theme="dark"] .text-amber-700,
+:root[data-theme="dark"] .text-amber-800,
+:root[data-theme="dark"] .text-amber-900 { color: #fbbf24; }
+:root[data-theme="dark"] .text-red-500,
+:root[data-theme="dark"] .text-red-600,
+:root[data-theme="dark"] .text-red-700 { color: #f87171; }
+:root[data-theme="dark"] .text-orange-600,
+:root[data-theme="dark"] .text-orange-700 { color: #fb923c; }
+
+/* Borders on those panels, same reasoning. */
+:root[data-theme="dark"] .border-amber-300 { border-color: rgb(var(--tint-amber) / .35); }
+:root[data-theme="dark"] .border-emerald-500 { border-color: rgb(var(--tint-emerald) / .45); }
+
 /* The light theme's near-white page background inside the binary grid reads as
    a seam against the dark hero; soften it in dark. */
 :root[data-theme="dark"] .binary-grid {

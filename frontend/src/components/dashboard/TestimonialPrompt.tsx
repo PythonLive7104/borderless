@@ -47,7 +47,7 @@ export default function TestimonialPrompt() {
     if (existing.status === "rejected") return null;
     return (
       <div className="card shadow-soft mb-6 flex flex-wrap items-center gap-3 border-l-4 border-l-success p-5">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="font-bold">
             {existing.status === "approved" ? "Your testimonial is live" : "Thanks for your testimonial"}
           </div>
@@ -81,15 +81,20 @@ export default function TestimonialPrompt() {
 
   if (!open) {
     return (
-      <div className="card shadow-soft mb-6 flex flex-wrap items-center gap-4 border-l-4 border-l-brand p-5">
-        <div className="flex-1">
+      <div className="card shadow-soft mb-6 flex flex-col gap-4 border-l-4 border-l-brand p-5 sm:flex-row sm:items-center">
+        {/* Stacked on a phone. As a wrapping row the text column had no width
+            basis, so it collapsed to two or three words per line while the
+            button sat beside it — which read as broken rather than tight. */}
+        <div className="min-w-0 flex-1">
           <div className="font-bold">Is TryNoBot working for you?</div>
           <p className="mt-1 text-sm text-fg-muted">
             If it's saved you money or caught something you'd have missed, a couple of
             sentences would help other advertisers decide. We only publish it with your permission.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>Write a testimonial</Button>
+        <Button onClick={() => setOpen(true)} className="w-full shrink-0 sm:w-auto">
+          Write a testimonial
+        </Button>
       </div>
     );
   }
