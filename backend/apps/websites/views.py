@@ -42,8 +42,13 @@ class WebsiteViewSet(viewsets.ModelViewSet):
                 f"Your {where} can protect {limit} website{'s' if limit != 1 else ''}. "
                 "Upgrade to a higher plan on the Billing page to add more.")
         website = serializer.save()
+        # Start protected rather than start permissive. Without this a new site
+        # allows everything until the customer writes a rule, while the
+        # dashboard already says "Protected".
+        from apps.rules.defaults import create_default_rule
+        create_default_rule(website)
         from apps.rules.sync import publish_org
-        publish_org(website.organization_id)
+        publish_org(website.organization_id)   # publishes the new rule too
 
     def perform_update(self, serializer):
         self._require_manager(serializer.instance.organization_id)

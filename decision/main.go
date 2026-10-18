@@ -45,6 +45,10 @@ type CollectPayload struct {
 	Currency    string  `json:"currency"`
 	FP          *FP     `json:"fp"`
 	BH          *BH     `json:"bh"`
+	// The browser's own timezone. The tracker has always sent this and the
+	// engine has always ignored it, folding it into the fingerprint hash and
+	// nothing more — see tzMismatch below for why that was a waste.
+	TZ          string  `json:"tz"`
 }
 
 // BH is the passive behaviour block from the JS tracker. It is absent on the
@@ -219,6 +223,15 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	intel := h.knownIntel(rctx, fp.IP)
 	intel = h.resolveIntel(rctx, fp.IP, intel, ruleSet)
 	h.warmIntel(fp.IP, intel.ISP != "") // fill ISP/ASN/conn for next time, off the hot path
+
+	// A browser clock in a different country from the IP is a tunnel the
+	// provider has not catalogued yet — the gap that let a VPN visitor through
+	// a "block VPN" rule on a freshly rotated exit address. Applied AFTER the
+	// lookup, so a positive provider answer is only added to, never weakened.
+	tzMismatch := geo.TZMismatch(p.TZ, fp.Country)
+	if tzMismatch {
+		intel.VPN, intel.Proxy = true, true
+	}
 	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(rctx, fp.IP)
 	badFP := h.corpusKnownBad(rctx, ja3, ja4, fpHash)
@@ -252,6 +265,10 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 				reviewerPlatform = platform
 			}
 		}
+	}
+	if tzMismatch {
+		// Named in the signals so "why was I turned away?" has an answer.
+		result.Signals = append(result.Signals, "timezone_country_mismatch")
 	}
 	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
 		h.rememberBot(fp.IP)
@@ -1332,8 +1349,15 @@ func mapProxycheck(proxyField, typ, provider, asn string, risk int) ipIntel {
 	t := strings.ToLower(typ)
 	vpn := strings.Contains(t, "vpn") || strings.Contains(t, "tor")
 	mobile := strings.Contains(t, "mobile") || strings.Contains(t, "wireless")
-	// A flagged non-VPN IP is, in practice, hosting/datacenter traffic.
-	datacenter := proxy && !vpn
+	// Hosting is hosting whether or not the provider also calls it a proxy.
+	//
+	// This used to be `proxy && !vpn` alone, which meant an address proxycheck
+	// typed as "Hosting" but did not flag as a proxy — an ordinary VPS, the
+	// kind someone runs an RDP session from — came back datacenter=false, and a
+	// "Datacenter / RDP is Yes" rule never fired on it.
+	hosting := strings.Contains(t, "hosting") || strings.Contains(t, "datacenter") ||
+		strings.Contains(t, "data center") || strings.Contains(t, "server")
+	datacenter := hosting || (proxy && !vpn)
 	// Normalise proxycheck's type words to the same vocabulary IPQS uses, so a
 	// connection_type rule written for one provider still matches on the other.
 	conn := "Residential"
@@ -1342,6 +1366,8 @@ func mapProxycheck(proxyField, typ, provider, asn string, risk int) ipIntel {
 		conn = "VPN"
 	case datacenter:
 		conn = "Data Center"
+	case strings.Contains(t, "tor"):
+		conn = "VPN"
 	case mobile:
 		conn = "Mobile"
 	case strings.Contains(t, "business") || strings.Contains(t, "corporate") || strings.Contains(t, "organization"):

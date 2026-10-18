@@ -201,3 +201,146 @@ class RuleActionValidationTest(TestCase):
             with self.subTest(action=action):
                 self.assertEqual(
                     self._post(action=action, redirect_url="", tag="").status_code, 201)
+
+
+class DefaultRuleTest(TestCase):
+    """A new website must start protected, not permissive."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.c.post("/api/auth/register/", {
+            "email": "dr@example.com", "password": "testpass123", "first_name": "D"}, format="json")
+        tok = self.c.post("/api/auth/token/", {
+            "email": "dr@example.com", "password": "testpass123"}, format="json").json()["access"]
+        self.c.credentials(HTTP_AUTHORIZATION=f"Bearer {tok}")
+        orgs = self.c.get("/api/organizations/").json()
+        self.org = orgs[0]["id"] if isinstance(orgs, list) else orgs["results"][0]["id"]
+
+    def _add_site(self, domain="example.com"):
+        r = self.c.post("/api/websites/", {
+            "organization": self.org, "name": domain, "domain": domain}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        return r.json()["id"]
+
+    def test_a_new_website_gets_a_rule(self):
+        from apps.rules.models import TrafficRule
+        site = self._add_site()
+        rules = TrafficRule.objects.filter(website_id=site)
+        self.assertEqual(rules.count(), 1)
+        self.assertTrue(rules.first().active)
+
+    def test_it_catches_bots_and_fraud(self):
+        from apps.rules.models import TrafficRule
+        rule = TrafficRule.objects.get(website_id=self._add_site())
+        cond = rule.conditions.get()
+        self.assertEqual(cond.field, "classification")
+        self.assertEqual(cond.operator, "in")
+        self.assertEqual(set(cond.value.split(",")), {"bot", "fraud"})
+
+    def test_it_redirects_somewhere_that_exists(self):
+        """A redirect rule with no destination silently does nothing — the
+        default must not ship in that state."""
+        from apps.rules.models import TrafficRule
+        rule = TrafficRule.objects.get(website_id=self._add_site())
+        self.assertEqual(rule.action, "redirect")
+        self.assertTrue(rule.redirect_url.strip())
+        self.assertTrue(rule.redirect_url.endswith("/blocked.html"))
+
+    def test_it_runs_after_the_customers_own_rules(self):
+        """First match wins, so the default must sort last — a deliberate
+        `allow` written by the customer has to beat it."""
+        from apps.rules.defaults import DEFAULT_RULE_PRIORITY
+        from apps.rules.models import TrafficRule
+        rule = TrafficRule.objects.get(website_id=self._add_site())
+        self.assertEqual(rule.priority, DEFAULT_RULE_PRIORITY)
+        self.assertGreater(rule.priority, 100)  # the UI's default for new rules
+
+    def test_it_is_an_ordinary_rule_the_customer_can_remove(self):
+        from apps.rules.models import TrafficRule
+        rule = TrafficRule.objects.get(website_id=self._add_site())
+        r = self.c.delete(f"/api/rules/{rule.id}/")
+        self.assertIn(r.status_code, (200, 204))
+        self.assertFalse(TrafficRule.objects.filter(id=rule.id).exists())
+
+    def test_it_is_not_duplicated(self):
+        from apps.rules.defaults import create_default_rule
+        from apps.rules.models import TrafficRule
+        from apps.websites.models import Website
+        site = Website.objects.get(id=self._add_site())
+        self.assertIsNone(create_default_rule(site))
+        self.assertEqual(TrafficRule.objects.filter(website=site).count(), 1)
+
+    def test_each_website_gets_its_own(self):
+        """At the model level: the API path can't add a second site on the free
+        trial, but the rule is per-website and must not be shared."""
+        from apps.organizations.models import Organization
+        from apps.rules.defaults import create_default_rule
+        from apps.rules.models import TrafficRule
+        from apps.websites.models import Website
+
+        org = Organization.objects.get(id=self.org)
+        a = Website.objects.create(organization=org, name="a", domain="a.com")
+        b = Website.objects.create(organization=org, name="b", domain="b.com")
+        create_default_rule(a)
+        create_default_rule(b)
+
+        self.assertEqual(TrafficRule.objects.filter(website=a).count(), 1)
+        self.assertEqual(TrafficRule.objects.filter(website=b).count(), 1)
+        self.assertNotEqual(
+            TrafficRule.objects.get(website=a).id,
+            TrafficRule.objects.get(website=b).id)
+
+
+class BotCoverageBackfillTest(TestCase):
+    """A site can have rules and still be wide open to bots.
+
+    This is the case that frustrated a real customer: rules for VPN and OS, and
+    a visitor scored 80 and classified a bot walked straight through, because
+    no rule acted on the classification.
+    """
+
+    def setUp(self):
+        from apps.organizations.models import Organization, create_workspace
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="bc@example.com", email="bc@example.com", password="testpass123")
+        create_workspace(self.user, "W")
+        self.org = Organization.objects.filter(members__user=self.user).first()
+        from apps.websites.models import Website
+        self.site = Website.objects.create(organization=self.org, name="s", domain="s.com")
+
+    def _vpn_rule(self):
+        from apps.rules.models import RuleCondition, TrafficRule
+        r = TrafficRule.objects.create(
+            organization=self.org, website=self.site, name="vpn", priority=100,
+            action="redirect", redirect_url="https://example.com/x", active=True)
+        RuleCondition.objects.create(rule=r, field="is_proxy", operator="eq", value="1")
+        return r
+
+    def test_force_adds_the_bot_rule_to_a_site_that_already_has_rules(self):
+        from apps.rules.defaults import create_default_rule
+        from apps.rules.models import TrafficRule
+        self._vpn_rule()
+
+        # Without force it declines — the site has rules.
+        self.assertIsNone(create_default_rule(self.site))
+        # With force it adds the missing bot coverage alongside them.
+        self.assertIsNotNone(create_default_rule(self.site, force=True))
+        self.assertEqual(TrafficRule.objects.filter(website=self.site).count(), 2)
+
+    def test_force_is_still_idempotent(self):
+        """Running the backfill twice must not leave two copies."""
+        from apps.rules.defaults import create_default_rule
+        from apps.rules.models import TrafficRule
+        self._vpn_rule()
+        create_default_rule(self.site, force=True)
+        self.assertIsNone(create_default_rule(self.site, force=True))
+        self.assertEqual(TrafficRule.objects.filter(website=self.site).count(), 2)
+
+    def test_the_bot_rule_sorts_after_the_customers_vpn_rule(self):
+        from apps.rules.defaults import create_default_rule
+        from apps.rules.models import TrafficRule
+        vpn = self._vpn_rule()
+        bot = create_default_rule(self.site, force=True)
+        ordered = list(TrafficRule.objects.filter(website=self.site).order_by("priority", "id"))
+        self.assertEqual(ordered, [vpn, bot])
