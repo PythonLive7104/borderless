@@ -20,7 +20,7 @@ export default function CookieConsent() {
 
   return (
     <div role="dialog" aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-white/95 p-4 shadow-[0_-8px_24px_-16px_rgba(15,23,42,.4)] backdrop-blur">
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-card/95 p-4 shadow-[0_-8px_24px_-16px_rgba(15,23,42,.4)] backdrop-blur">
       <div className="container-page flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-fg-muted">
           We use cookies to measure how our ads and site perform. Decline and we'll only

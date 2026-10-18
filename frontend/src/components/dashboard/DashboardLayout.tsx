@@ -108,7 +108,7 @@ export default function DashboardLayout() {
 
       {/* main */}
       <div className="lg:pl-60">
-        <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-xl">
+        <header className="sticky top-0 z-20 border-b border-line bg-card/85 backdrop-blur-xl">
           <div className="flex h-16 items-center justify-between gap-3 px-5">
             <div className="flex min-w-0 items-center gap-3">
               <button className="shrink-0 rounded-lg p-2 text-fg-muted hover:bg-bg-mute lg:hidden" onClick={() => setOpen(!open)}>

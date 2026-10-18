@@ -10,7 +10,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-white/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-line bg-card/85 backdrop-blur-xl">
       <div className="container-page flex h-16 items-center justify-between">
         <Logo />
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
