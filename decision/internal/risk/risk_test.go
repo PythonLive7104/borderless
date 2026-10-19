@@ -82,3 +82,30 @@ func hasSignal(r Result, name string) bool {
 	}
 	return false
 }
+
+// A browser clock that disagrees with the IP's country is common and innocent:
+// travellers, expatriates, remote workers, and anyone who never set their
+// timezone. On its own it must never reach a blocking classification.
+//
+// This is pinned because the opposite shipped once and redirected real
+// visitors: the mismatch was folded into the proxy flag, so an ordinary person
+// on no VPN scored 35 and matched a "Proxy / VPN / Datacenter is Yes" rule.
+func TestTimezoneMismatchAloneStaysHuman(t *testing.T) {
+	r := Evaluate(Input{TZMismatch: true})
+	if r.Classification != "human" {
+		t.Fatalf("a timezone mismatch alone classified %q (score %d); it must stay human",
+			r.Classification, r.Score)
+	}
+	if !hasSig(r.Signals, "timezone_country_mismatch") {
+		t.Fatal("the mismatch should still be recorded as a signal")
+	}
+}
+
+// It still has to count for something, stacked with real evidence.
+func TestTimezoneMismatchAddsToRealEvidence(t *testing.T) {
+	withOut := Evaluate(Input{Datacenter: true, Proxy: true})
+	withIn := Evaluate(Input{Datacenter: true, Proxy: true, TZMismatch: true})
+	if withIn.Score <= withOut.Score {
+		t.Fatalf("mismatch should raise the score: %d -> %d", withOut.Score, withIn.Score)
+	}
+}

@@ -240,20 +240,20 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	// It now feeds the risk score instead, where it is one signal among several
 	// and cannot condemn anyone on its own.
 	tzMismatch := geo.TZMismatch(p.TZ, fp.Country)
-	if tzMismatch {
-		// Treated as a tunnel outright, which is a deliberate product choice:
-		// the requirement is "VPN on, site off", and an IP-intelligence
-		// provider cannot catalogue every exit address — a freshly rotated one
-		// looks clean, and a "Proxy / VPN is Yes" rule silently does nothing.
-		//
-		// The cost is accepted knowingly: a traveller, an expatriate or a
-		// remote worker whose laptop clock does not match the country they are
-		// browsing from is turned away too. If that becomes a problem, the
-		// softer route is to drop these two assignments — the mismatch still
-		// scores 20 risk points and is still exposed as the `tz_mismatch` rule
-		// field, so customers can act on it deliberately instead.
-		intel.VPN, intel.Proxy = true, true
-	}
+	// NOT folded into intel.VPN / intel.Proxy.
+	//
+	// It was, briefly, and it redirected real people. Live traffic showed
+	// ordinary visitors on no VPN at all scoring exactly 35 — 15 for "proxy"
+	// plus 20 for the mismatch — classified Human, and turned away anyway,
+	// because setting Proxy satisfied their "Proxy / VPN / Datacenter is Yes"
+	// rule. A device whose clock does not match its IP is common and innocent:
+	// travellers, expatriates, remote workers, and anyone who simply never set
+	// their timezone.
+	//
+	// The signal is still used — it scores 20 (on its own, "human", so it can
+	// never condemn anybody by itself) and is exposed as the `tz_mismatch`
+	// rule field for customers who want to act on it knowingly. What it must
+	// not do is quietly redefine what another field means.
 	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
 	repeat := h.isRepeatOffender(rctx, fp.IP)
 	badFP := h.corpusKnownBad(rctx, ja3, ja4, fpHash)
