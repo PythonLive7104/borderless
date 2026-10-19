@@ -11,6 +11,11 @@ FIELD_CHOICES = [
     # datacenter", which is what the single flag forced.
     ("is_proxy", "Proxy / VPN / Datacenter (any)"),
     ("is_vpn", "VPN or Tor"), ("is_datacenter", "Datacenter / RDP"),
+    # Browser clock disagrees with the IP's country — a tunnel the provider has
+    # not catalogued. Its own field rather than folded into is_vpn: it is an
+    # inference with real false positives (travellers, expats, remote workers),
+    # so a customer should opt into it knowingly.
+    ("tz_mismatch", "Timezone doesn't match IP country"),
     # Deeper targeting signals (from IP intelligence + the request).
     ("connection_type", "Connection type"), ("isp", "ISP"), ("asn", "ASN"),
     ("is_mobile", "Mobile connection"),

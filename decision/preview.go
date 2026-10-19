@@ -100,6 +100,7 @@ var signalLabels = map[string]string{
 	"automation_signal":             "Automation framework detected",
 	"datacenter_ip":                 "Datacenter IP — where bots usually run",
 	"proxy_detected":                "VPN or proxy",
+	"timezone_country_mismatch":     "Browser clock is in a different country from the IP",
 	"no_js_fingerprint":             "No browser fingerprint (not a real browser)",
 	"abnormal_request_rate":         "Unusually fast request rate",
 	"known_bad_ja3":                 "Known-bad TLS fingerprint (JA3)",

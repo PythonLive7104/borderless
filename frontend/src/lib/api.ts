@@ -393,7 +393,7 @@ export const RULE_FIELDS = [
   ["risk_score", "Risk score"], ["requests_per_min", "Requests per minute"], ["classification", "Classification"], ["country", "Country"],
   ["device", "Device"], ["browser", "Browser"], ["os", "OS"], ["is_bot", "Bot detected"],
   ["is_proxy", "Proxy / VPN / Datacenter (any)"], ["is_vpn", "VPN or Tor"],
-  ["is_datacenter", "Datacenter / RDP"],
+  ["is_datacenter", "Datacenter / RDP"], ["tz_mismatch", "Timezone doesn't match IP country"],
   ["connection_type", "Connection type"], ["isp", "ISP"], ["asn", "ASN"],
   ["is_mobile", "Mobile connection"], ["browser_version", "Browser version"],
   ["os_version", "OS version"], ["language", "Browser language"],
@@ -417,6 +417,7 @@ export const FIELD_VALUE_OPTIONS: Record<string, [string, string][]> = {
   is_proxy: [["1", "Yes"], ["0", "No"]],
   is_vpn: [["1", "Yes"], ["0", "No"]],
   is_datacenter: [["1", "Yes"], ["0", "No"]],
+  tz_mismatch: [["1", "Yes"], ["0", "No"]],
   is_mobile: [["1", "Yes"], ["0", "No"]],
   // IPQualityScore's connection_type values, verbatim, so an equals match works.
   connection_type: [

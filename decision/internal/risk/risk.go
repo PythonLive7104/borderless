@@ -27,6 +27,12 @@ const (
 	wRecentAbuse     = 25 // IP recently seen in abuse/fraud
 	wHighFraudIP     = 40 // provider fraud score very high (>=85): actionable alone
 	wElevatedFraudIP = 20 // provider fraud score elevated (>=75): a nudge
+	// Browser clock in a different country from the IP. Evidence of a tunnel,
+	// NOT proof of one: travellers, expatriates and remote workers trip it
+	// honestly. Weighted as a nudge for that reason — on its own it lands at
+	// 20, which is "human", so it can never turn a clean visitor away by
+	// itself. It only matters stacked on something else.
+	wTZMismatch = 20
 	wRepeatOffender  = 30 // this IP was caught as a bot recently (any link/site)
 
 	// Behavioural signals (Phase 1). These come from the JS tracker watching how
@@ -67,6 +73,8 @@ type Input struct {
 	IPFraudScore   int  // IP-intelligence fraud score, 0..100 (0 = unknown)
 	RepeatOffender bool // caught as a bot recently, anywhere in the platform
 
+	// Browser timezone contradicts the IP's country. See wTZMismatch.
+	TZMismatch       bool
 	SyntheticEvents  bool // tracker saw a JS-dispatched (isTrusted=false) event
 	HumanInteraction bool // tracker saw genuine human interaction this session
 
@@ -94,6 +102,9 @@ func Evaluate(in Input) Result {
 	}
 	if in.Datacenter {
 		add(wDatacenter, "datacenter_ip")
+	}
+	if in.TZMismatch {
+		add(wTZMismatch, "timezone_country_mismatch")
 	}
 	if in.Proxy {
 		add(wProxy, "proxy_detected")

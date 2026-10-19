@@ -228,8 +228,30 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 	// provider has not catalogued yet — the gap that let a VPN visitor through
 	// a "block VPN" rule on a freshly rotated exit address. Applied AFTER the
 	// lookup, so a positive provider answer is only added to, never weakened.
+	// Evidence toward a verdict, never the verdict itself.
+	//
+	// This used to set intel.VPN and intel.Proxy outright, which quietly
+	// redefined what "Proxy / VPN / Datacenter is Yes" means for every customer
+	// who had already written that rule — and turned away ordinary people whose
+	// laptop clock simply does not match the country they are browsing from.
+	// Travellers, expatriates, remote workers and anyone behind a corporate
+	// tunnel all trip this honestly.
+	//
+	// It now feeds the risk score instead, where it is one signal among several
+	// and cannot condemn anyone on its own.
 	tzMismatch := geo.TZMismatch(p.TZ, fp.Country)
 	if tzMismatch {
+		// Treated as a tunnel outright, which is a deliberate product choice:
+		// the requirement is "VPN on, site off", and an IP-intelligence
+		// provider cannot catalogue every exit address — a freshly rotated one
+		// looks clean, and a "Proxy / VPN is Yes" rule silently does nothing.
+		//
+		// The cost is accepted knowingly: a traveller, an expatriate or a
+		// remote worker whose laptop clock does not match the country they are
+		// browsing from is turned away too. If that becomes a problem, the
+		// softer route is to drop these two assignments — the mismatch still
+		// scores 20 risk points and is still exposed as the `tz_mismatch` rule
+		// field, so customers can act on it deliberately instead.
 		intel.VPN, intel.Proxy = true, true
 	}
 	iprate := h.st.RateIncr(rctx, "iprate:"+fp.IP, time.Minute)
@@ -250,6 +272,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 		RecentAbuse:         intel.RecentAbuse,
 		IPFraudScore:        intel.FraudScore,
 		RepeatOffender:      repeat,
+		TZMismatch:          tzMismatch,
 		SyntheticEvents:     syntheticEvents,
 		HumanInteraction:    humanInteraction,
 		KnownBadFingerprint: badFP,
@@ -288,6 +311,7 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 			"is_bot":          boolStr(fp.IsBot),
 			"is_proxy":        boolStr(intel.flagged()),
 			"is_vpn":          boolStr(intel.VPN),
+			"tz_mismatch":     boolStr(tzMismatch),
 			"is_datacenter":   boolStr(intel.Datacenter),
 			"isp":             intel.ISP,
 			"asn":             intel.ASN,
