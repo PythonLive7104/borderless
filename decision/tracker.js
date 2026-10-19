@@ -55,7 +55,14 @@
           'border-top-color:rgba(127,127,127,.6)}}';
       (document.head || document.documentElement).appendChild(v);
     } catch (e) {}
-    revealTimer = setTimeout(reveal, 1200);   // fail open, always
+    // Fail open, always — but late enough that a real verdict can arrive first.
+    //
+    // This was 1200ms, the same number the server was allowed to spend waiting
+    // on the IP-intelligence provider, so a decision that used its full budget
+    // could never beat the reveal: the page appeared, and only then was the
+    // visitor redirected. Keep this comfortably above intelSyncTimeout() in
+    // main.go (600ms) plus a round trip.
+    revealTimer = setTimeout(reveal, 1800);
   }
   var endpoint;
   try { endpoint = new URL(script.src).origin + '/v1/collect'; } catch (e) { return; }
@@ -64,10 +71,26 @@
     try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
     return 'xxxxxxxxxxxx'.replace(/x/g, function () { return (Math.random() * 16 | 0).toString(16); }) + Date.now().toString(16);
   }
-  function g(store, k) { try { return store.getItem(k); } catch (e) { return null; } }
-  function s(store, k, v) { try { store.setItem(k, v); } catch (e) {} }
-  var vid = g(localStorage, 'bl_vid'); if (!vid) { vid = uid(); s(localStorage, 'bl_vid', vid); }
-  var sid = g(sessionStorage, 'bl_sid'); if (!sid) { sid = uid(); s(sessionStorage, 'bl_sid', sid); }
+  // Reaching for window.localStorage can THROW, it does not merely return
+  // null: Chrome raises SecurityError when cookies are blocked entirely, and
+  // several privacy modes do the same. This used to be written as
+  // `g(localStorage, 'bl_vid')`, where the storage object is evaluated as an
+  // argument — outside g()'s try/catch. The exception escaped, the whole
+  // tracker aborted on its second line of real work, no verdict was ever
+  // requested, and the page rendered as if the visitor had been allowed.
+  //
+  // That is worse than a privacy edge case. Any client that turns storage off
+  // skipped detection completely, which is a free bypass for exactly the
+  // automation this is meant to catch.
+  function store(kind) { try { return window[kind] || null; } catch (e) { return null; } }
+  function g(st, k) { try { return st ? st.getItem(k) : null; } catch (e) { return null; } }
+  function s(st, k, v) { try { if (st) st.setItem(k, v); } catch (e) {} }
+  var LS = store('localStorage'), SS = store('sessionStorage');
+  // No storage is not a reason to stop. The ids stay in memory for this page
+  // view: the visitor is not recognised on their next one, but they ARE still
+  // scored on this one, which is the part that matters.
+  var vid = g(LS, 'bl_vid'); if (!vid) { vid = uid(); s(LS, 'bl_vid', vid); }
+  var sid = g(SS, 'bl_sid'); if (!sid) { sid = uid(); s(SS, 'bl_sid', sid); }
 
   function utm(name) { try { return new URLSearchParams(location.search).get(name) || ''; } catch (e) { return ''; } }
   function hash32(str) { var h = 5381, i = str.length; while (i) h = (h * 33) ^ str.charCodeAt(--i); return (h >>> 0).toString(16); }

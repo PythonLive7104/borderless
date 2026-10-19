@@ -535,7 +535,7 @@ func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"action": "allow", "error": "POST only"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), shieldTimeout())
 	defer cancel()
 
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 16*1024))
@@ -575,7 +575,7 @@ func (h *handler) decide(w http.ResponseWriter, r *http.Request) {
 // (with X-TA-Action/X-TA-Redirect headers when a redirect rule matched). Fails
 // open (204) on any misconfiguration so a broken setup never blocks the site.
 func (h *handler) guard(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), shieldTimeout())
 	defer cancel()
 
 	// Public site_id alone authorizes; an X-TA-Key is optional (must own the site
@@ -1146,16 +1146,39 @@ func (h *handler) setIntelFlag(ctx context.Context, kind, ip string) {
 }
 
 // intelSyncTimeout caps how long a decision may wait on the IP-intelligence
-// provider. Deliberately short: the engine advertises single-digit-millisecond
-// decisions, and a rule that cannot be resolved in time falls back to the
-// cached answer rather than holding the page.
+// provider.
+//
+// MUST stay comfortably below the tracker's strict-mode reveal timer (1800ms,
+// see revealTimer in tracker.js) with room for a round trip. The two were both
+// 1200ms, which meant a decision that used the full lookup budget could not
+// physically reach the browser before the page had already been revealed: the
+// visitor saw the content, and a blocked one was redirected a moment later —
+// which looks exactly like the protection not working. A fresh private window
+// made it near-certain, having neither a cached tracker nor a warm connection.
+//
+// 600ms is generous for proxycheck, which typically answers in well under 200.
+// shieldTimeout is the whole budget for a server-side decision (/v1/decide and
+// /v1/guard).
+//
+// DERIVED from intelSyncTimeout rather than written as its own number. These
+// were a flat 300ms while the intel lookup inside wanted 600ms, and a child
+// context cannot outlive its parent — so the lookup was silently cut short and
+// a cold IP came back with no proxy/VPN data on the one path customers are told
+// is the reliable one. Two independent constants that have to stay in step is
+// the same mistake as the reveal timer; deriving one from the other is the fix.
+//
+// The headroom covers Redis, geo and scoring, which are all local and fast.
+func shieldTimeout() time.Duration {
+	return intelSyncTimeout() + 350*time.Millisecond
+}
+
 func intelSyncTimeout() time.Duration {
 	if v := env("IP_INTEL_SYNC_MS", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			return time.Duration(n) * time.Millisecond
 		}
 	}
-	return 1200 * time.Millisecond
+	return 600 * time.Millisecond
 }
 
 // warmIntel enriches an IP's record (ISP/ASN/connection type) in the background
