@@ -223,8 +223,22 @@ class StrictModeTest(TestCase):
         self.site.refresh_from_db()
         return WebsiteSerializer(self.site).data["snippet"]
 
-    def test_off_by_default_so_existing_sites_are_unchanged(self):
-        self.assertFalse(self.site.strict_mode)
+    def test_on_by_default_so_a_new_site_never_flashes_its_content(self):
+        """The default flipped deliberately.
+
+        Off, a blocked visitor sees the real page for a fraction of a second
+        before being turned away — which customers read as the protection not
+        working, and which genuinely leaks the content to anything that
+        screenshots or scrapes quickly.
+        """
+        self.assertTrue(self.site.strict_mode)
+        self.assertIn("data-strict", self._snippet())
+
+    def test_turning_it_off_restores_the_plain_async_snippet(self):
+        """It must stay a real choice — some customers will accept the flash
+        rather than any delay at all."""
+        self.site.strict_mode = False
+        self.site.save(update_fields=["strict_mode"])
         self.assertIn("async", self._snippet())
         self.assertNotIn("data-strict", self._snippet())
 
@@ -265,6 +279,10 @@ class StrictModeTest(TestCase):
                                           role=Role.ANALYST)
         c = APIClient()
         c.force_authenticate(user=other)
+        # Flip it away from the default so the assertion below proves the
+        # request was refused, rather than coincidentally matching.
+        self.site.strict_mode = False
+        self.site.save(update_fields=["strict_mode"])
         r = c.patch(f"/api/websites/{self.site.id}/",
                               {"strict_mode": True}, format="json")
         self.assertEqual(r.status_code, 403, r.content)

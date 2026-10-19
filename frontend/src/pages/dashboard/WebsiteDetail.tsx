@@ -144,14 +144,14 @@ export default function WebsiteDetail() {
               disabled={savingStrict} className="mt-0.5 h-4 w-4 accent-brand" />
             <span className="min-w-0">
               <span className="block text-sm font-semibold">
-                Hide the page until the visitor is checked
+                Show a loader until the visitor is checked
                 {savingStrict && <span className="ml-2 text-xs font-normal text-fg-muted">saving…</span>}
               </span>
               <span className="mt-1 block text-xs text-fg-muted">
                 Without this, a blocked visitor sees your content for a moment before the check finishes.
-                With it the page stays blank until the verdict lands — and always reveals after 1.2s, so a
-                slow check can never leave a real visitor staring at nothing.
-                {" "}Turn it on if you can't install the{" "}
+                With it they see a brief loading spinner instead, and the page appears only once the check
+                clears — always within 1.2 seconds, so a slow check can never leave a real visitor waiting.
+                {" "}Especially worth keeping on if you can't install the{" "}
                 <Link to="/dashboard/shield" className="font-semibold underline">Shield</Link>{" "}
                 on your server. Note it runs in the browser, so it can't stop a scraper that ignores JavaScript.
               </span>

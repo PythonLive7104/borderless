@@ -27,12 +27,19 @@ class Website(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
-    # Emits data-strict="1" in the snippet: the tracker hides the page until the
+    # Emits data-strict="1" in the snippet: the tracker shows a loader until the
     # verdict lands, so a blocked visitor never sees the content. Always reveals
     # on a 1.2s timer, so a slow check can never white-screen a real visitor.
+    #
+    # Defaults ON for new sites. Off, a blocked visitor sees the real page for a
+    # fraction of a second before being turned away — which customers read as
+    # the protection not working, and which does genuinely leak the content to
+    # anything that screenshots or scrapes fast enough. Existing sites keep
+    # whatever they were set to; a default only applies to rows created after it.
     strict_mode = models.BooleanField(
-        default=False,
-        help_text="Hide the page until the bot check finishes (stops blocked visitors seeing content).")
+        default=True,
+        help_text="Show a loader until the bot check finishes, so a blocked "
+                  "visitor never sees the page. Reveals automatically after 1.2s.")
 
     # An internal holder for traffic that isn't tied to a real site — clicks on
     # a redirect that has no website attached. Without somewhere to put them the

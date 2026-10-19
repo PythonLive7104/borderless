@@ -22,7 +22,37 @@
     try {
       var v = document.createElement('style');
       v.id = 'bl-veil';
-      v.textContent = 'html{visibility:hidden!important}';
+      // A loader, not a blank page.
+      //
+      // This used to be `visibility:hidden` alone, which does stop a blocked
+      // visitor seeing the content — but a real visitor got up to 1.2s of
+      // white nothing, which reads as a broken site. Customers turned strict
+      // mode off because of it and went back to the content flashing instead.
+      //
+      // Drawn with ::before and ::after on <html> rather than a DOM node,
+      // because this runs while the document is still parsing: there may be no
+      // <body> to append to yet, and a div parented to <html> is invalid markup
+      // that browsers relocate unpredictably. Pseudo-elements need nothing to
+      // exist but the root.
+      //
+      // `Canvas`/`CanvasText` are the system colours, so the backdrop matches
+      // the visitor's light or dark preference instead of flashing white on a
+      // dark site. The plain values before them are the fallback where those
+      // keywords are unsupported.
+      v.textContent =
+        'html{visibility:hidden!important}' +
+        'html::before,html::after{visibility:visible!important}' +
+        'html::before{content:"";position:fixed;inset:0;z-index:2147483646;' +
+          'background:#fff;background:Canvas}' +
+        'html::after{content:"";position:fixed;z-index:2147483647;' +
+          'top:50%;left:50%;width:38px;height:38px;margin:-19px 0 0 -19px;' +
+          'border-radius:50%;border:3px solid rgba(127,127,127,.25);' +
+          'border-top-color:#2563eb;animation:bl-spin .7s linear infinite}' +
+        '@keyframes bl-spin{to{transform:rotate(360deg)}}' +
+        // Someone who has asked for less motion still needs to see that
+        // something is happening, so the ring stays and only the spin goes.
+        '@media(prefers-reduced-motion:reduce){html::after{animation:none;' +
+          'border-top-color:rgba(127,127,127,.6)}}';
       (document.head || document.documentElement).appendChild(v);
     } catch (e) {}
     revealTimer = setTimeout(reveal, 1200);   // fail open, always
