@@ -125,6 +125,25 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
+	// Say out loud whether IP intelligence is switched on.
+	//
+	// Both ways it can be off are silent: resolveIntel returns early when no
+	// provider is configured, and lookupIP's provider switch has a bare
+	// `default: return out`. A misspelt or missing IP_INTEL_PROVIDER therefore
+	// disables every VPN, proxy and datacenter rule on every site, writes
+	// nothing to the cache and logs nothing at all — the rules simply never
+	// match and the dashboard looks perfectly healthy. One line at boot turns
+	// that into something anyone can see in `docker compose logs decision`.
+	if prov := strings.ToLower(env("IP_INTEL_PROVIDER", "")); prov == "" {
+		log.Printf("ipintel: DISABLED — IP_INTEL_PROVIDER is not set. " +
+			"VPN / proxy / datacenter rules cannot match on any site.")
+	} else if !intelProviderConfigured() {
+		log.Printf("ipintel: DISABLED — IP_INTEL_PROVIDER=%q but its API key is "+
+			"missing or the name is not recognised (expected \"proxycheck\" or "+
+			"\"ipqualityscore\"). VPN / proxy / datacenter rules cannot match.", prov)
+	} else {
+		log.Printf("ipintel: enabled, provider=%s", prov)
+	}
 	log.Printf("Borderless traffic engine listening on :%s", port)
 	log.Fatal(srv.ListenAndServe())
 }
