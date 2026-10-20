@@ -14,6 +14,7 @@ It reuses the Bot Check fetcher, which is already SSRF-hardened (scheme/port
 allow-list, private-IP rejection, redirect re-validation). We only read the
 homepage HTML — nothing is scanned or stored.
 """
+import re
 from urllib.parse import urlparse
 
 from apps.intelligence.botcheck import _fetch, _validate
@@ -24,6 +25,49 @@ FOUND = "found"                 # snippet is in the served HTML
 MISSING = "missing"             # page loaded, snippet not in it
 UNREACHABLE = "unreachable"     # couldn't load the page at all
 NO_URL = "no_url"               # we don't know which URL to check
+
+# How the tag on the page compares with what strict mode needs. Strict mode
+# lives in OUR database but is enforced by an attribute in THEIR HTML, so the
+# two drift apart silently: a customer turns strict mode on, we start claiming
+# blocked visitors never see the page, and the old async tag is still sitting
+# on their site doing none of it. Nothing used to detect that — verify()
+# short-circuited on "we're receiving traffic", which an async tag does
+# perfectly well. This is how that mismatch becomes visible.
+STRICT_OK = "ok"                # tag has data-strict="1" and is not async
+STRICT_ASYNC = "async"          # tag is async: it cannot hide the page in time
+STRICT_MISSING = "missing_attr"  # tag has no data-strict="1" at all
+STRICT_NA = "not_applicable"    # strict mode is off for this website
+STRICT_UNKNOWN = "unknown"      # we could not read the page to tell
+
+_SCRIPT_TAG = re.compile(r"<script\b[^>]*>", re.IGNORECASE)
+
+
+def tag_for(html: str, tracking_id: str) -> str:
+    """The opening <script> tag on the page that carries THIS site's id."""
+    if not tracking_id or not html:
+        return ""
+    tid = tracking_id.lower()
+    for tag in _SCRIPT_TAG.findall(html):
+        low = tag.lower()
+        if f'data-site-id="{tid}"' in low or f"data-site-id='{tid}'" in low:
+            return tag
+    return ""
+
+
+def strict_state(html: str, tracking_id: str, strict_enabled: bool) -> str:
+    """Whether the tag actually on the page can deliver strict mode."""
+    if not strict_enabled:
+        return STRICT_NA
+    tag = tag_for(html, tracking_id)
+    if not tag:
+        return STRICT_UNKNOWN
+    low = tag.lower()
+    # `async` as its own attribute, not the letters appearing inside a URL.
+    if re.search(r"[\s\"']async(?=[\s=>/])", low) or re.search(r"\sasync\b", low):
+        return STRICT_ASYNC
+    if 'data-strict="1"' not in low and "data-strict='1'" not in low:
+        return STRICT_MISSING
+    return STRICT_OK
 
 
 def _candidate_url(website) -> str:
@@ -77,4 +121,7 @@ def check(website) -> dict:
         "url": url,
         "checked_url": final_url,
         "status_code": status_code,
+        "strict_state": strict_state(body, website.tracking_id,
+                                     bool(getattr(website, "strict_mode", False))),
+        "tag": tag_for(body, website.tracking_id),
     }

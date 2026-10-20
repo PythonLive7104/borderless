@@ -81,14 +81,59 @@ class WebsiteViewSet(viewsets.ModelViewSet):
 
         w = self.get_object()
         installed = w.last_event_at is not None
-        if installed:
+        if installed and not w.strict_mode:
             return Response({
                 "status": w.status,
                 "live_state": w.live_state(),
                 "installed": True,
                 "snippet_state": snippet_check.FOUND,
+                "strict_state": snippet_check.STRICT_NA,
                 "last_event_at": w.last_event_at,
                 "message": "Installation detected — you're receiving traffic.",
+            })
+
+        if installed:
+            # Traffic is arriving, so the tag is definitely on the page — but
+            # strict mode needs a DIFFERENT tag from the one that merely
+            # collects traffic, and an async tag collects traffic perfectly
+            # well while hiding nothing. Short-circuiting here on "we're
+            # receiving traffic" is why a customer could turn strict mode on,
+            # be told everything was fine, and still watch their page flash in
+            # front of every blocked visitor. So we look at the real tag.
+            try:
+                probe = snippet_check.check(w)
+            except Exception:
+                probe = {"state": snippet_check.FOUND,
+                         "strict_state": snippet_check.STRICT_UNKNOWN}
+            st = probe.get("strict_state", snippet_check.STRICT_UNKNOWN)
+            strict_messages = {
+                snippet_check.STRICT_OK:
+                    "Installation detected, and your tag is set up for the loader — "
+                    "blocked visitors won't see your page.",
+                snippet_check.STRICT_ASYNC:
+                    "Your traffic is arriving, but the tag on your page still has "
+                    "`async`. An async script can't hide the page before the browser "
+                    "draws it, so blocked visitors see your content flash first. "
+                    "Copy the snippet above again and replace the old tag.",
+                snippet_check.STRICT_MISSING:
+                    "Your traffic is arriving, but the tag on your page is missing "
+                    '`data-strict="1"`, so the loader never runs and blocked visitors '
+                    "see your page. Copy the snippet above again and replace the old tag.",
+                snippet_check.STRICT_UNKNOWN:
+                    "Installation detected. We couldn't re-read your page to confirm "
+                    "the loader is set up — check that the tag is the one shown above.",
+            }
+            return Response({
+                "status": w.status,
+                "live_state": w.live_state(),
+                # Not "ok" when the tag can't deliver what strict mode promises:
+                # the dashboard shows this amber rather than green.
+                "installed": st in (snippet_check.STRICT_OK, snippet_check.STRICT_UNKNOWN),
+                "snippet_state": snippet_check.FOUND,
+                "strict_state": st,
+                "found_tag": probe.get("tag", ""),
+                "last_event_at": w.last_event_at,
+                "message": strict_messages.get(st, strict_messages[snippet_check.STRICT_UNKNOWN]),
             })
 
         try:
@@ -116,6 +161,8 @@ class WebsiteViewSet(viewsets.ModelViewSet):
             "live_state": w.live_state(),
             "installed": False,
             "snippet_state": state,
+            "strict_state": probe.get("strict_state", snippet_check.STRICT_UNKNOWN),
+            "found_tag": probe.get("tag", ""),
             "checked_url": probe.get("checked_url") or probe.get("url", ""),
             "last_event_at": None,
             "message": messages.get(state, "No events received yet. "
