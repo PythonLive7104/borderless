@@ -1146,7 +1146,18 @@ func (h *handler) resolveIntel(ctx context.Context, ip string, known ipIntel, ru
 	if !intelProviderConfigured() {
 		return known
 	}
-	lctx, cancel := context.WithTimeout(ctx, intelSyncTimeout())
+	// Deliberately NOT derived from ctx.
+	//
+	// The caller's context is the 150ms risk-scoring budget, and a child
+	// context cannot outlive its parent — so this lookup, nominally allowed
+	// 600ms, actually died at 150ms. Everything downstream then failed on an
+	// already-expired deadline: the intel CACHE READ returned nothing, so every
+	// visitor looked uncached, and the cache WRITE was dropped, so the answer
+	// was never stored. The result was a fresh provider query on literally
+	// every request — which is what burned a 1,000/day allowance, and once that
+	// allowance was gone the provider returned "denied", intel came back empty,
+	// and a "block VPN" rule matched nothing at all.
+	lctx, cancel := context.WithTimeout(context.Background(), intelSyncTimeout())
 	defer cancel()
 	if got := h.lookupIP(lctx, ip); got.ISP != "" || got.flagged() {
 		return got
@@ -1271,15 +1282,23 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		return out
 	}
 	key := "ipintel:cache:" + ip
+	// Redis gets its own short budget rather than the caller's.
+	//
+	// Redis is local and answers in well under a millisecond; the thing it must
+	// never inherit is a deadline that is already spent. When it did, a cached
+	// answer read as a miss and a fresh answer was never written back, so the
+	// cache did nothing at all and every visitor cost a provider query.
+	sctx, scancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer scancel()
 	// Cache first: it holds the full record (ISP/ASN/connection type), which the
 	// proxy/datacenter sets don't — so checking the sets first would throw that
 	// detail away for any IP we've already flagged.
-	if raw := h.st.GetStr(ctx, key); raw != "" {
+	if raw := h.st.GetStr(sctx, key); raw != "" {
 		json.Unmarshal([]byte(raw), &out)
-		if h.hasIntelFlag(ctx, "datacenter", ip) {
+		if h.hasIntelFlag(sctx, "datacenter", ip) {
 			out.Datacenter = true
 		}
-		if h.hasIntelFlag(ctx, "proxy", ip) {
+		if h.hasIntelFlag(sctx, "proxy", ip) {
 			out.Proxy = true
 		}
 		return out
@@ -1301,14 +1320,17 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	}
 	out = res
 	// Share the answer with Django's cache and sets, same keys and shape.
+	// On sctx, not ctx: the write is the whole point of having paid for the
+	// lookup, and dropping it because the caller's budget ran out is how one
+	// query per visitor became one query per request.
 	if b, err := json.Marshal(out); err == nil {
-		h.st.SetEx(ctx, key, string(b), 24*time.Hour)
+		h.st.SetEx(sctx, key, string(b), 24*time.Hour)
 	}
 	if out.Datacenter {
-		h.setIntelFlag(ctx, "datacenter", ip)
+		h.setIntelFlag(sctx, "datacenter", ip)
 	}
 	if out.Proxy || out.VPN {
-		h.setIntelFlag(ctx, "proxy", ip)
+		h.setIntelFlag(sctx, "proxy", ip)
 	}
 	return out
 }
