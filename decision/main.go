@@ -1032,7 +1032,25 @@ type ipIntel struct {
 
 func (i ipIntel) flagged() bool { return i.Proxy || i.VPN || i.Datacenter }
 
-var intelClient = &http.Client{Timeout: 700 * time.Millisecond}
+// intelHTTPTimeout bounds the provider call itself.
+//
+// This was a flat 700ms. proxycheck with vpn=3&asn=1&risk=1 is a heavy query
+// and regularly needs longer than that, and when it did the call returned a
+// transport error, lookupIP failed open, and the visitor walked straight
+// through a "block VPN" rule. Nothing logged it — the err!=nil branch below
+// was silent — so a provider timing out was indistinguishable from a provider
+// saying "this address is clean". That is why the rule looked correct and the
+// VPN traffic kept arriving.
+func intelHTTPTimeout() time.Duration {
+	if v := env("IP_INTEL_HTTP_MS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Millisecond
+		}
+	}
+	return 1500 * time.Millisecond
+}
+
+var intelClient = &http.Client{Timeout: intelHTTPTimeout()}
 
 // --- Cross-surface bot memory (#4) + per-IP global rate (#5) ------------------
 
@@ -1347,6 +1365,11 @@ func fetchProxycheck(ip string) (ipIntel, bool) {
 	resp, err := intelClient.Get("https://proxycheck.io/v2/" + url.PathEscape(ip) +
 		"?key=" + url.QueryEscape(apiKey) + "&vpn=3&asn=1&risk=1")
 	if err != nil {
+		// Never silent. A timeout here means this visitor is about to be let
+		// through unchecked, which on a site with a VPN rule is the single
+		// most expensive thing this engine can do quietly.
+		log.Printf("ipintel: proxycheck lookup FAILED for %s (%v)"+
+			" — this visitor is being allowed through unchecked", ip, err)
 		return ipIntel{}, false
 	}
 	defer resp.Body.Close()

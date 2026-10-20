@@ -11,6 +11,13 @@
   // slow or failed check can't white-screen real people.
   var strict = script.getAttribute('data-strict') === '1';
   var revealTimer = 0, revealed = false;
+  // How long strict mode will wait on a hung request before giving up and
+  // showing the page. Overridable per site with data-strict-ms for anyone whose
+  // origin is genuinely slow; floored so a typo can't reintroduce the flash.
+  function strictCeiling() {
+    var n = parseInt(script.getAttribute('data-strict-ms') || '', 10);
+    return n > 0 ? Math.max(n, 1500) : 6000;
+  }
   function reveal() {
     if (revealed) return;
     revealed = true;
@@ -55,14 +62,21 @@
           'border-top-color:rgba(127,127,127,.6)}}';
       (document.head || document.documentElement).appendChild(v);
     } catch (e) {}
-    // Fail open, always — but late enough that a real verdict can arrive first.
+    // A last-resort ceiling, NOT a normal reveal.
     //
-    // This was 1200ms, the same number the server was allowed to spend waiting
-    // on the IP-intelligence provider, so a decision that used its full budget
-    // could never beat the reveal: the page appeared, and only then was the
-    // visitor redirected. Keep this comfortably above intelSyncTimeout() in
-    // main.go (600ms) plus a round trip.
-    revealTimer = setTimeout(reveal, 1800);
+    // This used to be a blind 1800ms timer: the page appeared when it fired,
+    // whether or not a verdict was still on its way. That is the complaint —
+    // a VPN visitor on a slow lookup saw the content, and only afterwards got
+    // redirected. The whole point of strict mode is that they never see it.
+    //
+    // Every way a check can genuinely FAIL already reveals immediately: a
+    // network error, a non-200, a missing body, and the sendBeacon fallback
+    // that cannot read a reply all call reveal() directly. So this timer no
+    // longer has to cover slowness — only the one case none of those catch,
+    // a request that is accepted and then never answered at all. That earns a
+    // much longer fuse, because the cost of firing early is showing the page
+    // to exactly the visitor the customer asked us to turn away.
+    revealTimer = setTimeout(reveal, strictCeiling());
   }
   var endpoint;
   try { endpoint = new URL(script.src).origin + '/v1/collect'; } catch (e) { return; }
@@ -229,6 +243,10 @@
       } catch (e) {}
     }
     try { if (navigator.sendBeacon) { navigator.sendBeacon(endpoint, new Blob([body], { type: 'text/plain' })); } } catch (e) {}
+    // sendBeacon cannot read a reply, so no verdict will ever arrive on this
+    // path. Reveal now rather than making the visitor sit behind the loader
+    // until the ceiling for a decision that is never coming.
+    reveal();
   }
 
   // Enforce the engine's verdict. This is best-effort by nature: it runs in the
@@ -270,7 +288,15 @@
   window.bl = bl;
   if (existing && existing.q) for (var i = 0; i < existing.q.length; i++) bl.apply(null, existing.q[i]);
 
-  send('pageview', {});
+  // Wrapped: strict mode now waits on this request rather than on a short
+  // timer, so anything that throws BEFORE the request goes out would leave the
+  // loader up until the ceiling. Revealing here turns a tracker bug into a
+  // tracker that does nothing, instead of into a blank customer site.
+  try {
+    send('pageview', {});
+  } catch (e) {
+    reveal();
+  }
 
   // A parting behaviour beacon: most sessions never fire a custom event, so
   // without this the only signal we would ever have is the behaviour-free
