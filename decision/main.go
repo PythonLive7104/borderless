@@ -1423,6 +1423,7 @@ func fetchProxycheck(ip string) (ipIntel, bool) {
 	}
 	var d struct {
 		Proxy    string `json:"proxy"`
+		VPN      string `json:"vpn"`
 		Type     string `json:"type"`
 		Provider string `json:"provider"`
 		ASN      string `json:"asn"`
@@ -1431,15 +1432,27 @@ func fetchProxycheck(ip string) (ipIntel, bool) {
 	if json.Unmarshal(rec, &d) != nil {
 		return ipIntel{}, false
 	}
-	return mapProxycheck(d.Proxy, d.Type, d.Provider, d.ASN, d.Risk), true
+	return mapProxycheck(d.Proxy, d.VPN, d.Type, d.Provider, d.ASN, d.Risk), true
 }
 
 // mapProxycheck normalises a proxycheck.io record onto our provider-blind
 // signals. Pure, so the mapping is unit-tested without any network.
-func mapProxycheck(proxyField, typ, provider, asn string, risk int) ipIntel {
+func mapProxycheck(proxyField, vpnField, typ, provider, asn string, risk int) ipIntel {
 	proxy := strings.EqualFold(proxyField, "yes")
 	t := strings.ToLower(typ)
-	vpn := strings.Contains(t, "vpn") || strings.Contains(t, "tor")
+	// proxycheck answers the &vpn=3 flag in its OWN "vpn" field, and that field
+	// is authoritative. We only ever read "type" — which a VPN-only answer does
+	// not include at all. So a reply that said, in plain words,
+	//
+	//     "proxy": "no",  "vpn": "yes",  "provider": "WorldStream B.V."
+	//
+	// mapped to completely clean intel: is_vpn false, is_proxy false,
+	// is_datacenter false. A "block VPN" rule could never match it. Whether a
+	// VPN visitor was stopped came down to whether their risk score happened to
+	// cross some other threshold, which is exactly why blocking looked random
+	// and why customers reported VPN traffic walking through a correct rule.
+	vpn := strings.EqualFold(vpnField, "yes") ||
+		strings.Contains(t, "vpn") || strings.Contains(t, "tor")
 	mobile := strings.Contains(t, "mobile") || strings.Contains(t, "wireless")
 	// Hosting is hosting whether or not the provider also calls it a proxy.
 	//

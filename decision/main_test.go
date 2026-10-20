@@ -179,7 +179,7 @@ func TestDeepCheckPageRenders(t *testing.T) {
 
 func TestMapProxycheck(t *testing.T) {
 	// A datacenter/hosting proxy (non-VPN) -> flagged as datacenter.
-	dc := mapProxycheck("yes", "Compromised Server", "Amazon", "AS16509", 66)
+	dc := mapProxycheck("yes", "no", "Compromised Server", "Amazon", "AS16509", 66)
 	if !dc.Proxy || dc.VPN || !dc.Datacenter {
 		t.Fatalf("hosting proxy: %+v", dc)
 	}
@@ -187,21 +187,21 @@ func TestMapProxycheck(t *testing.T) {
 		t.Fatalf("hosting fields: %+v", dc)
 	}
 	// A VPN -> VPN true, not datacenter.
-	v := mapProxycheck("yes", "VPN", "NordVPN", "AS0", 80)
+	v := mapProxycheck("yes", "yes", "VPN", "NordVPN", "AS0", 80)
 	if !v.VPN || v.Datacenter || v.ConnType != "VPN" {
 		t.Fatalf("vpn: %+v", v)
 	}
 	// A clean residential IP -> nothing flagged.
-	clean := mapProxycheck("no", "Residential", "Comcast", "AS7922", 0)
+	clean := mapProxycheck("no", "no", "Residential", "Comcast", "AS7922", 0)
 	if clean.Proxy || clean.VPN || clean.Datacenter || clean.ConnType != "Residential" {
 		t.Fatalf("clean: %+v", clean)
 	}
 	// A business IP is not "Residential".
-	if b := mapProxycheck("no", "Business", "Google", "AS15169", 0); b.ConnType != "Corporate" {
+	if b := mapProxycheck("no", "no", "Business", "Google", "AS15169", 0); b.ConnType != "Corporate" {
 		t.Fatalf("business should map to Corporate: %+v", b)
 	}
 	// A mobile carrier IP.
-	if m := mapProxycheck("no", "Mobile", "MTN", "AS29465", 0); m.ConnType != "Mobile" || !m.Mobile {
+	if m := mapProxycheck("no", "no", "Mobile", "MTN", "AS29465", 0); m.ConnType != "Mobile" || !m.Mobile {
 		t.Fatalf("mobile: %+v", m)
 	}
 }
@@ -229,5 +229,26 @@ func TestCorpusThresholdNeverDropsBelowTwo(t *testing.T) {
 	t.Setenv("CORPUS_BAD_IP_THRESHOLD", "5")
 	if got := corpusBadIPThreshold(); got != 5 {
 		t.Fatalf("valid override 5 gave %d", got)
+	}
+}
+
+// A real proxycheck reply for a live VPN exit address, copied verbatim from the
+// answer that a customer's own VPN produced while a "block VPN" rule sat on the
+// site and did nothing:
+//
+//     "proxy": "no", "vpn": "yes", "provider": "WorldStream B.V.", "risk": 66
+//
+// Note there is no "type" field at all. The mapping read only "type", so this
+// produced entirely clean intel and the rule had nothing to match on.
+func TestProxycheckVPNFieldIsHonoured(t *testing.T) {
+	got := mapProxycheck("no", "yes", "", "WorldStream B.V.", "AS49981", 66)
+	if !got.VPN {
+		t.Fatal("vpn:yes in the provider reply must set VPN")
+	}
+	if !got.flagged() {
+		t.Fatal("a VPN must satisfy 'Proxy / VPN / Datacenter is Yes'")
+	}
+	if got.ConnType != "VPN" {
+		t.Fatalf("connection_type = %q, want VPN", got.ConnType)
 	}
 }
