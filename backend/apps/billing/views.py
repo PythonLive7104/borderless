@@ -504,7 +504,10 @@ class BachsWebhookView(views.APIView):
         # A private-domain purchase is a one-off, not a plan change. Without
         # this branch it would fall through and be read as a subscription
         # payment with no plan — activating nothing and losing the sale.
-        if (meta.get("kind") or "") == "private_domain":
+        # startswith, not ==: checkout tags renewals "private_domain_renew",
+        # and an exact match sent those straight into the subscription branch,
+        # where a one-off payment with no plan activates nothing at all.
+        if (meta.get("kind") or "").startswith("private_domain"):
             from apps.links.models import PrivateDomainPurchase
             from apps.links.purchases import mark_paid
             purchase = None

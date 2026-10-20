@@ -753,6 +753,28 @@ class PrivateDomainPurchaseTest(TestCase):
         mark_paid(p)                                   # webhook + reconcile both fire
         self.assertEqual(ShortDomain.private_stock().count(), 1)
 
+    def test_two_requests_fulfilling_one_purchase_hand_over_one_domain(self):
+        """One payment, two domains — how a customer ended up owning two.
+
+        The test above reuses the SAME object, so the in-memory domain_id guard
+        catches it. Real callers don't: the webhook, the verify poll (which runs
+        every two seconds, ten times) and the reconcile cron each load their own
+        copy of the purchase, and every copy says PENDING with no domain. Both
+        then called assign_domain, and because the stock query uses skip_locked
+        the second caller was handed the NEXT free domain rather than waiting.
+        Fulfilment has to re-read the row under a lock, not trust what it loaded.
+        """
+        from apps.links.purchases import mark_paid
+        ShortDomain.objects.create(host="spare.cc", active=True,
+                                   verified_at=timezone.now(), is_shared=False)
+        p = self._purchase()
+        a = self.P.objects.get(pk=p.pk)      # the webhook's copy
+        b = self.P.objects.get(pk=p.pk)      # the verify poll's copy, read moments earlier
+        first, second = mark_paid(a), mark_paid(b)
+        self.assertEqual(first.host, second.host)
+        self.assertEqual(ShortDomain.private_for(self.org.id).count(), 1)
+        self.assertEqual(ShortDomain.private_stock().count(), 1)
+
 
 class PrivateDomainCheckoutApiTest(TestCase):
     def setUp(self):

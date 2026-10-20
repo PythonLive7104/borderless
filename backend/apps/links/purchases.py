@@ -4,6 +4,16 @@ Payment and fulfilment are deliberately separate. Someone can pay when we have
 no stock in hand; the money is recorded as PAID and the domain is handed over
 the moment one exists. That's better than refusing the sale, and far better than
 taking payment and silently doing nothing.
+
+Everything that can hand over a domain does it under a row lock on the purchase.
+Three different callers can fulfil the same purchase at the same moment — the
+Bachs webhook, the browser polling PrivateDomainVerifyView every two seconds on
+return from checkout, and the reconcile cron — and each arrives holding a copy
+of the purchase it read seconds earlier. Guarding on that stale copy is not a
+guard at all: two callers both saw status=PENDING, both called assign_domain,
+and because the stock query uses skip_locked the second one was handed a
+DIFFERENT domain rather than being made to wait. One payment, two domains. The
+lock below is what makes the second caller re-read and stop.
 """
 import logging
 from datetime import timedelta
@@ -19,15 +29,51 @@ from .models import PrivateDomainPurchase, ShortDomain
 log = logging.getLogger("bachs")
 
 
+def _lock(purchase: PrivateDomainPurchase) -> PrivateDomainPurchase | None:
+    """Re-read the purchase under a row lock.
+
+    Must be called inside a transaction. Everything after it reads committed
+    state rather than whatever the caller happened to load before it blocked.
+    """
+    return (PrivateDomainPurchase.objects
+            .select_for_update()
+            .filter(pk=purchase.pk)
+            .first())
+
+
+def _mirror(dst: PrivateDomainPurchase, src: PrivateDomainPurchase) -> None:
+    """Copy the fulfilment result onto the caller's instance.
+
+    Callers keep using the object they passed in — `_notify(p, p.domain)` in
+    fulfil_backlog, for one — so leaving it holding pre-lock values would just
+    move the stale-read problem one level up.
+    """
+    dst.status = src.status
+    dst.domain_id = src.domain_id
+    dst.paid_at = src.paid_at
+    dst.fulfilled_at = src.fulfilled_at
+
+
 @transaction.atomic
 def assign_domain(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     """Hand the buyer a domain from stock, if there is one.
 
-    Locked with skip_locked so two buyers checking out at the same moment can't
-    be sold the same domain — the whole point of the purchase is exclusivity.
+    The purchase row is locked first, so a second fulfilment of the same
+    purchase waits here and then sees the domain already assigned. The stock
+    rows are locked with skip_locked so two DIFFERENT buyers checking out at the
+    same moment can't be sold the same domain.
     """
-    if purchase.domain_id:
-        return purchase.domain
+    p = _lock(purchase)
+    if p is None:
+        return None
+    # Re-read, not the caller's copy. This is the check that stops one payment
+    # becoming two domains.
+    if p.domain_id:
+        _mirror(purchase, p)
+        return p.domain
+    if p.status == PrivateDomainPurchase.Status.FULFILLED:
+        _mirror(purchase, p)
+        return None
 
     stock = ShortDomain.private_stock().select_for_update(skip_locked=True)
     # Honour the buyer's pick when it is still unsold. Re-querying through
@@ -35,23 +81,24 @@ def assign_domain(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     # a domain sold between checkout and fulfilment simply isn't in stock, and
     # the row lock means two buyers racing for the same one can't both win.
     domain = None
-    if purchase.requested_domain_id:
-        domain = stock.filter(pk=purchase.requested_domain_id).first()
+    if p.requested_domain_id:
+        domain = stock.filter(pk=p.requested_domain_id).first()
     if domain is None:
         domain = stock.order_by("sort", "host").first()
     if not domain:
         return None
 
-    domain.organization_id = purchase.organization_id
+    domain.organization_id = p.organization_id
     domain.is_shared = False
     domain.is_default = False
     domain.private_until = timezone.now() + timedelta(days=PERIOD_DAYS)
     domain.save(update_fields=["organization", "is_shared", "is_default", "private_until"])
 
-    purchase.domain = domain
-    purchase.status = PrivateDomainPurchase.Status.FULFILLED
-    purchase.fulfilled_at = timezone.now()
-    purchase.save(update_fields=["domain", "status", "fulfilled_at"])
+    p.domain = domain
+    p.status = PrivateDomainPurchase.Status.FULFILLED
+    p.fulfilled_at = timezone.now()
+    p.save(update_fields=["domain", "status", "fulfilled_at"])
+    _mirror(purchase, p)
     return domain
 
 
@@ -62,37 +109,64 @@ def renew(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     early never loses time, and renewing after a lapse doesn't back-date into
     an already-expired window.
     """
-    # Renew the specific domain this purchase targets; fall back to the first
-    # owned one for older purchases that predate targeted renewals.
-    domain = purchase.renew_domain or ShortDomain.private_for(purchase.organization_id).first()
-    if not domain or domain.organization_id != purchase.organization_id:
-        return None
-    base = max(domain.private_until or timezone.now(), timezone.now())
-    domain.private_until = base + timedelta(days=PERIOD_DAYS)
-    domain.save(update_fields=["private_until"])
-    purchase.domain = domain
-    purchase.status = PrivateDomainPurchase.Status.FULFILLED
-    purchase.fulfilled_at = timezone.now()
-    purchase.save(update_fields=["domain", "status", "fulfilled_at"])
-    return domain
+    with transaction.atomic():
+        p = _lock(purchase)
+        if p is None:
+            return None
+        # A renewal that already ran must not run again: the browser polls
+        # verify ten times, and each extra pass would silently add 30 free days.
+        if p.status == PrivateDomainPurchase.Status.FULFILLED:
+            _mirror(purchase, p)
+            return p.domain
+
+        # Renew the specific domain this purchase targets; fall back to the first
+        # owned one for older purchases that predate targeted renewals.
+        domain = p.renew_domain or ShortDomain.private_for(p.organization_id).first()
+        if not domain or domain.organization_id != p.organization_id:
+            return None
+        base = max(domain.private_until or timezone.now(), timezone.now())
+        domain.private_until = base + timedelta(days=PERIOD_DAYS)
+        domain.save(update_fields=["private_until"])
+        p.domain = domain
+        p.status = PrivateDomainPurchase.Status.FULFILLED
+        p.fulfilled_at = timezone.now()
+        p.save(update_fields=["domain", "status", "fulfilled_at"])
+        _mirror(purchase, p)
+        return domain
 
 
 def mark_paid(purchase: PrivateDomainPurchase) -> ShortDomain | None:
-    """Record the payment, then fulfil if stock allows."""
-    if purchase.status == PrivateDomainPurchase.Status.FULFILLED:
-        return purchase.domain
-    # A purchase that names a domain is a renewal of that one; otherwise it buys
-    # a fresh domain from stock — so a workspace can own several at once.
-    if purchase.renew_domain_id:
-        purchase.status = PrivateDomainPurchase.Status.PAID
-        purchase.paid_at = timezone.now()
-        purchase.save(update_fields=["status", "paid_at"])
-        return renew(purchase)
-    if purchase.status != PrivateDomainPurchase.Status.PAID:
-        purchase.status = PrivateDomainPurchase.Status.PAID
-        purchase.paid_at = timezone.now()
-        purchase.save(update_fields=["status", "paid_at"])
-    domain = assign_domain(purchase)
+    """Record the payment, then fulfil if stock allows.
+
+    Safe to call repeatedly and concurrently for the same purchase — which it
+    is, from the webhook, the verify poll and the reconcile cron at once.
+    """
+    with transaction.atomic():
+        p = _lock(purchase)
+        if p is None:
+            return None
+        if p.status == PrivateDomainPurchase.Status.FULFILLED:
+            _mirror(purchase, p)
+            return p.domain
+        # A purchase that names a domain is a renewal of that one; otherwise it
+        # buys a fresh domain from stock — so a workspace can own several.
+        if p.renew_domain_id:
+            if p.status != PrivateDomainPurchase.Status.PAID:
+                p.status = PrivateDomainPurchase.Status.PAID
+                p.paid_at = timezone.now()
+                p.save(update_fields=["status", "paid_at"])
+            _mirror(purchase, p)
+            renewed = renew(p)
+            _mirror(purchase, p)
+            return renewed
+        if p.status != PrivateDomainPurchase.Status.PAID:
+            p.status = PrivateDomainPurchase.Status.PAID
+            p.paid_at = timezone.now()
+            p.save(update_fields=["status", "paid_at"])
+        _mirror(purchase, p)
+        domain = assign_domain(p)
+        _mirror(purchase, p)
+
     if domain:
         _notify(purchase, domain)
     else:
