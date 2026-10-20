@@ -147,6 +147,20 @@ def _get(path):
         return None, f"Bachs request failed: {e}"
 
 
+def get_product(product_id: str):
+    """Fetch one product's configuration from Bachs. Returns (data, error).
+
+    Read-only, and only used by the check_bachs_products command. What a
+    checkout offers — price, billing interval, which payment methods appear —
+    is a property of the PRODUCT in the Bachs dashboard, not of the session we
+    create, so the only way to explain a difference between two checkouts is to
+    look at the two products.
+    """
+    if not product_id:
+        return None, "no product id configured"
+    return _get(f"/products/{urllib.parse.quote(product_id)}")
+
+
 def get_checkout_session(session_id: str):
     """Read a checkout session back from Bachs. Returns (data, error).
 

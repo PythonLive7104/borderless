@@ -18,7 +18,19 @@ export const tokens = {
 // field errors {field: ["..."]} / {non_field_errors: ["..."]}.
 export function errText(data: any, fallback = "Something went wrong. Please try again."): string {
   if (data == null) return fallback;
-  if (typeof data === "string") return data;
+  if (typeof data === "string") {
+    // A gateway, proxy or CDN failure answers with an HTML page, not JSON. The
+    // JSON parse fails, the raw markup arrives here as a string, and returning
+    // it verbatim rendered an entire Cloudflare 502 page inside the "Choose a
+    // plan" dialog a customer was reading. Anything that looks like markup, or
+    // is far too long to be a message, is an infrastructure error rather than
+    // something we meant to say.
+    const s = data.trim();
+    if (!s) return fallback;
+    if (/^\s*(<!doctype|<html|<\?xml)/i.test(s) || /<\/(html|body|head)>/i.test(s)) return fallback;
+    if (s.length > 300) return fallback;
+    return s;
+  }
   if (typeof data.detail === "string") return data.detail;
   if (Array.isArray(data)) return typeof data[0] === "string" ? data[0] : fallback;
   for (const k of Object.keys(data)) {
