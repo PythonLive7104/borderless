@@ -150,13 +150,34 @@ export default function WebsiteDetail() {
               <span className="mt-1 block text-xs text-fg-muted">
                 Without this, a blocked visitor sees your content for a moment before the check finishes.
                 With it they see a brief loading spinner instead, and the page appears only once the check
-                clears — always within 1.2 seconds, so a slow check can never leave a real visitor waiting.
+                clears — always within 1.8 seconds, so a slow check can never leave a real visitor waiting.
                 {" "}Especially worth keeping on if you can't install the{" "}
                 <Link to="/dashboard/shield" className="font-semibold underline">Shield</Link>{" "}
                 on your server. Note it runs in the browser, so it can't stop a scraper that ignores JavaScript.
               </span>
             </span>
           </label>
+
+          {/* Turning this on REWRITES the snippet — it drops `async`, because an
+              async script cannot hide the page before the browser paints it.
+              Nothing used to say so, so customers toggled strict mode, kept the
+              old async tag on their site, and got the worst of both: the loader
+              appeared, but only after the content had already flashed. That is
+              the exact complaint this notice exists to prevent. */}
+          {site.strict_mode && (
+            <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-xs leading-relaxed text-fg">
+              <b>Re-copy your snippet after turning this on.</b> The tag above changed —
+              strict mode removes <code className="rounded bg-bg-mute px-1 py-0.5">async</code>,
+              because an async script can't hide the page before the browser draws it.
+              If the old tag is still on your site, visitors will see your content flash
+              <i> before</i> the loader appears.
+              <br />
+              Paste it as the <b>first thing inside <code className="rounded bg-bg-mute px-1 py-0.5">&lt;head&gt;</code></b>,
+              above every stylesheet and script. Loading it through Google Tag Manager or a
+              plugin that defers scripts will always flash, whatever this setting says —
+              those inject it after the page has drawn.
+            </div>
+          )}
 
           <div className="mt-4 flex items-center gap-3">
             <Button onClick={verify}>{verifying ? "Checking…" : "Verify installation"}</Button>
