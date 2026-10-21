@@ -1156,13 +1156,18 @@ func ipRateLimit() int64 {
 // waiting on a third party.
 func (h *handler) resolveIntel(ctx context.Context, ip string, known ipIntel, ruleSet []rules.Rule) ipIntel {
 	if ip == "" || !rules.NeedsIntel(ruleSet) {
+		intelTrace(ip, "SKIPPED: no rule on this site tests an IP-intelligence field "+
+			"(rules loaded: %d)", len(ruleSet))
 		return known
 	}
 	// Already answered by the cache: nothing to wait for.
 	if known.ISP != "" || known.flagged() {
+		intelTrace(ip, "cache hit: vpn=%v proxy=%v datacenter=%v isp=%q",
+			known.VPN, known.Proxy, known.Datacenter, known.ISP)
 		return known
 	}
 	if !intelProviderConfigured() {
+		intelTrace(ip, "SKIPPED: IP_INTEL_PROVIDER/key not configured in this container")
 		return known
 	}
 	// Deliberately NOT derived from ctx.
@@ -1178,10 +1183,28 @@ func (h *handler) resolveIntel(ctx context.Context, ip string, known ipIntel, ru
 	// and a "block VPN" rule matched nothing at all.
 	lctx, cancel := context.WithTimeout(context.Background(), intelSyncTimeout())
 	defer cancel()
-	if got := h.lookupIP(lctx, ip); got.ISP != "" || got.flagged() {
+	got := h.lookupIP(lctx, ip)
+	intelTrace(ip, "provider answered: vpn=%v proxy=%v datacenter=%v isp=%q risk=%d",
+		got.VPN, got.Proxy, got.Datacenter, got.ISP, got.FraudScore)
+	if got.ISP != "" || got.flagged() {
 		return got
 	}
+	// Reached only when the provider gave us nothing usable. Silent until now,
+	// which is why "the VPN rule does not fire" was impossible to tell apart
+	// from "the provider says this address is clean".
+	intelTrace(ip, "provider returned NOTHING usable — rules on is_vpn/is_proxy/"+
+		"is_datacenter cannot match this visitor")
 	return known
+}
+
+// intelTrace logs one line per decision about where the IP intelligence came
+// from, or why it never arrived. Off unless IP_INTEL_DEBUG is set, because it
+// is one line per request; on, it turns a day of inference into a single visit.
+func intelTrace(ip, format string, args ...any) {
+	if env("IP_INTEL_DEBUG", "") == "" {
+		return
+	}
+	log.Printf("ipintel[%s]: %s", ip, fmt.Sprintf(format, args...))
 }
 
 // IP-intelligence flags, as per-IP keys with a TTL rather than members of a
