@@ -9,13 +9,14 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     quality = serializers.SerializerMethodField()
     slug = serializers.SlugField(max_length=200, required=False)
     domain_host = serializers.CharField(source="domain.host", read_only=True, default="")
+    scan_locked = serializers.SerializerMethodField()
 
     class Meta:
         model = ShortLink
         fields = ["id", "organization", "website", "slug", "destination_url", "title",
                   "domain", "domain_host", "active", "bot_action", "challenge", "challenge_style", "forward_params", "forward_param_keys", "block_vpn", "block_datacenter", "deep_check", "decoy_url", "country_mode", "countries", "device_mode", "devices",
                   "os_mode", "operating_systems", "max_risk", "scan_optout", "clicks", "human_clicks", "bot_clicks", "reviewer_clicks", "url_safe",
-                  "url_threats", "url_scanned_at", "short_url", "quality", "created_at"]
+                  "url_threats", "url_scanned_at", "short_url", "quality", "scan_locked", "created_at"]
         read_only_fields = ["clicks", "human_clicks", "bot_clicks", "reviewer_clicks", "url_safe", "url_threats",
                             "url_scanned_at", "created_at"]
 
@@ -32,6 +33,17 @@ class ShortLinkSerializer(serializers.ModelSerializer):
 
     def get_quality(self, obj) -> float:
         return round(obj.human_clicks / obj.clicks, 4) if obj.clicks else 0.0
+
+    def get_scan_locked(self, obj) -> bool:
+        """True when Google confirmed phishing/malware and this cannot be undone.
+
+        The dashboard uses it to drop the "make it live anyway" control, so the
+        UI stops offering something the API will refuse.
+        """
+        from .sync import _flagged_by_from_threats
+        if obj.url_safe is not False:
+            return False
+        return "google_safe_browsing" in _flagged_by_from_threats(obj.url_threats)
 
     def validate_organization(self, org):
         from apps.organizations.models import ensure_membership
@@ -61,6 +73,28 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         org = attrs.get("organization") or getattr(self.instance, "organization", None)
         if website and org and website.organization_id != org.id:
             raise serializers.ValidationError({"website": "That website isn't in this workspace."})
+
+        # A link Google has confirmed as phishing or malware stays off.
+        #
+        # Enforced here and not only in the UI: hiding the button stops an
+        # honest mistake, it does not stop someone sending the PATCH by hand,
+        # and the whole point is that this particular lock cannot be picked.
+        # Changing the destination is allowed and is the way back — the next
+        # scan re-enables the link if the new destination is clean.
+        if self.instance is not None and self.get_scan_locked(self.instance):
+            changing_destination = (
+                "destination_url" in attrs
+                and attrs["destination_url"] != self.instance.destination_url)
+            if not changing_destination:
+                if attrs.get("active") and not self.instance.active:
+                    raise serializers.ValidationError({"active": (
+                        "Google Safe Browsing flagged this destination as phishing or "
+                        "malware, so this redirect can't be switched back on. Point it "
+                        "at a safe destination instead.")})
+                if attrs.get("scan_optout") and not self.instance.scan_optout:
+                    raise serializers.ValidationError({"scan_optout": (
+                        "The safety scan can't be skipped for a destination Google has "
+                        "confirmed as phishing or malware.")})
         return attrs
 
     def create(self, validated_data):

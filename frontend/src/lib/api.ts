@@ -316,7 +316,7 @@ export interface ShortLink {
   id: number; organization: number; website: number | null; slug: string;
   destination_url: string; title: string; active: boolean; bot_action: BotAction;
   clicks: number; human_clicks: number; bot_clicks: number;
-  url_safe: boolean | null; url_threats: string[]; url_scanned_at: string | null;
+  url_safe: boolean | null; url_threats: string[]; url_scanned_at: string | null; scan_locked: boolean;
   short_url: string; quality: number; created_at: string;
 }
 export const linkApi = {

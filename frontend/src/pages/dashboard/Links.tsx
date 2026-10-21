@@ -594,10 +594,15 @@ export default function Links() {
                   <div className="mt-1 min-w-0 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
                   {l.url_safe === false && (
                     <div className={`mt-1 text-xs ${l.active ? "text-fg-muted" : "text-red-600"}`}>
-                      {l.active
-                        ? `We flagged this destination as possibly unsafe — it's live because you allowed it.`
-                        : `We flagged this destination as possibly unsafe, so it's switched off.`}
-                      {canManage && (
+                      {/* A Safe Browsing verdict is final, so don't offer a way
+                          out of it. The API refuses the change regardless; a
+                          button that always errors is worse than no button. */}
+                      {l.scan_locked
+                        ? `Google flagged this destination as phishing or malware, so this redirect is off and can't be switched back on. Point it at a safe destination and it goes live again after the next scan.`
+                        : l.active
+                          ? `We flagged this destination as possibly unsafe — it's live because you allowed it.`
+                          : `We flagged this destination as possibly unsafe, so it's switched off.`}
+                      {canManage && !l.scan_locked && (
                         <button onClick={() => toggleScanOptout(l)}
                           className="ml-2 font-semibold text-brand underline hover:no-underline">
                           {l.active ? "Turn it off" : "Make it live anyway"}
@@ -633,12 +638,20 @@ export default function Links() {
                   <div className="text-center"><div className="font-bold tabular-nums text-red-500">{l.bot_clicks}</div><div className="text-[11px] text-fg-dim">bot</div></div>
                   {canManage && (
                     <>
-                      <div className="flex flex-col items-center gap-0.5">
-                        <button onClick={() => toggle(l)} title={l.active ? "Live — click to pause" : "Paused — click to make live"}
+                      {/* Labelled with the ACTION, not the state.
+                          It used to read "Live" / "Off" — the same words as the
+                          status badge at the top of the row — while sitting in a
+                          line of counters. People read it as one more statistic
+                          and asked where the pause control was. The state is
+                          already on the badge; this says what clicking does. */}
+                      <div className="flex flex-col items-center gap-0.5 border-l border-line pl-4">
+                        <button onClick={() => toggle(l)} role="switch" aria-checked={l.active}
+                          aria-label={l.active ? "Pause this redirect" : "Make this redirect live"}
+                          title={l.active ? "Pause this redirect" : "Make this redirect live"}
                           className={`h-6 w-11 rounded-full p-0.5 transition ${l.active ? "bg-brand" : "bg-bg-mute"}`}>
                           <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${l.active ? "translate-x-5" : ""}`} />
                         </button>
-                        <span className="text-[10px] font-semibold text-fg-dim">{l.active ? "Live" : "Off"}</span>
+                        <span className="text-[10px] font-semibold text-brand">{l.active ? "Pause" : "Make live"}</span>
                       </div>
                       <button onClick={() => openEdit(l)} className="text-brand hover:underline">Edit</button>
                       <button onClick={() => remove(l.id)} className="text-red-500 hover:underline">Delete</button>

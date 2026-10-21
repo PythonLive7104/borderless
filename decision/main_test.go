@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -250,5 +252,61 @@ func TestProxycheckVPNFieldIsHonoured(t *testing.T) {
 	}
 	if got.ConnType != "VPN" {
 		t.Fatalf("connection_type = %q, want VPN", got.ConnType)
+	}
+}
+
+// Two requests for the same visitor arrive together on every page load. Before
+// this, both queried the provider; a rate-limited plan refused the second, and
+// that request was decided with no IP intelligence at all — which is how a VPN
+// visitor walked through a rule that blocks VPNs, intermittently and for no
+// reason anyone could see from the dashboard.
+func TestDedupeLookupQueriesOnceForConcurrentCallers(t *testing.T) {
+	var calls int32
+	const callers = 8
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	got := make([]ipIntel, callers)
+
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			got[i] = dedupeLookup("203.0.113.9", func() ipIntel {
+				atomic.AddInt32(&calls, 1)
+				time.Sleep(30 * time.Millisecond) // hold it open so the rest queue
+				return ipIntel{VPN: true, ISP: "Proton AG", FraudScore: 66}
+			})
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	if n := atomic.LoadInt32(&calls); n != 1 {
+		t.Fatalf("provider queried %d times for one address, want 1", n)
+	}
+	// Every waiter must get the real answer. Returning empty to the ones that
+	// queued would reproduce the exact bug this prevents.
+	for i, g := range got {
+		if !g.VPN || g.ISP != "Proton AG" {
+			t.Fatalf("caller %d got %+v, want the leader's answer", i, g)
+		}
+	}
+}
+
+// A second lookup AFTER the first finished must not join the completed one.
+func TestDedupeLookupDoesNotReuseAFinishedCall(t *testing.T) {
+	var calls int32
+	run := func() ipIntel {
+		return dedupeLookup("203.0.113.10", func() ipIntel {
+			atomic.AddInt32(&calls, 1)
+			return ipIntel{ISP: "x"}
+		})
+	}
+	run()
+	run()
+	if n := atomic.LoadInt32(&calls); n != 2 {
+		t.Fatalf("sequential lookups queried %d times, want 2", n)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"borderless/decision/internal/crawler"
@@ -1318,6 +1319,46 @@ func intelProviderConfigured() bool {
 	return false
 }
 
+// inflightLookup is one provider call that other callers can wait on.
+type inflightLookup struct {
+	wg  sync.WaitGroup
+	val ipIntel
+}
+
+var (
+	inflightMu sync.Mutex
+	inflight   = map[string]*inflightLookup{}
+)
+
+// dedupeLookup runs fn once per address at a time; callers arriving while it is
+// in flight wait for that same answer instead of starting their own.
+//
+// This is a correctness fix, not an optimisation. See the comment at the call
+// site: a rate-limited provider refuses the second of two simultaneous queries,
+// and the caller that gets refused ends up with no intelligence at all.
+func dedupeLookup(ip string, fn func() ipIntel) ipIntel {
+	inflightMu.Lock()
+	if c, ok := inflight[ip]; ok {
+		inflightMu.Unlock()
+		c.wg.Wait() // happens-before: c.val is fully written when Wait returns
+		return c.val
+	}
+	c := &inflightLookup{}
+	c.wg.Add(1)
+	inflight[ip] = c
+	inflightMu.Unlock()
+
+	c.val = fn()
+
+	// Remove before Done so a caller arriving after this point starts a fresh
+	// lookup rather than joining one that has already finished.
+	inflightMu.Lock()
+	delete(inflight, ip)
+	inflightMu.Unlock()
+	c.wg.Done()
+	return c.val
+}
+
 func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 	var out ipIntel
 	if ip == "" {
@@ -1345,36 +1386,60 @@ func (h *handler) lookupIP(ctx context.Context, ip string) ipIntel {
 		}
 		return out
 	}
-	// Dispatch to whichever IP-intelligence provider is configured. Both map
-	// into the same ipIntel shape, so the rest of the engine is provider-blind.
-	var res ipIntel
-	var ok bool
-	switch strings.ToLower(env("IP_INTEL_PROVIDER", "")) {
-	case "ipqualityscore":
-		res, ok = fetchIPQS(ip)
-	case "proxycheck":
-		res, ok = fetchProxycheck(ip)
-	default:
-		return out // no provider configured
-	}
-	if !ok {
-		return out // fail open: a bad/slow lookup never holds a visitor up
-	}
-	out = res
-	// Share the answer with Django's cache and sets, same keys and shape.
-	// On sctx, not ctx: the write is the whole point of having paid for the
-	// lookup, and dropping it because the caller's budget ran out is how one
-	// query per visitor became one query per request.
-	if b, err := json.Marshal(out); err == nil {
-		h.st.SetEx(sctx, key, string(b), 24*time.Hour)
-	}
-	if out.Datacenter {
-		h.setIntelFlag(sctx, "datacenter", ip)
-	}
-	if out.Proxy || out.VPN {
-		h.setIntelFlag(sctx, "proxy", ip)
-	}
-	return out
+	// One provider call per address at a time.
+	//
+	// The tracker sends more than one request per page load, so two requests
+	// for the same visitor routinely arrive together, both miss the cold cache
+	// and both query the provider. On a rate-limited plan the second is refused
+	// and returns empty — leaving that request with NO intelligence, so a
+	// "block VPN" rule has nothing to match and the visitor is let through.
+	// Live traffic showed it on one address a second apart:
+	//
+	//   18:55:46  provider answered: proxy=true datacenter=true risk=66
+	//   18:55:47  provider returned NOTHING usable
+	//
+	// The first caller does the work and the rest wait for its answer, which
+	// removes that failure and roughly halves the queries we pay for.
+	return dedupeLookup(ip, func() ipIntel {
+		// Re-check the cache: a lookup that completed while we were queued has
+		// already written it, and buying the same answer twice is the thing
+		// this whole function exists to avoid.
+		if raw := h.st.GetStr(sctx, key); raw != "" {
+			var cached ipIntel
+			if json.Unmarshal([]byte(raw), &cached) == nil {
+				return cached
+			}
+		}
+		// Dispatch to whichever IP-intelligence provider is configured. Both map
+		// into the same ipIntel shape, so the rest of the engine is provider-blind.
+		var res ipIntel
+		var ok bool
+		switch strings.ToLower(env("IP_INTEL_PROVIDER", "")) {
+		case "ipqualityscore":
+			res, ok = fetchIPQS(ip)
+		case "proxycheck":
+			res, ok = fetchProxycheck(ip)
+		default:
+			return ipIntel{} // no provider configured
+		}
+		if !ok {
+			return ipIntel{} // fail open: a bad/slow lookup never holds a visitor up
+		}
+		// Share the answer with Django's cache and sets, same keys and shape.
+		// On sctx, not ctx: the write is the whole point of having paid for the
+		// lookup, and dropping it because the caller's budget ran out is how one
+		// query per visitor became one query per request.
+		if b, err := json.Marshal(res); err == nil {
+			h.st.SetEx(sctx, key, string(b), 24*time.Hour)
+		}
+		if res.Datacenter {
+			h.setIntelFlag(sctx, "datacenter", ip)
+		}
+		if res.Proxy || res.VPN {
+			h.setIntelFlag(sctx, "proxy", ip)
+		}
+		return res
+	})
 }
 
 // fetchIPQS queries IPQualityScore. ok=false on any error or unsuccessful body.

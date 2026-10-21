@@ -130,12 +130,45 @@ def scan_and_flag(link):
                 flagged_by.extend(decoy.get("flagged_by", []) or [])
         except Exception:
             pass
+    was_active = link.active
     link.url_safe = safe
     link.url_threats = threats
     link.url_scanned_at = timezone.now()
     if link.url_safe is False and _should_disable(link, flagged_by):
         link.active = False  # kill malicious links automatically
     link.save(update_fields=["url_safe", "url_threats", "url_scanned_at", "active"])
+    # A red label on a row nobody has a reason to revisit is not the same as
+    # telling someone their redirect stopped working. Say it where they will
+    # see it, with what to do about it.
+    if was_active and not link.active:
+        _announce_disabled(link, threats, "google_safe_browsing" in flagged_by)
+
+
+def _announce_disabled(link, threats, permanent: bool) -> None:
+    """Put a notice in the workspace's dashboard feed. Never raises.
+
+    Called from the middle of switching off a dangerous link, so a delivery
+    failure must never undo the action it is explaining.
+    """
+    try:
+        from apps.notifications.system import notify_workspace
+        what = ", ".join(str(t) for t in (threats or [])[:3]) or "an unsafe destination"
+        where = f"{link.host()}/{link.slug}" if link.host() else f"/{link.slug}"
+        if permanent:
+            tail = ("Google Safe Browsing confirmed this, so the redirect cannot be "
+                    "switched back on. Point it at a safe destination and it will go "
+                    "live again after the next scan.")
+        else:
+            tail = ("Change the destination, or allow it from the redirect's row if "
+                    "you are certain the warning is wrong.")
+        notify_workspace(
+            link.organization,
+            f"Redirect switched off: {where}",
+            f"We scanned {link.destination_url} and found {what}. "
+            f"The redirect has stopped serving. {tail}",
+        )
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def _flagged_by_from_threats(threats) -> list:
@@ -176,15 +209,22 @@ def _should_disable(link, flagged_by) -> bool:
 
     Default is strict: any flag disables. A workspace can opt out
     (link_scan_optout) — then flagged links stay live — with one floor that no
-    opt-out can lift: a Google Safe Browsing hit on a SHARED domain always
-    disables, because that flag gets the whole shared domain blacklisted and
-    would take down every other customer's links, not just this owner's.
+    opt-out can lift: a Google Safe Browsing hit always disables, wherever the
+    link lives. That verdict means phishing or malware, and nobody gets to keep
+    serving one of those from here.
     """
-    d = link.domain
-    own_private = bool(d and not d.is_shared and d.organization_id == link.organization_id)
     sb_flagged = "google_safe_browsing" in flagged_by
-    if sb_flagged and not own_private:
-        return True  # protect the shared domain for everyone — non-negotiable
+    if sb_flagged:
+        # No opt-out survives a Google Safe Browsing verdict, on ANY domain.
+        #
+        # This used to exempt a workspace's own private domain, reasoning that
+        # the only reputation at stake there was theirs. That does not hold for
+        # phishing: the owner of a private domain could tick 'stay live even if
+        # flagged' and keep a confirmed credential-harvesting page serving
+        # indefinitely, on our infrastructure, with our own bot filtering hiding
+        # it from the crawlers that would otherwise catch it. It also blackens
+        # the whole platform with Google, not just the one host.
+        return True
     optout = bool(getattr(link, "scan_optout", False)) or \
         bool(getattr(link.organization, "link_scan_optout", False))
     return not optout
