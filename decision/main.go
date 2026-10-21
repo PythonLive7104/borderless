@@ -309,10 +309,11 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if tzMismatch {
-		// Named in the signals so "why was I turned away?" has an answer.
-		result.Signals = append(result.Signals, "timezone_country_mismatch")
-	}
+	// NOT appended here. risk.Evaluate already emits "timezone_country_mismatch"
+	// alongside its wTZMismatch points, so adding it again put the signal in
+	// every affected event twice — and the funnel's "why traffic was turned
+	// away" chart counts signals, so the timezone reason showed at double its
+	// real share. The score was never affected; only the explanation was.
 	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
 		h.rememberBot(fp.IP)
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, fpHash)
