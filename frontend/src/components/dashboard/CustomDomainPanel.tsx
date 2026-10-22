@@ -54,7 +54,8 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged, isPro }
       <div className="text-sm font-bold">Use your own domain</div>
       <p className="mt-1 text-sm text-fg-muted">
         Prefer your own brand? Point a domain you own (like <span className="font-mono">go.yourbrand.com</span>)
-        at us and run redirects on it. Its reputation is entirely yours — no monthly rental.
+        at us and run redirects on it. Its reputation is entirely yours — no monthly rental,
+        and <b>no limit on how many redirects you create on it</b>.
       </p>
       {!isPro && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/30 bg-brand/5 p-3">

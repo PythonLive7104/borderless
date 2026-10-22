@@ -1688,3 +1688,75 @@ class DisabledLinkNoticeTest(TestCase):
         self.assertEqual(ch.prefix, "system")
         # Reusing the same channel rather than making a new one every notice.
         self.assertEqual(_system_channel(self.org).pk, ch.pk)
+
+
+class ByodRedirectsAreUncappedTest(TestCase):
+    """A domain the customer brought themselves doesn't consume plan capacity.
+
+    The per-domain allowance exists because we rent them a hostname from our
+    pool and carry its reputation. Neither applies to a domain they registered
+    and pay for, so metering it charges twice for something we don't provide.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from apps.billing.models import Plan, Subscription
+        from rest_framework.test import APIClient
+        from apps.organizations.models import OrganizationMember
+
+        self.org = _workspace("byodcap@example.com")
+        self.pro = Plan.objects.filter(slug="pro").first() or Plan.objects.create(
+            slug="pro", name="Pro", price=70, monthly_events=1000000, max_redirects=2, sort=3)
+        self.pro.max_redirects = 2          # a deliberately tiny cap
+        self.pro.save(update_fields=["max_redirects"])
+        self.sub, _ = Subscription.objects.update_or_create(
+            organization=self.org,
+            defaults={"plan": self.pro, "status": "active", "interval": "weekly",
+                      "period_end": timezone.now() + timedelta(days=3)})
+
+        self.shared = _domain(host="shcap.cc", is_shared=True, is_default=False)
+        self.mine = ShortDomain.objects.create(
+            host="go.mybrand.example", organization=self.org, byod=True,
+            is_shared=False, active=True, verified_at=timezone.now())
+
+        self.user = OrganizationMember.objects.get(organization=self.org, role="owner").user
+        self.c = APIClient(); self.c.force_authenticate(user=self.user)
+
+    def _make(self, domain, slug):
+        return self.c.post("/api/links/", {
+            "organization": self.org.id, "destination_url": "https://e.example",
+            "slug": slug, "domain": domain.id, "bot_action": "decoy",
+        }, format="json")
+
+    def test_shared_domain_still_hits_the_cap(self):
+        self.assertEqual(self._make(self.shared, "s1").status_code, 201)
+        self.assertEqual(self._make(self.shared, "s2").status_code, 201)
+        self.assertEqual(self._make(self.shared, "s3").status_code, 403)
+
+    def test_own_domain_goes_past_the_cap(self):
+        for i in range(5):                                  # cap is 2
+            r = self._make(self.mine, f"m{i}")
+            self.assertEqual(r.status_code, 201, r.data)
+
+    def test_downgrading_off_pro_re_applies_the_cap(self):
+        """Otherwise: connect a domain on Pro, drop to the cheapest plan, keep
+        an unlimited allowance forever."""
+        from apps.billing.models import Plan
+        self.assertEqual(self._make(self.mine, "d1").status_code, 201)
+        self.assertEqual(self._make(self.mine, "d2").status_code, 201)
+        basic = Plan.objects.filter(slug="basic").first() or Plan.objects.create(
+            slug="basic", name="Basic", price=10, monthly_events=1000, max_redirects=2, sort=1)
+        basic.max_redirects = 2
+        basic.save(update_fields=["max_redirects"])
+        self.sub.plan = basic
+        self.sub.save(update_fields=["plan"])
+        self.assertEqual(self._make(self.mine, "d3").status_code, 403)
+
+    def test_another_workspaces_byod_domain_is_not_a_loophole(self):
+        other = _workspace("other@example.com")
+        theirs = ShortDomain.objects.create(
+            host="go.theirbrand.example", organization=other, byod=True,
+            is_shared=False, active=True, verified_at=timezone.now())
+        # Not ours, so the serializer refuses it outright rather than uncapping.
+        self.assertIn(self._make(theirs, "x1").status_code, (400, 403))

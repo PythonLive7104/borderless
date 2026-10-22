@@ -64,6 +64,11 @@ const INCLUDED = [
   "Silent \"checking your browser\" deep check for headless bots",
   "Human check (press-and-hold, tick-a-box or slide)",
   "Cross-surface bot memory — caught once, flagged everywhere",
+  // The two below are capabilities the site never claimed. The crawler one is
+  // the strongest: a bot blocker that turns Googlebot away quietly de-indexes
+  // the site it is supposed to protect, and most buyers do not know to ask.
+  "Never cloaks — verified search crawlers always see exactly what your visitors see, so your rankings are never at risk",
+  "Strict mode — blocked visitors see a loader, never your content",
   "Filtering funnel & per-campaign analytics with CSV export",
   "Server-side Shield (PHP, Django, nginx, Cloudflare, Node)",
   "Google Safe Browsing monitoring for your sites",

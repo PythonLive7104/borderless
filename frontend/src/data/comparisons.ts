@@ -74,6 +74,8 @@ const OURS = {
   scoring: "0–100 score with the exact signals that produced it",
   latency: "Under 10ms decision latency",
   trial: "7-day trial, no credit card",
+  crawlers: "Verified search crawlers are identified by reverse DNS, not user-agent, "
+          + "and always receive the same page as a human visitor",
 };
 
 const NOT_PUBLISHED = "Not published on their pricing or features pages";
@@ -107,6 +109,11 @@ export const COMPARISONS: Comparison[] = [
         them: "All site visits, which is a tighter cap than the same number of ad clicks",
       },
       { label: "TLS fingerprinting", us: OURS.tls, them: NOT_PUBLISHED, edge: true },
+      // Deliberately NOT marked `edge`. Serving a crawler different content
+      // from a visitor is cloaking and can cost a site its rankings, so what
+      // a blocker does here matters — but we cannot see what anyone else
+      // does, and rule 1 at the top of this file forbids guessing.
+      { label: "Search-engine safety", us: OURS.crawlers, them: NOT_PUBLISHED },
       { label: "Server-side enforcement", us: OURS.serverSide, them: NOT_PUBLISHED, edge: true },
       {
         label: "Shared threat network", us: OURS.network,
@@ -170,6 +177,11 @@ export const COMPARISONS: Comparison[] = [
       { label: "Websites", us: OURS.sites, them: fraudblocker.sites + " at the entry tier", edge: true },
       { label: "Metering unit", us: "Ad clicks", them: "Ad clicks — directly comparable" },
       { label: "TLS fingerprinting", us: OURS.tls, them: NOT_PUBLISHED, edge: true },
+      // Deliberately NOT marked `edge`. Serving a crawler different content
+      // from a visitor is cloaking and can cost a site its rankings, so what
+      // a blocker does here matters — but we cannot see what anyone else
+      // does, and rule 1 at the top of this file forbids guessing.
+      { label: "Search-engine safety", us: OURS.crawlers, them: NOT_PUBLISHED },
       { label: "Server-side enforcement", us: OURS.serverSide, them: NOT_PUBLISHED, edge: true },
       { label: "Shared threat network", us: OURS.network, them: NOT_PUBLISHED, edge: true },
       {
@@ -230,6 +242,11 @@ export const COMPARISONS: Comparison[] = [
       { label: "Scope", us: OURS.sites, them: clickpatrol.sites + " at the entry tier", edge: true },
       { label: "Metering unit", us: "Ad clicks", them: "Ad clicks — directly comparable" },
       { label: "TLS fingerprinting", us: OURS.tls, them: NOT_PUBLISHED, edge: true },
+      // Deliberately NOT marked `edge`. Serving a crawler different content
+      // from a visitor is cloaking and can cost a site its rankings, so what
+      // a blocker does here matters — but we cannot see what anyone else
+      // does, and rule 1 at the top of this file forbids guessing.
+      { label: "Search-engine safety", us: OURS.crawlers, them: NOT_PUBLISHED },
       { label: "Server-side enforcement", us: OURS.serverSide, them: NOT_PUBLISHED, edge: true },
       { label: "Score transparency", us: OURS.scoring, them: NOT_PUBLISHED, edge: true },
       {

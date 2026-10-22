@@ -81,11 +81,29 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         # plan-sized allowance. So buying more private domains buys more capacity.
         limit = redirect_limit(org.id)
         domain = serializer.validated_data.get("domain")
-        if limit and domain and ShortLink.objects.filter(
+
+        # A domain the customer brought themselves is not capped.
+        #
+        # The per-domain allowance exists because we are renting them a hostname
+        # out of our pool and carrying its reputation. None of that applies to a
+        # domain they registered, pay for, and whose reputation is entirely
+        # theirs — so metering it is charging twice for something we do not
+        # provide. Bring-your-own-domain is already a Pro feature.
+        #
+        # is_pro is re-checked here rather than trusted from when the domain was
+        # added: without it, a workspace could connect a domain on Pro, drop to
+        # the cheapest plan, and keep an uncapped allowance forever.
+        from apps.billing.models import is_pro
+        uncapped = bool(domain and domain.byod
+                        and domain.organization_id == org.id
+                        and is_pro(org.id))
+
+        if limit and domain and not uncapped and ShortLink.objects.filter(
                 organization_id=org.id, domain=domain).count() >= limit:
             raise PermissionDenied(
                 f"You've reached your plan's redirect limit ({limit}) for this domain. "
-                "Use another domain, add a private domain, or upgrade your plan.")
+                "Use another domain, add a private domain, or connect your own domain "
+                "on Pro for unlimited redirects.")
         link = serializer.save()
         scan_and_flag(link)   # threat scan; auto-disables if the destination is unsafe
         publish_link(link)

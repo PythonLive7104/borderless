@@ -36,7 +36,7 @@ export const PLAN_ADD: Record<string, string[]> = {
   pro: [
     "Highest ad-click, redirect & antibot-site limits",
     "Longest data retention",
-    "Bring your own domain — run redirects on your brand",
+    "Bring your own domain — unlimited redirects on it, no cap",
     "Private domains available",
     "Dedicated support",
   ],

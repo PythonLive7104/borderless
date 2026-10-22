@@ -248,7 +248,9 @@ export default function TrafficRules() {
 
       <Modal open={open} onClose={closeModal} size="wide" title={editingId ? "Edit traffic rule" : "New traffic rule"}>
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          {/* Stacks on a phone. Two fixed columns put Priority half off-screen
+              at 360px, which is where this form is most often opened. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Rule name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Block mobile bots" />
             <Field label="Priority" type="number" value={form.priority} onChange={(v) => setForm({ ...form, priority: v })} />
           </div>
@@ -297,13 +299,16 @@ export default function TrafficRules() {
             </p>
             <div className="space-y-2">
               {form.conditions.map((c, i) => (
-                <div key={i} className="flex items-center gap-1.5">
+                <div key={i} className="flex flex-wrap items-center gap-1.5">
+                  {/* On a phone the field takes its own line and the operator
+                      and value share the next one; from sm up all three sit
+                      together as before. */}
                   <select value={c.field} onChange={(e) => setCond(i, { field: e.target.value })}
-                    className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand">
+                    className="w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand sm:w-auto sm:flex-1">
                     {RULE_FIELDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                   <select value={c.operator} onChange={(e) => setCond(i, { operator: e.target.value })}
-                    className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand">
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand sm:flex-none">
                     {opsFor(c.field).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                   <CondValue c={c} onChange={(v) => setCond(i, { value: v })} />
