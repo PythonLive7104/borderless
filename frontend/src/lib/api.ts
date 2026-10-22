@@ -490,7 +490,8 @@ export interface EventRow {
   id: number; type: string; visitor_ref: string; ip: string | null; country: string;
   device: string; browser: string; os: string; url: string; referrer: string;
   risk_score: number | null; classification: string; action: string; tag: string;
-  fingerprint: string; fp_signals: string[]; ja3: string; ja4: string; utm_campaign: string; website_name: string; created_at: string;
+  fingerprint: string; fp_signals: string[]; ja3: string; ja4: string; utm_campaign: string; website_name: string;
+  signals: string[]; created_at: string;
 }
 export interface SourceRow { key: string; events: number; human: number; quality: number; }
 

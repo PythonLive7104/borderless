@@ -11,7 +11,12 @@ class EventSerializer(serializers.ModelSerializer):
         model = TrafficEvent
         fields = ["id", "type", "visitor_ref", "ip", "country", "device", "browser", "os",
                   "url", "referrer", "risk_score", "classification", "action", "tag",
-                  "fingerprint", "fp_signals", "ja3", "ja4", "utm_campaign", "website_name", "created_at"]
+                  "fingerprint", "fp_signals", "ja3", "ja4", "utm_campaign", "website_name",
+                  # The risk signals, so the Click Log can say WHY a decision
+                  # went the way it did. Without them a verified Googlebot shows
+                  # as "Suspicious / Allow" with no explanation, which reads as
+                  # the engine ignoring the customer's own rule.
+                  "signals", "created_at"]
 
 
 class VisitorSerializer(serializers.ModelSerializer):

@@ -14,6 +14,35 @@ const actionTone: Record<string, string> = {
   block: "bg-danger/10 text-red-600", tag: "bg-brand/10 text-brand",
 };
 
+/** Why a decision ignored the customer's rules.
+ *
+ *  Four signals override rule evaluation outright. Without saying so, the row
+ *  reads as the engine malfunctioning: a verified Googlebot is scored 50 and
+ *  classified Suspicious, exactly what a "block suspicious" rule targets, and
+ *  then allowed anyway. It is allowed on purpose — serving a crawler something
+ *  different from what people get is cloaking, and Google penalises sites for
+ *  it — but nothing on screen said that, so it looked like the rule was broken.
+ */
+const OVERRIDES: { signal: string; label: string; why: string; tone: string }[] = [
+  { signal: "verified_crawler", label: "Search crawler", tone: "bg-brand/10 text-brand",
+    why: "A real search-engine crawler, confirmed by reverse DNS rather than its user-agent. "
+       + "Rules are skipped for these on purpose: showing a crawler something different from "
+       + "what visitors see is cloaking, and it can get the site removed from search results." },
+  { signal: "ad_reviewer", label: "Ad reviewer", tone: "bg-brand/10 text-brand",
+    why: "An ad platform reviewing your landing page. It gets exactly the page real visitors "
+       + "get — it is only labelled here so your click numbers can exclude it." },
+  { signal: "ip_allowlisted", label: "On your allow list", tone: "bg-success/10 text-emerald-700",
+    why: "This address is on your IP allow list, which takes precedence over every rule. "
+       + "Remove it under Traffic Rules if you want your rules to apply here." },
+  { signal: "ip_blocklisted", label: "On your block list", tone: "bg-danger/10 text-red-600",
+    why: "This address is on your IP block list, which takes precedence over every rule." },
+];
+
+function overrideFor(signals: string[] | undefined) {
+  if (!signals?.length) return null;
+  return OVERRIDES.find((o) => signals.includes(o.signal)) || null;
+}
+
 export default function ClickLog() {
   const { current } = useWorkspace();
   const [rows, setRows] = useState<EventRow[]>([]);
@@ -80,7 +109,18 @@ export default function ClickLog() {
                     <td className="px-4 py-3 capitalize">{e.device || "—"}</td>
                     <td className="px-4 py-3 font-mono font-bold">{e.risk_score ?? "—"}</td>
                     <td className="px-4 py-3"><ClassBadge value={e.classification} /></td>
-                    <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${actionTone[e.action] || "bg-bg-mute"}`}>{e.action}{e.tag ? `:${e.tag}` : ""}</span></td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${actionTone[e.action] || "bg-bg-mute"}`}>{e.action}{e.tag ? `:${e.tag}` : ""}</span>
+                      {(() => {
+                        const o = overrideFor(e.signals);
+                        return o ? (
+                          <span title={o.why}
+                            className={`mt-1 block w-fit cursor-help rounded-full px-2 py-0.5 text-[10px] font-semibold ${o.tone}`}>
+                            {o.label}
+                          </span>
+                        ) : null;
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
