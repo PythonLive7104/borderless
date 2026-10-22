@@ -215,3 +215,69 @@ class FunnelTest(TestCase):
         self.assertEqual(by["human"], 6)
         self.assertEqual(by["bot"], 3)
         self.assertEqual(by["fraud"], 1)
+
+
+class CrawlerHeldOutOfQualityTest(TestCase):
+    """Traffic quality counts only traffic the customer can act on.
+
+    Googlebot is automated, so it scores around 50 and classifies as Suspicious
+    — correctly. But the engine exempts verified crawlers from rules on purpose,
+    because serving a crawler different content from real visitors is cloaking
+    and can get a site dropped from search. Counting them dragged "traffic
+    quality" below 100% and inflated "Suspicious + Fraud" on precisely the sites
+    that get indexed most, which read as the engine malfunctioning.
+    """
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="cq@example.com", email="cq@example.com", password="testpass123")
+        self.org = create_workspace(user, "Crawler Co")
+        self.site = Website.objects.create(organization=self.org, name="S", domain="s.example")
+
+        def ev(classification, signals, risk=0):
+            n = TrafficEvent.objects.count()
+            v = Visitor.objects.create(website=self.site, visitor_id=f"v{n}")
+            sess = Session.objects.create(website=self.site, visitor=v, session_id=f"s{n}")
+            TrafficEvent.objects.create(
+                website=self.site, visitor=v, session=sess, type="pageview",
+                action="allow", classification=classification, signals=signals,
+                risk_score=risk, created_at=timezone.now())
+
+        for _ in range(6):
+            ev("human", [])
+        for _ in range(2):
+            ev("suspicious", ["known_bot", "verified_crawler"], risk=50)   # Googlebot
+        ev("suspicious", ["proxy_detected"], risk=50)                       # a real one
+
+        self.c = APIClient()
+        self.c.force_authenticate(user=user)
+
+    def _totals(self):
+        return self.c.get(f"/api/analytics/overview/?organization={self.org.id}").json()["totals"]
+
+    def test_quality_ignores_verified_crawlers(self):
+        t = self._totals()
+        # 9 events, 2 of them crawlers -> 6 human out of 7 actionable.
+        self.assertEqual(t["events"], 9)
+        self.assertEqual(t["crawlers"], 2)
+        self.assertEqual(t["scored_events"], 7)
+        self.assertAlmostEqual(t["quality"], round(6 / 7, 4))
+
+    def test_suspicious_count_ignores_verified_crawlers(self):
+        # Only the genuine one, not the two crawlers.
+        self.assertEqual(self._totals()["suspicious"], 1)
+
+    def test_flagged_ignores_verified_crawlers(self):
+        self.assertEqual(self._totals()["flagged"], 1)
+
+    def test_crawlers_are_reported_not_hidden(self):
+        """They must still be visible, or the figures stop reconciling against
+        the Visitors card and we have traded one confusion for another."""
+        t = self._totals()
+        self.assertEqual(t["crawlers"] + t["scored_events"], t["events"])
+
+    def test_the_daily_series_agrees_with_the_headline(self):
+        r = self.c.get(f"/api/analytics/overview/?organization={self.org.id}").json()
+        pts = r["timeseries"]["quality"]
+        self.assertEqual(len(pts), 1)
+        self.assertAlmostEqual(pts[0]["pct"], round(6 / 7, 4))

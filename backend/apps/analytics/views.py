@@ -49,7 +49,26 @@ class OverviewView(views.APIView):
         qs = _events(request.user, request.query_params).filter(created_at__gte=since)
 
         total = qs.count()
-        by_class = dict(qs.exclude(classification="").values_list("classification")
+
+        # Verified search crawlers are held out of traffic quality.
+        #
+        # Googlebot is automated, so it scores around 50 and classifies as
+        # Suspicious — correctly. But the engine deliberately exempts verified
+        # crawlers from rules (blocking them would be cloaking, which can get a
+        # site dropped from search), so the customer cannot act on them and
+        # should not be marked down for them. Counting them dragged "traffic
+        # quality" below 100% and inflated "Suspicious + Fraud" on exactly the
+        # sites that are indexed most often. They are reported separately rather
+        # than hidden, so the numbers still reconcile.
+        #
+        # ad_reviewer is only ever set alongside verified_crawler, so this one
+        # filter covers both.
+        crawler_q = Q(signals__contains=["verified_crawler"])
+        crawlers = qs.filter(crawler_q).count()
+        scored = qs.exclude(crawler_q)
+        scored_total = total - crawlers
+
+        by_class = dict(scored.exclude(classification="").values_list("classification")
                         .annotate(n=Count("id")).values_list("classification", "n"))
         human = by_class.get("human", 0)
         conversions = qs.filter(type="conversion").count()
@@ -61,10 +80,14 @@ class OverviewView(views.APIView):
         # time series (per day)
         per_day = (qs.annotate(d=TruncDate("created_at")).values("d")
                    .annotate(events=Count("id"), visitors=Count("visitor", distinct=True),
-                             human=Count("id", filter=Q(classification="human")))
+                             human=Count("id", filter=Q(classification="human")),
+                             crawlers=Count("id", filter=crawler_q))
                    .order_by("d"))
         visitors_ts = [{"date": r["d"], "count": r["visitors"]} for r in per_day]
-        quality_ts = [{"date": r["d"], "pct": round(r["human"] / r["events"], 4) if r["events"] else 0}
+        # Same hold-out per day, or the chart would disagree with the headline.
+        quality_ts = [{"date": r["d"],
+                       "pct": round(r["human"] / (r["events"] - r["crawlers"]), 4)
+                              if (r["events"] - r["crawlers"]) else 0}
                       for r in per_day]
 
         def top(field, limit=8):
@@ -82,12 +105,16 @@ class OverviewView(views.APIView):
             "range": {"days": days},
             "totals": {
                 "events": total, "visitors": visitors, "sessions": sessions,
-                "quality": round(human / total, 4) if total else 0.0,
+                # Quality is over traffic the customer can actually act on,
+                # i.e. everything except verified crawlers.
+                "quality": round(human / scored_total, 4) if scored_total else 0.0,
                 "human": human,
                 "suspicious": by_class.get("suspicious", 0),
                 "bot": by_class.get("bot", 0),
                 "fraud": by_class.get("fraud", 0),
-                "flagged": total - human,
+                "flagged": scored_total - human,
+                "crawlers": crawlers,
+                "scored_events": scored_total,
                 "conversions": conversions,
                 "conversion_rate": round(conversions / sessions, 4) if sessions else 0.0,
                 "revenue": round(revenue, 2),

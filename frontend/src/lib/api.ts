@@ -475,6 +475,9 @@ export interface Overview {
   totals: {
     events: number; visitors: number; sessions: number; quality: number; human: number;
     suspicious: number; bot: number; fraud: number; flagged: number;
+    /** Verified search crawlers, held out of quality/flagged so the percentage
+     *  means "of the traffic you can actually act on". Reported, not hidden. */
+    crawlers: number; scored_events: number;
     conversions: number; conversion_rate: number;
   };
   timeseries: { visitors: { date: string; count: number }[]; quality: { date: string; pct: number }[] };

@@ -71,8 +71,18 @@ export default function Overview() {
         <>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Visitors" value={t!.visitors.toLocaleString()} sub={`${t!.events} events`} tone="brand" />
-            <StatCard label="Traffic quality" value={`${(t!.quality * 100).toFixed(1)}%`} sub={`${t!.human} human`} tone="green" />
-            <StatCard label="Suspicious + Fraud" value={(t!.suspicious + t!.bot + t!.fraud).toLocaleString()} sub={`${t!.flagged} flagged`} tone="red" />
+            {/* Both of these now exclude verified search crawlers. Googlebot is
+                automated, so it scores as Suspicious — correctly — but the engine
+                exempts verified crawlers from rules on purpose, so the customer
+                can't act on them and shouldn't be marked down for them. The count
+                is shown in the subtitle rather than dropped, so the figures still
+                add up against the Visitors card. */}
+            <StatCard label="Traffic quality" value={`${(t!.quality * 100).toFixed(1)}%`}
+              sub={t!.crawlers ? `${t!.human} human - ${t!.crawlers} search crawlers excluded`
+                               : `${t!.human} human`} tone="green" />
+            <StatCard label="Suspicious + Fraud" value={(t!.suspicious + t!.bot + t!.fraud).toLocaleString()}
+              sub={t!.crawlers ? `${t!.flagged} flagged, crawlers not counted`
+                               : `${t!.flagged} flagged`} tone="red" />
             <StatCard label="Conversions" value={t!.conversions.toLocaleString()} sub={`${(t!.conversion_rate * 100).toFixed(1)}% rate`} tone="amber" />
           </div>
 
