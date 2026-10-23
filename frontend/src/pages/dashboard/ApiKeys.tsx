@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { keysApi, type ApiKey } from "../../lib/api";
+import { keysApi, websiteApi, type ApiKey, type Website } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/auth/Field";
 import PageNote from "../../components/dashboard/PageNote";
 import { useDialog } from "../../context/DialogContext";
+import ApiDocs from "../../components/dashboard/ApiDocs";
 
 export default function ApiKeys() {
   const { confirm } = useDialog();
@@ -16,6 +17,9 @@ export default function ApiKeys() {
   const [name, setName] = useState("");
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Pulled so the samples below can carry the reader's real tracking ID
+  // instead of a placeholder they have to go and look up.
+  const [sites, setSites] = useState<Website[]>([]);
   const canManage = current?.role === "owner" || current?.role === "admin";
 
   async function load() {
@@ -24,6 +28,14 @@ export default function ApiKeys() {
     try { setKeys((await keysApi.list(current.id)).results); } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
+  useEffect(() => {
+    if (!current) return;
+    let live = true;
+    websiteApi.list(current.id)
+      .then((r) => { if (live) setSites(r.results); })
+      .catch(() => { /* the docs fall back to a placeholder site id */ });
+    return () => { live = false; };
+  }, [current?.id]);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -73,6 +85,8 @@ export default function ApiKeys() {
           </table>
         </div>
       )}
+
+      <ApiDocs sites={sites.map((s) => ({ name: s.name, tracking_id: s.tracking_id }))} />
 
       <Modal open={open} onClose={() => setOpen(false)} title={created ? "Copy your API key" : "Create API key"}>
         {created ? (
