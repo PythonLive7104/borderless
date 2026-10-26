@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#0a0f1d" />
+    <!-- Installable from the browser: home-screen icon, own window, no address
+         bar. Same build as the website, so there is no second codebase. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TryNoBot" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <!-- Applies the saved theme BEFORE first paint. Inline and synchronous on
          purpose: anything deferred lets the page paint in the wrong theme and
          then snap, which is worse than either theme on its own. The markup

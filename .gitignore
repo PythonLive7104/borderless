@@ -43,3 +43,6 @@ pgdata/
 # Committing both would carry the same footage twice, the masters being the
 # larger copy. Keep these in cloud storage so a walkthrough can be re-encoded.
 /videos/
+
+# --- Mobile / desktop app shells (built locally, never committed) ---
+mobile/

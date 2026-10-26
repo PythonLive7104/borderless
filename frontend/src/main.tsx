@@ -5,6 +5,7 @@ import "./index.css";
 import { initAnalytics, storedConsent } from "./lib/analytics";
 import { initSelfTracker } from "./lib/selfTracker";
 import { captureAttribution, captureReferral } from "./lib/attribution";
+import { initPWA } from "./lib/pwa";
 
 if (storedConsent() === "granted") initAnalytics();
 // Before React renders, because this is the one moment the gclid is still in
@@ -15,6 +16,9 @@ captureAttribution();
 // if the visitor first arrived some other way months ago.
 captureReferral();
 initSelfTracker(); // we run our own bot protection on trynobot.com
+// Installability. Registers the service worker in production only and
+// captures the install prompt; does nothing at all where unsupported.
+initPWA();
 const root = document.getElementById("root")!;
 const app = (
   <React.StrictMode>

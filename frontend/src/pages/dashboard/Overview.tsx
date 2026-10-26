@@ -13,6 +13,7 @@ import FunnelReport from "../../components/dashboard/FunnelReport";
 import WebsitePicker from "../../components/dashboard/WebsitePicker";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { analyticsApi, type Overview as OverviewT } from "../../lib/api";
+import InstallApp from "../../components/dashboard/InstallApp";
 import RangeTabs from "../../components/dashboard/RangeTabs";
 import StatCard from "../../components/dashboard/StatCard";
 import NoData from "../../components/dashboard/NoData";
@@ -85,6 +86,8 @@ export default function Overview() {
                                : `${t!.flagged} flagged`} tone="red" />
             <StatCard label="Conversions" value={t!.conversions.toLocaleString()} sub={`${(t!.conversion_rate * 100).toFixed(1)}% rate`} tone="amber" />
           </div>
+
+          <InstallApp />
 
           {current && (
             <div className="mt-6">
