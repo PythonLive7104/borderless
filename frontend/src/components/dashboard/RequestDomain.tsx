@@ -115,7 +115,7 @@ export default function RequestDomain({ label, variant = "outline", className }:
             <p className="text-sm text-fg-muted">
               Not seeing one you like? Tell us the domain you want for your redirects and we'll
               register it for you — normally in <b>under {SOURCING_HOURS} hours</b>, at the same
-              monthly price. Nothing is charged until it's live in your account.
+              price as the ones in stock. Nothing is charged until it's live in your account.
             </p>
             <Field
               label="Domain you want"
