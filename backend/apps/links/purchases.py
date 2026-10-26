@@ -21,8 +21,17 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
-# One payment buys this much time on the domain.
-PERIOD_DAYS = 30
+
+def period_days() -> int:
+    """How long one payment buys on a private domain.
+
+    Read at call time rather than frozen at import, so the term can be changed
+    by configuration and so tests can override it. Yearly since October 2026;
+    it was 30 days before that.
+    """
+    from django.conf import settings
+    return int(getattr(settings, "PRIVATE_DOMAIN_PERIOD_DAYS", 365))
+
 
 from .models import PrivateDomainPurchase, ShortDomain
 
@@ -91,7 +100,7 @@ def assign_domain(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     domain.organization_id = p.organization_id
     domain.is_shared = False
     domain.is_default = False
-    domain.private_until = timezone.now() + timedelta(days=PERIOD_DAYS)
+    domain.private_until = timezone.now() + timedelta(days=period_days())
     domain.save(update_fields=["organization", "is_shared", "is_default", "private_until"])
 
     p.domain = domain
@@ -125,7 +134,7 @@ def renew(purchase: PrivateDomainPurchase) -> ShortDomain | None:
         if not domain or domain.organization_id != p.organization_id:
             return None
         base = max(domain.private_until or timezone.now(), timezone.now())
-        domain.private_until = base + timedelta(days=PERIOD_DAYS)
+        domain.private_until = base + timedelta(days=period_days())
         domain.save(update_fields=["private_until"])
         p.domain = domain
         p.status = PrivateDomainPurchase.Status.FULFILLED

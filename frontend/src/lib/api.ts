@@ -289,8 +289,12 @@ export interface PrivateDomains {
   available: number;
   /** Unsold stock the buyer picks from at checkout. */
   stock?: ShortDomain[];
-  /** USD per 30 days, served so the price shown can’t drift from the one charged. */
+  /** USD per term, served so the price shown can’t drift from the one charged. */
   price?: number;
+  /** Length of that term in days — 365 since October 2026, was 30. Served for
+   *  the same reason as the price: it appears in several strings and must not
+   *  be hard-coded in any of them. */
+  period_days?: number;
 }
 export interface CustomDomain { id: number; host: string; verified: boolean;
   verify: { txt_name: string; txt_value: string; cname_target: string }; }

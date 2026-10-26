@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useTour } from "../../context/TourContext";
@@ -43,9 +43,19 @@ export default function Settings() {
   const { current } = useWorkspace();
   const { startTour } = useTour();
   const [params] = useSearchParams();
-  // Deep-link support: the nav bell sends ?tab=notify here.
+  // Deep-link support: ?tab=notify opens the Notify API tab.
   const initialTab: Tab = params.get("tab") === "notify" ? "Notify API" : "Profile";
   const [tab, setTab] = useState<Tab>(initialTab);
+  // Re-read the parameter when it changes, not only on mount.
+  //
+  // React Router keeps this page mounted when the search string changes, so a
+  // link to ?tab=notify from somewhere else in Settings used to update the URL
+  // and nothing else: useState's initial value is read exactly once. Arriving
+  // from another page worked, clicking through from this one did nothing, and
+  // the difference is invisible to whoever reports it.
+  useEffect(() => {
+    if (params.get("tab") === "notify") setTab("Notify API");
+  }, [params]);
   const [toast, setToast] = useState("");
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2500); };
   const initials = ((user?.first_name?.[0] || "") + (user?.last_name?.[0] || "")).toUpperCase() || (user?.email?.[0] || "?").toUpperCase();

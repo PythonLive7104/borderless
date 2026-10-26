@@ -258,7 +258,13 @@ BACHS_PRODUCTS = {
 # One-off purchase: exclusive use of a short domain. Leave the product id blank
 # until it exists in Bachs — checkout then refuses rather than handing one over
 # unpaid.
-PRIVATE_DOMAIN_PRICE = int(os.getenv("PRIVATE_DOMAIN_PRICE", "10"))  # per 30 days
+PRIVATE_DOMAIN_PRICE = int(os.getenv("PRIVATE_DOMAIN_PRICE", "10"))
+# How long one payment buys. Yearly as of October 2026; it was 30 days before
+# that. Settable so the term can be changed without a code deploy, but note
+# that the PRICE lives in the Bachs product, not here — this figure is only
+# what we display, so the two have to be changed together or the button will
+# advertise one number and the invoice will charge another.
+PRIVATE_DOMAIN_PERIOD_DAYS = int(os.getenv("PRIVATE_DOMAIN_PERIOD_DAYS", "365"))
 BACHS_PRODUCT_PRIVATE_DOMAIN = os.getenv("BACHS_PRODUCT_PRIVATE_DOMAIN", "")
 
 BACHS_PRODUCTS_YEARLY = {

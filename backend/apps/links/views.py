@@ -54,6 +54,11 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
             # Served rather than hard-coded in the client, so the displayed price
             # can never drift from the one the server records on the purchase.
             "price": int(getattr(settings, "PRIVATE_DOMAIN_PRICE", 25)),
+            # The term is served for the same reason as the price: it appears in
+            # half a dozen strings in the dashboard, and hard-coding "30 days" in
+            # each is how the button ends up advertising a term the server no
+            # longer honours.
+            "period_days": int(getattr(settings, "PRIVATE_DOMAIN_PERIOD_DAYS", 365)),
         }
         # Kept for the create-form preview: the default domain, or "" when the
         # service has no usable domain at all.

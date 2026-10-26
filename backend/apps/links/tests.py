@@ -825,9 +825,16 @@ class PrivateDomainRentalTest(TestCase):
         from apps.links.purchases import mark_paid
         return mark_paid(self.P.objects.create(organization=self.org, amount=5, renew_domain=domain))
 
-    def test_paying_rents_it_for_30_days(self):
+    def test_paying_rents_it_for_one_term(self):
+        """Derived from period_days(), not hard-coded.
+
+        These assertions said 29/59 when a term was 30 days. Moving to yearly
+        broke three of them at once, which is the tell that they were testing
+        the constant rather than the behaviour."""
+        from apps.links.purchases import period_days
         d = self._pay()
-        self.assertAlmostEqual((d.private_until - timezone.now()).days, 29, delta=1)
+        self.assertAlmostEqual((d.private_until - timezone.now()).days,
+                               period_days() - 1, delta=1)
 
     def test_a_second_plain_payment_takes_another_domain(self):
         first = self._pay()
@@ -841,17 +848,22 @@ class PrivateDomainRentalTest(TestCase):
         d = self._pay()
         ShortDomain.objects.create(host="korv2.cc", active=True,
                                    verified_at=timezone.now(), is_shared=False)
+        from apps.links.purchases import period_days
         r = self._renew(d)
         self.assertEqual(r.host, "pavo.cc")
-        self.assertAlmostEqual((r.private_until - timezone.now()).days, 59, delta=1)
+        # Renewing early stacks: the new term is added to what was left.
+        self.assertAlmostEqual((r.private_until - timezone.now()).days,
+                               period_days() * 2 - 1, delta=1)
         self.assertEqual(ShortDomain.private_for(self.org.id).count(), 1)  # no new domain taken
 
     def test_renewing_after_a_lapse_starts_from_today_not_the_old_date(self):
         d = self._pay()
         d.private_until = timezone.now() - timedelta(days=10)
         d.save()
+        from apps.links.purchases import period_days
         d = self._renew(d)
-        self.assertGreater(d.private_until, timezone.now() + timedelta(days=29))
+        self.assertGreater(d.private_until,
+                           timezone.now() + timedelta(days=period_days() - 1))
 
     def test_a_lapsed_rental_is_only_reminded_during_the_grace_period(self):
         d = self._pay()
@@ -1760,3 +1772,36 @@ class ByodRedirectsAreUncappedTest(TestCase):
             is_shared=False, active=True, verified_at=timezone.now())
         # Not ours, so the serializer refuses it outright rather than uncapping.
         self.assertIn(self._make(theirs, "x1").status_code, (400, 403))
+
+
+class PrivateDomainTermTest(TestCase):
+    """The rental term is configuration, not a constant baked into the code.
+
+    It moved from 30 days to a year in October 2026. The point of reading it at
+    call time is that the next change is a setting, not a patch — and that the
+    price shown in the dashboard is served from the same place, so the button
+    can't advertise a term the server doesn't honour.
+    """
+
+    def test_it_defaults_to_a_year(self):
+        from apps.links.purchases import period_days
+        self.assertEqual(period_days(), 365)
+
+    def test_a_setting_overrides_it(self):
+        from django.test import override_settings
+        from apps.links.purchases import period_days
+        with override_settings(PRIVATE_DOMAIN_PERIOD_DAYS=30):
+            self.assertEqual(period_days(), 30)
+
+    def test_the_term_is_served_to_the_dashboard(self):
+        """So the six strings that mention it all read from one source."""
+        from django.test import override_settings
+        from rest_framework.test import APIClient
+        from apps.organizations.models import OrganizationMember
+        org = _workspace("term@example.com")
+        user = OrganizationMember.objects.get(organization=org, role="owner").user
+        c = APIClient(); c.force_authenticate(user=user)
+        with override_settings(PRIVATE_DOMAIN_PERIOD_DAYS=365):
+            r = c.get(f"/api/links/?organization={org.id}")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["private"]["period_days"], 365)

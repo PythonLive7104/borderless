@@ -1,6 +1,7 @@
 """Keep private-domain rentals honest, without breaking live campaigns.
 
-A private domain is rented for 30 days at a time. When it lapses the links on it
+A private domain is rented for a fixed term (a year as of October 2026, set by
+PRIVATE_DOMAIN_PERIOD_DAYS). When it lapses the links on it
 keep working through a grace period and the owner is reminded — a redirect may
 already be printed on an ad or sitting in someone's inbox, so pulling it the
 moment a payment is late would break traffic the customer is paying for

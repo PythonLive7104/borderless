@@ -99,14 +99,20 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
   // Server-served, so the price on the button is always the one on the invoice.
   const price = priv.price ?? 10;
   const stock = priv.stock ?? [];
+  // Likewise the term. Derived into words once, so the several places that
+  // mention it cannot disagree with each other or with what the server honours.
+  const days = priv.period_days ?? 365;
+  const per = days >= 360 ? "/yr" : days >= 28 ? "/mo" : `/${days}d`;
+  const perLong = days >= 360 ? "year" : days >= 28 ? "month" : `${days} days`;
+  const termWords = days >= 360 ? "a year" : days >= 28 ? "a month" : `${days} days`;
 
   // Renewals target a domain they already own, so there is nothing to choose —
   // they keep the same host. Only a NEW purchase opens the picker.
   async function buy(renewId?: number) {
     if (!renewId) { setPicked(stock[0]?.id ?? null); setMsg(""); setPicking(true); return; }
     if (!(await confirm({
-      title: `Renew — $${price}/month`,
-      message: "Extend this private domain by another 30 days.",
+      title: `Renew — $${price}/${perLong}`,
+      message: `Extend this private domain by another ${termWords}.`,
       confirmLabel: "Continue to payment",
       cancelLabel: "Not now",
       tone: "brand",
@@ -148,7 +154,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
                   </div>
                   {canManage && (
                     <Button onClick={() => buy(d.id)} variant="outline" disabled={busy}>
-                      {busy ? "…" : `Renew · $${price}/mo`}
+                      {busy ? "…" : `Renew · $${price}${per}`}
                     </Button>
                   )}
                 </div>
@@ -158,7 +164,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
           {canManage && (
             <div className="mt-3 flex flex-col items-start gap-1">
               <Button onClick={() => buy()} disabled={busy}>
-                {busy ? "Starting…" : `Get another private domain · $${price}/mo`}
+                {busy ? "Starting…" : `Get another private domain · $${price}${per}`}
               </Button>
               {/* The button above opens the picker, which is where asking for a
                   specific name lives — so this stays a plain statement. */}
@@ -182,7 +188,7 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
           {canManage && (
             <div className="flex flex-col items-end gap-1">
               <Button onClick={() => buy()} disabled={busy} className={busy ? "" : "cta-glow"}>
-                {busy ? "Starting…" : `Get a private domain · $${price}/mo`}
+                {busy ? "Starting…" : `Get a private domain · $${price}${per}`}
               </Button>
               {msg && <span className="max-w-xs text-right text-xs text-red-600">{msg}</span>}
             </div>
@@ -193,10 +199,10 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
       <Modal
         open={picking}
         onClose={() => setPicking(false)}
-        title={`Choose your private domain \u2014 $${price}/month`}
+        title={`Choose your private domain \u2014 $${price}/${perLong}`}
       >
         <p className="text-sm text-fg-muted">
-          Pick the one you want. It becomes yours alone for 30 days — nobody else can
+          Pick the one you want. It becomes yours alone for {termWords} — nobody else can
           publish links on it — and renews alongside your plan.
         </p>
 
