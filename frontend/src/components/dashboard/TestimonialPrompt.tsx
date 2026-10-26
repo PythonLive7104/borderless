@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { testimonialApi, type MyTestimonial, type TestimonialDraft } from "../../lib/api";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import Button from "../ui/Button";
+import ReviewAsk from "./ReviewAsk";
 
 const CONSENT_TEXT =
   "I agree that TryNoBot may publish this testimonial, along with my name, " +
@@ -46,7 +47,7 @@ export default function TestimonialPrompt() {
   if (existing) {
     if (existing.status === "rejected") return null;
     return (
-      <div className="card shadow-soft mb-6 flex flex-wrap items-center gap-3 border-l-4 border-l-success p-5">
+      <div className="card shadow-soft mb-6 border-l-4 border-l-success p-5">
         <div className="min-w-0 flex-1">
           <div className="font-bold">
             {existing.status === "approved" ? "Your testimonial is live" : "Thanks for your testimonial"}
@@ -57,6 +58,7 @@ export default function TestimonialPrompt() {
               : "We're reviewing it now. It won't be published anywhere until we have."}
           </p>
         </div>
+        <ReviewAsk t={existing} />
       </div>
     );
   }
