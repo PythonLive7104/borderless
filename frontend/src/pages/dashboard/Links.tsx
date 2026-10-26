@@ -141,21 +141,51 @@ function PrivateDomainPanel({ priv, canManage, orgId, onChanged, perDomainCap }:
           </p>
           <div className="mt-3 space-y-2">
             {priv.owned.map((d) => {
-              const lapsed = d.private_until ? new Date(d.private_until) < new Date() : false;
+              // Days remaining, not a renewal date.
+              //
+              // On a monthly term "Renews 14 Nov" was useful and a Renew button
+              // beside it was reasonable. On a yearly one it reads as a bill due
+              // now for something eleven months away, and it buries the thing the
+              // owner actually wants to know: how long this domain is theirs.
+              const until = d.private_until ? new Date(d.private_until) : null;
+              const left = until ? Math.ceil((until.getTime() - Date.now()) / 86_400_000) : null;
+              const lapsed = left !== null && left <= 0;
+              const soon = left !== null && left > 0 && left <= 30;
+              const graceEnds = d.private_grace_ends ? new Date(d.private_grace_ends) : null;
+              const tone = lapsed ? "text-red-600" : soon ? "text-amber-700" : "text-fg-dim";
               return (
                 <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2">
                   <div className="min-w-0">
                     <div className="font-mono text-sm font-semibold">{d.host}</div>
-                    <div className={`text-xs ${lapsed ? "text-red-600" : "text-fg-dim"}`}>
-                      {d.private_until
-                        ? (lapsed ? "Lapsed — renew to keep it" : `Renews ${new Date(d.private_until).toLocaleDateString()}`)
-                        : "Active"}
+                    <div className={`text-xs ${tone}`}>
+                      {left === null ? "Active" : lapsed ? (
+                        graceEnds && graceEnds > new Date()
+                          // Say when the links die, not just that it lapsed. The
+                          // grace period is the only part that is still urgent.
+                          ? `Expired — your links stop working on ${graceEnds.toLocaleDateString()}`
+                          : "Expired — renew to start using it again"
+                      ) : (
+                        <>
+                          <b>{left} {left === 1 ? "day" : "days"} left</b>
+                          <span className="text-fg-dim"> · expires {until!.toLocaleDateString()}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   {canManage && (
-                    <Button onClick={() => buy(d.id)} variant="outline" disabled={busy}>
-                      {busy ? "…" : `Renew · $${price}${per}`}
-                    </Button>
+                    lapsed || soon ? (
+                      <Button onClick={() => buy(d.id)} variant="outline" disabled={busy}>
+                        {busy ? "…" : `Renew · $${price}${per}`}
+                      </Button>
+                    ) : (
+                      // Still offered, because renewing early stacks onto the time
+                      // already left rather than wasting it — but as a quiet link,
+                      // not a button competing for attention a year ahead of time.
+                      <button type="button" onClick={() => buy(d.id)} disabled={busy}
+                        className="text-xs font-semibold text-fg-dim hover:text-brand hover:underline">
+                        {busy ? "…" : "Renew early"}
+                      </button>
+                    )
                   )}
                 </div>
               );

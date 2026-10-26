@@ -1805,3 +1805,76 @@ class PrivateDomainTermTest(TestCase):
             r = c.get(f"/api/links/?organization={org.id}")
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.data["private"]["period_days"], 365)
+
+
+class ExtendPrivateDomainsTest(TestCase):
+    """Topping up existing rentals when the term got longer.
+
+    The rental was 30 days until October 2026. Without this, everyone holding a
+    domain bought under the old term gets asked for a year's money within weeks
+    of paying for a month.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        self.org = _workspace("extend@example.com")
+        self.now = timezone.now()
+
+    def _domain(self, host, days_left, **kw):
+        from django.utils import timezone
+        return ShortDomain.objects.create(
+            host=host, organization=self.org, is_shared=False, active=True,
+            verified_at=timezone.now(),
+            private_until=self.now + timedelta(days=days_left) if days_left is not None else None,
+            **kw)
+
+    def _run(self, *args):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command("extend_private_domains", *args, stdout=out, stderr=out)
+        return out.getvalue()
+
+    def test_a_short_rental_is_topped_up_to_a_full_term(self):
+        from apps.links.purchases import period_days
+        d = self._domain("short.cc", 12)
+        self._run("--apply", "--quiet")
+        d.refresh_from_db()
+        self.assertAlmostEqual((d.private_until - self.now).days, period_days(), delta=1)
+
+    def test_it_reports_without_applying_by_default(self):
+        d = self._domain("dry.cc", 12)
+        out = self._run()
+        self.assertIn("dry.cc", out)
+        self.assertIn("Would extend", out)
+        d.refresh_from_db()
+        self.assertAlmostEqual((d.private_until - self.now).days, 12, delta=1)
+
+    def test_it_never_shortens_a_longer_rental(self):
+        """Someone who already paid for two years must not lose a year to this."""
+        d = self._domain("long.cc", 800)
+        self._run("--apply", "--quiet")
+        d.refresh_from_db()
+        self.assertAlmostEqual((d.private_until - self.now).days, 800, delta=1)
+
+    def test_running_it_twice_changes_nothing_the_second_time(self):
+        self._domain("idem.cc", 12)
+        self._run("--apply", "--quiet")
+        out = self._run()
+        self.assertIn("Nothing to extend", out)
+
+    def test_byod_domains_are_left_alone(self):
+        """A domain the customer registered themselves has no rental to extend."""
+        d = self._domain("mine.example", 12, byod=True)
+        self._run("--apply", "--quiet")
+        d.refresh_from_db()
+        self.assertAlmostEqual((d.private_until - self.now).days, 12, delta=1)
+
+    def test_the_workspace_is_told(self):
+        from apps.notifications.models import Notification
+        self._domain("told.cc", 12)
+        self._run("--apply")
+        n = Notification.objects.filter(channel__organization=self.org).first()
+        self.assertIsNotNone(n)
+        self.assertIn("told.cc", n.title)
+        self.assertIn("no charge", n.message)

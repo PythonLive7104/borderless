@@ -283,7 +283,13 @@ export const websiteApi = {
 
 // ---- short links ----
 export type BotAction = "off" | "decoy" | "notfound" | "blank";
-export interface ShortDomain { id: number; host: string; base: string; is_default: boolean; is_shared: boolean; private_until: string | null; }
+export interface ShortDomain {
+  id: number; host: string; base: string; is_default: boolean; is_shared: boolean;
+  private_until: string | null;
+  /** When the links stop resolving — later than private_until, because a
+   *  lapsed domain keeps serving through a grace period. */
+  private_grace_ends?: string | null;
+}
 export interface PrivateDomains {
   owned: ShortDomain[];
   available: number;

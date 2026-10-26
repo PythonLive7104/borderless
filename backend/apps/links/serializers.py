@@ -107,7 +107,12 @@ class ShortLinkSerializer(serializers.ModelSerializer):
 
 class ShortDomainSerializer(serializers.ModelSerializer):
     base = serializers.CharField(read_only=True)
+    # When the links actually stop resolving, which is NOT the expiry date —
+    # there is a grace period after it. The dashboard needs the real deadline to
+    # tell someone how long they have, rather than implying it is already gone.
+    private_grace_ends = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = ShortDomain
-        fields = ["id", "host", "base", "is_default", "is_shared", "private_until"]
+        fields = ["id", "host", "base", "is_default", "is_shared", "private_until",
+                  "private_grace_ends"]
