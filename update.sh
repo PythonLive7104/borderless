@@ -67,6 +67,15 @@ say "Building images (this leans on swap; a few minutes is normal)"
 $COMPOSE build backend web decision worker || die "Build failed. The running stack is untouched."
 ok "built"
 
+# Drop build cache older than three days.
+#
+# BuildKit keeps every layer of every build forever. Each deploy compiles Go and
+# runs a Vite build, so this grows without limit: it reached 19GB of a 38GB disk
+# before anyone looked, which is most of the way to a root filesystem too full
+# for the stack to start. Three days keeps recent layers so the next deploy is
+# still fast, and discards the rest. Never fails the deploy.
+docker builder prune -af --filter until=72h >/dev/null 2>&1   && ok "trimmed build cache (kept the last 3 days)"   || true
+
 say "Starting"
 # Bring up the dependencies (postgres, redis, certbot) normally...
 $COMPOSE up -d
