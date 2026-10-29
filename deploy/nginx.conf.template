@@ -80,6 +80,19 @@ server {
         add_header Cache-Control "public, immutable";
         include /etc/nginx/security-headers.inc;   # add_header here drops the server-level set
     }
+    # The service worker must never be cached.
+    #
+    # It was being served with the server default of max-age=14400, so a browser
+    # could keep using a four-hour-old copy when it checked for an update. That
+    # is four hours of a bad worker staying in front of real users after the fix
+    # has shipped — and the worker is the one file where "the browser already
+    # has a copy" is never an acceptable answer, because it is the thing that
+    # decides what every other file does.
+    location = /sw.js {
+        root /usr/share/nginx/html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        include /etc/nginx/security-headers.inc;
+    }
     # Walkthrough videos. These need their own location for the 404: the
     # catch-all below ends in `/_shell.html`, so a missing or misspelled video
     # would answer 200 with the SPA shell, and the <video> element would report
