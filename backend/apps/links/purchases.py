@@ -26,8 +26,8 @@ def period_days() -> int:
     """How long one payment buys on a private domain.
 
     Read at call time rather than frozen at import, so the term can be changed
-    by configuration and so tests can override it. Yearly since October 2026;
-    it was 30 days before that.
+    by configuration and so tests can override it — it went monthly to yearly
+    and back again inside a week, without a code change either time.
     """
     from django.conf import settings
     return int(getattr(settings, "PRIVATE_DOMAIN_PERIOD_DAYS", 365))

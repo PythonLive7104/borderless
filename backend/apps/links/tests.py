@@ -1777,21 +1777,21 @@ class ByodRedirectsAreUncappedTest(TestCase):
 class PrivateDomainTermTest(TestCase):
     """The rental term is configuration, not a constant baked into the code.
 
-    It moved from 30 days to a year in October 2026. The point of reading it at
-    call time is that the next change is a setting, not a patch — and that the
-    price shown in the dashboard is served from the same place, so the button
-    can't advertise a term the server doesn't honour.
+    It went 30 days -> a year -> back to 30 days inside a week in October 2026,
+    and neither change needed a code deploy. That is the point of reading it at
+    call time, and of serving it to the dashboard alongside the price: the
+    button can never advertise a term the server doesn't honour.
     """
 
-    def test_it_defaults_to_a_year(self):
+    def test_it_defaults_to_a_month(self):
         from apps.links.purchases import period_days
-        self.assertEqual(period_days(), 365)
+        self.assertEqual(period_days(), 30)
 
     def test_a_setting_overrides_it(self):
         from django.test import override_settings
         from apps.links.purchases import period_days
-        with override_settings(PRIVATE_DOMAIN_PERIOD_DAYS=30):
-            self.assertEqual(period_days(), 30)
+        with override_settings(PRIVATE_DOMAIN_PERIOD_DAYS=365):
+            self.assertEqual(period_days(), 365)
 
     def test_the_term_is_served_to_the_dashboard(self):
         """So the six strings that mention it all read from one source."""
