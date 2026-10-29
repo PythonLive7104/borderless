@@ -12,7 +12,7 @@
  *
  *  Bump CACHE when the strategy changes; activate deletes every other cache.
  */
-const CACHE = "tnb-v1";
+const CACHE = "tnb-v2";
 
 // Paths this worker must never come between the browser and the network.
 //
@@ -70,45 +70,22 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Pages: network first, cache only as a fallback for being offline. This is
-  // what stops an installed app from pinning itself to an old release.
-  if (req.mode === "navigate") {
-    e.respondWith((async () => {
-      try {
-        const res = await fetch(req);
-        if (res.ok) (await caches.open(CACHE)).put(req, res.clone());
-        return res;
-      } catch (err) {
-        return (await caches.match(req))
-            || (await caches.match("/dashboard"))
-            || (await caches.match("/"))
-            || new Response(
-                 "<!doctype html><meta charset=utf-8>"
-                 + "<meta name=viewport content='width=device-width,initial-scale=1'>"
-                 + "<title>Offline</title>"
-                 + "<body style='margin:0;min-height:100vh;display:grid;place-items:center;"
-                 + "font-family:system-ui,sans-serif;background:#0a0f1d;color:#e5e7eb'>"
-                 + "<div style='text-align:center;padding:1.5rem'>"
-                 + "<h1 style='font-size:1.25rem;margin:0 0 .5rem'>You're offline</h1>"
-                 + "<p style='color:#9ca3af;margin:0'>TryNoBot needs a connection to show live traffic.</p>"
-                 + "</div></body>",
-                 { headers: { "Content-Type": "text/html; charset=utf-8" }, status: 503 });
-      }
-    })());
-    return;
-  }
-
-  // Everything else (icons, fonts, the manifest): network first, fall back to
-  // whatever we have. Never fails louder than the network already did.
-  e.respondWith((async () => {
-    try {
-      const res = await fetch(req);
-      if (res.ok) (await caches.open(CACHE)).put(req, res.clone());
-      return res;
-    } catch (err) {
-      const hit = await caches.match(req);
-      if (hit) return hit;
-      throw err;
-    }
-  })());
+  // EVERYTHING ELSE IS LEFT ALONE. No interception, no fallback page.
+  //
+  // This used to take over page loads: network first, then cache, then an
+  // "You're offline" page. It was wrong in a way that only showed up in front
+  // of real users. A navigation fetch fails for reasons that have nothing to
+  // do with the visitor's connection — nginx restarting for a few seconds
+  // during a deploy, a transient blip, navigating away mid-request — and every
+  // one of those put a full-screen "You're offline" in front of someone whose
+  // connection was fine. For a new visitor that is not a glitch, it is the
+  // product looking broken on first contact.
+  //
+  // Guarding it on navigator.onLine would have narrowed it. Not standing in
+  // the way at all removes the failure mode completely, and costs nothing that
+  // matters: the dashboard needs the network to show anything useful anyway.
+  //
+  // What stays below is the part that is purely a win — /assets/ filenames
+  // carry a content hash, so a cached one can never be the wrong version.
+  // Keeping a fetch handler is also what makes the app installable.
 });
