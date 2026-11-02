@@ -46,3 +46,6 @@ pgdata/
 
 # --- Mobile / desktop app shells (built locally, never committed) ---
 mobile/
+
+# --- Ad renders (generated locally, never committed) ---
+ads/
