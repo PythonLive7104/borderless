@@ -13,7 +13,55 @@ class ShortDomainAdmin(admin.ModelAdmin):
     # opened to answer, and scanning a status column beats opening each row.
     list_filter = ("health", "active", "is_shared", "is_default")
     readonly_fields = ("health", "health_detail", "health_checked_at")
-    actions = ("hold_as_private_stock", "return_to_shared_pool", "check_health")
+    actions = ("reclaim_for_abuse", "hold_as_private_stock",
+               "return_to_shared_pool", "check_health")
+
+    @admin.action(description="Reclaim from the workspace (abuse) — notifies them")
+    def reclaim_for_abuse(self, request, queryset):
+        """Take a private domain back from a workspace, in one step, with notice.
+
+        return_to_shared_pool deliberately refuses to touch an owned domain, so
+        reclaiming an abused one meant clearing the owner by hand and then
+        running it — and the customer was told nothing at all. Their links
+        simply stopped resolving and they found out by finding them broken.
+        That is poor even for someone who earned it, and a reported domain is
+        sometimes reported wrongly; the owner needs to know what happened and
+        that their click history is intact.
+
+        Held back as stock rather than returned to the shared pool: a host that
+        has just been used for abuse should not start serving every other
+        customer's links.
+        """
+        from apps.notifications.system import notify_workspace
+
+        taken = skipped = 0
+        for d in queryset:
+            if d.organization_id is None:
+                skipped += 1
+                continue
+            org = d.organization
+            links = list(d.links.all())
+            d.organization = None
+            d.private_until = None
+            d.is_shared = False          # sellable stock, NOT the public pool
+            d.save(update_fields=["organization", "private_until", "is_shared"])
+            for link in links:
+                publish_link(link)       # withdraws them — no longer entitled
+            notify_workspace(
+                org,
+                f"{d.host} has been withdrawn",
+                f"We have withdrawn {d.host} from your workspace following a report of "
+                f"abuse, and the {len(links)} link(s) on it no longer resolve.\n\n"
+                f"Your links and their click history are still in your account. If you "
+                f"believe this is a mistake, reply to this notice or contact support and "
+                f"we will look again.",
+            )
+            taken += 1
+
+        msg = f"{taken} domain(s) withdrawn and the owner notified."
+        if skipped:
+            msg += f" {skipped} skipped — nobody owns them."
+        self.message_user(request, msg)
 
     @admin.display(description="Health", ordering="health")
     def health_badge(self, obj):
