@@ -234,6 +234,31 @@
     }
   }
 
+  /* The same breath in white, for a light button on a dark hero.
+     cta-glow is blue, which reads as a smudge under a white surface; this is
+     the secondary CTA's version of the same idea. It is slightly out of phase
+     with cta-glow (3.1s vs 2.6s) so that if the two ever appear together they
+     do not beat in unison and turn the page into a strobe. */
+  .demo-glow {
+    animation: demo-glow 3.1s ease-in-out infinite;
+  }
+  @keyframes demo-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(255, 255, 255, .40),
+                  0 8px 20px -10px rgba(255, 255, 255, .35);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(255, 255, 255, 0),
+                  0 12px 30px -8px rgba(255, 255, 255, .55);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .demo-glow {
+      animation: none;
+      box-shadow: 0 8px 22px -10px rgba(255, 255, 255, .5);
+    }
+  }
+
   /* Loud red pulse for the "watch first" video play button — deliberately
      hard to miss (users were scrolling past the subtle blue one). Combines a
      growing glow ring, a steady red halo, and a gentle scale. */

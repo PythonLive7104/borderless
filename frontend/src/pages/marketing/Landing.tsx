@@ -21,6 +21,7 @@ const REVIEW_NODES = reviews(
 );
 const LANDING_JSONLD = REVIEW_NODES.length ? graph(...REVIEW_NODES) : "";
 import DashboardPreview from "../../components/marketing/DashboardPreview";
+import DemoVideo from "../../components/marketing/DemoVideo";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
 import { BRAND } from "../../lib/brand";
 import { IRadar, IShield, IGauge, IChart, ITarget, IBolt, IArrow, IServer, ILock, IKey, IShieldGold, ICheck, IFunnel } from "../../components/ui/icons";
@@ -125,7 +126,7 @@ export default function Landing() {
             <HeroCarousel slides={SLIDES} />
             <div className="mt-8 flex flex-wrap gap-3">
               <Button to={cta.signupHref} size="lg">{cta.label("Start Free")} <IArrow width={18} /></Button>
-              <Button href="#demo" variant="light" size="lg">View Demo</Button>
+              <DemoVideo />
             </div>
             <p className="mt-4 text-sm text-slate-400">No credit card required · 7-day trial · Cancel anytime</p>
           </div>
