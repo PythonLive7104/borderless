@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import AbuseReport, ShortDomain, ShortLink
+from .models import AbuseReport, PrivateDomainPurchase, ShortDomain, ShortLink
 from .sync import publish_link
 
 
@@ -165,3 +165,105 @@ class AbuseReportAdmin(admin.ModelAdmin):
     @admin.action(description="Dismiss — no action needed")
     def dismiss_reports(self, request, queryset):
         queryset.update(status=AbuseReport.Status.DISMISSED, resolved_at=timezone.now())
+
+
+@admin.register(PrivateDomainPurchase)
+class PrivateDomainPurchaseAdmin(admin.ModelAdmin):
+    """Private domain orders — including the ones we owe a domain on.
+
+    This page did not exist, which meant the paid-but-not-yet-fulfilled backlog
+    was invisible: finding out who had paid and was still waiting took a shell
+    session. That is also where "they asked for a specific host" orders sit
+    until someone registers the name, so it is the queue to work from.
+    """
+    list_display = ("id", "organization", "wanted", "amount", "status",
+                    "paid_from", "created_at", "fulfilled_at")
+    list_filter = ("status",)
+    search_fields = ("requested_host", "organization__name", "organization__slug",
+                     "bachs_session_id")
+    readonly_fields = ("bachs_session_id", "paid_at", "fulfilled_at", "created_at")
+    actions = ("refund_to_wallet", "fulfil_now")
+
+    @admin.display(description="Wanted")
+    def wanted(self, obj):
+        if obj.domain_id:
+            return obj.domain.host
+        if obj.requested_host:
+            return f"{obj.requested_host} (to register)"
+        if obj.renew_domain_id:
+            return f"renewal: {obj.renew_domain.host}"
+        return "any from stock"
+
+    @admin.display(description="Paid by")
+    def paid_from(self, obj):
+        # The wallet path stamps the note; anything else came through Bachs.
+        return "wallet" if "wallet" in (obj.note or "").lower() else "card"
+
+    @admin.action(description="Refund to wallet (could not source the domain)")
+    def refund_to_wallet(self, request, queryset):
+        """Put the money back as wallet credit and tell the customer.
+
+        Only touches PAID orders. A FULFILLED one got what it paid for, and a
+        REFUNDED one has already been settled — refunding either again would
+        hand out money twice, so both are skipped rather than silently redone.
+
+        Note this returns credit, not a card reversal. For a card purchase the
+        customer gets spendable balance rather than money back in their bank;
+        if they want the latter, refund it in Bachs instead and leave this
+        order alone.
+        """
+        from apps.notifications.system import notify_workspace
+        from apps.referrals.service import refund
+
+        done = skipped = no_user = 0
+        for p in queryset.select_related("organization", "user"):
+            if p.status != PrivateDomainPurchase.Status.PAID:
+                skipped += 1
+                continue
+            if p.user_id is None:
+                # The buyer's account was deleted; there is no wallet to credit.
+                no_user += 1
+                continue
+
+            wanted = p.requested_host or "a private domain"
+            refund(p.user, int(p.amount) * 100,
+                   note=f"Refund: could not source {wanted}"[:200])
+            p.status = PrivateDomainPurchase.Status.REFUNDED
+            p.save(update_fields=["status"])
+            notify_workspace(
+                p.organization,
+                f"Refunded ${p.amount} for {wanted}",
+                f"We could not register {wanted}, so the ${p.amount} you paid has been "
+                f"returned to your wallet as credit. You can spend it on another "
+                f"private domain, a plan or a renewal whenever you like.",
+            )
+            done += 1
+
+        msg = f"{done} order(s) refunded to wallet and the customer notified."
+        if skipped:
+            msg += f" {skipped} skipped — not in the PAID state."
+        if no_user:
+            msg += f" {no_user} skipped — the buyer's account no longer exists."
+        self.message_user(request, msg)
+
+    @admin.action(description="Fulfil now (assign a domain from stock)")
+    def fulfil_now(self, request, queryset):
+        """Hand over a domain to an order that is paid and waiting.
+
+        Use after adding the host to stock. An order naming a specific host is
+        only filled once THAT host exists — assign_domain will not substitute a
+        different name for one somebody asked for by name.
+        """
+        from .purchases import assign_domain
+
+        filled = waiting = 0
+        for p in queryset.filter(status=PrivateDomainPurchase.Status.PAID):
+            if assign_domain(p):
+                filled += 1
+            else:
+                waiting += 1
+        self.message_user(
+            request,
+            f"{filled} order(s) fulfilled." +
+            (f" {waiting} still waiting — the host they asked for is not in stock yet."
+             if waiting else ""))

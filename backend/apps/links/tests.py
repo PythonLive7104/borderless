@@ -7,7 +7,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.links.abuse import extract_slug
-from apps.links.models import AbuseReport, ShortDomain, ShortLink
+from apps.links.models import (AbuseReport, PrivateDomainPurchase,
+                               ShortDomain, ShortLink)
 from django.contrib.auth import get_user_model
 
 from apps.organizations.models import create_workspace
@@ -1878,3 +1879,75 @@ class ExtendPrivateDomainsTest(TestCase):
         self.assertIsNotNone(n)
         self.assertIn("told.cc", n.title)
         self.assertIn("no charge", n.message)
+
+
+class RefundToWalletTest(TestCase):
+    """Returning money for a domain we could not source.
+
+    The admin action hands out money, so the guards are pinned here: it must
+    never pay twice, never pay for an order that was fulfilled, and never
+    silently skip without saying so.
+    """
+
+    def setUp(self):
+        from apps.referrals.models import CreditEntry, wallet_for
+        from apps.referrals.service import credit
+        self.org = _workspace("refund@example.com")
+        self.user = self.org.owner
+        # Fund the wallet and buy a host we do not stock, so the order sits PAID.
+        credit(self.user, 5000, kind=CreditEntry.Kind.TOPUP)
+        self.P = PrivateDomainPurchase
+        self.wallet_for = wallet_for
+        self.purchase = self.P.objects.create(
+            organization=self.org, user=self.user, amount=25,
+            requested_host="go-acme.example", status=self.P.Status.PAID,
+            note="Paid from wallet (entry 1)")
+
+    def _refund(self, qs=None):
+        from django.contrib.admin.sites import AdminSite
+        from apps.links.admin import PrivateDomainPurchaseAdmin
+        from unittest.mock import Mock
+        a = PrivateDomainPurchaseAdmin(self.P, AdminSite())
+        req = Mock()
+        a.message_user = Mock()
+        a.refund_to_wallet(req, qs if qs is not None else self.P.objects.all())
+        return a.message_user.call_args[0][1]
+
+    def test_it_returns_the_money_and_marks_the_order(self):
+        before = self.wallet_for(self.user).balance_cents
+        self._refund()
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.status, self.P.Status.REFUNDED)
+        self.assertEqual(self.wallet_for(self.user).balance_cents, before + 2500)
+
+    def test_running_it_twice_does_not_pay_twice(self):
+        self._refund()
+        after_one = self.wallet_for(self.user).balance_cents
+        msg = self._refund()
+        self.assertEqual(self.wallet_for(self.user).balance_cents, after_one)
+        self.assertIn("not in the PAID state", msg)
+
+    def test_a_fulfilled_order_is_never_refunded(self):
+        """They got the domain they paid for."""
+        self.purchase.status = self.P.Status.FULFILLED
+        self.purchase.save(update_fields=["status"])
+        before = self.wallet_for(self.user).balance_cents
+        self._refund()
+        self.assertEqual(self.wallet_for(self.user).balance_cents, before)
+
+    def test_a_deleted_buyer_is_skipped_and_reported(self):
+        """No account means no wallet to credit — say so rather than failing."""
+        self.purchase.user = None
+        self.purchase.save(update_fields=["user"])
+        msg = self._refund()
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.status, self.P.Status.PAID)
+        self.assertIn("no longer exists", msg)
+
+    def test_the_customer_is_told(self):
+        from apps.notifications.models import Notification
+        self._refund()
+        n = Notification.objects.filter(channel__organization=self.org).first()
+        self.assertIsNotNone(n)
+        self.assertIn("go-acme.example", n.title)
+        self.assertIn("returned to your wallet", n.message)

@@ -67,12 +67,21 @@ class WalletTopupView(views.APIView):
         org_id = request.data.get("organization") or None
         topup = WalletTopup.objects.create(user=request.user, organization_id=org_id)
 
+        # Come back to wherever the top-up was started from. Someone told to
+        # top up while ordering a domain should land back on that page, not be
+        # dumped on the wallet to find their own way. Restricted to a dashboard
+        # path so this can never be turned into an open redirect.
+        back = str(request.data.get("return_to") or "/dashboard/referrals")
+        if not back.startswith("/dashboard/") or "//" in back:
+            back = "/dashboard/referrals"
+
         front = settings.FRONTEND_URL.rstrip("/")
+        sep = "&" if "?" in back else "?"
         data, err = bachs.create_checkout_session(
             product_id=product_id,
             email=request.user.email,
-            return_url=f"{front}/dashboard/referrals?topup=success",
-            cancel_url=f"{front}/dashboard/referrals?topup=cancelled",
+            return_url=f"{front}{back}{sep}topup=success",
+            cancel_url=f"{front}{back}{sep}topup=cancelled",
             metadata={"kind": "wallet_topup", "topup_id": str(topup.id),
                       "user_id": str(request.user.id)},
         )

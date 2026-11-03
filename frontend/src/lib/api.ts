@@ -182,8 +182,9 @@ export const referralApi = {
   /** Start a top-up. The AMOUNT is chosen on Bachs's own checkout page, because
    *  the product is "pay what you want" — we never assume a figure, and only
    *  the one Bachs confirms reaches the balance. */
-  topup: (orgId?: number) =>
-    http.post<{ checkout_url: string }>("/referrals/topup/", { organization: orgId ?? null }),
+  topup: (orgId?: number, returnTo?: string) =>
+    http.post<{ checkout_url: string }>("/referrals/topup/",
+      { organization: orgId ?? null, return_to: returnTo ?? null }),
   /** Settle on return from checkout. The webhook cannot be the only path: one
    *  that never arrives would mean money taken and no balance. */
   topupVerify: () =>

@@ -53,7 +53,9 @@ const NAV: Group[] = [
   { title: "Settings", items: [
     { label: "Team", to: "/dashboard/team", icon: IUsers },
     { label: "Billing", to: "/dashboard/billing", icon: ICard },
-    { label: "Refer & earn", to: "/dashboard/referrals", icon: IUsers },
+    // Holds the wallet as well as referrals now. Labelled "Refer & earn", it
+    // was unfindable: someone told to top up had nowhere to go.
+    { label: "Wallet & referrals", to: "/dashboard/referrals", icon: IUsers },
     { label: "Usage", to: "/dashboard/usage", icon: IGauge },
     { label: "Settings", to: "/dashboard/settings", icon: IGear },
   ]},

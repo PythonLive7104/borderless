@@ -2,7 +2,7 @@ import { useState } from "react";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Field from "../auth/Field";
-import { contactApi, errText, linkApi } from "../../lib/api";
+import { contactApi, errText, linkApi, referralApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
 
@@ -46,13 +46,28 @@ export default function RequestDomain({ label, variant = "outline", className }:
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
+  // Set when the wallet could not cover it, so the error can offer a way out.
+  const [short, setShort] = useState(false);
 
   function close() {
     setOpen(false);
     // Reset only after a success, so a failed attempt keeps what they typed —
     // retyping a domain name because the network blipped is a good way to lose
     // someone at exactly the point they were about to pay.
-    if (sent) { setHost(""); setNote(""); setSent(false); setErr(""); }
+    if (sent) { setHost(""); setNote(""); setSent(false); setErr(""); setShort(false); }
+  }
+
+  async function addFunds() {
+    setBusy(true);
+    try {
+      // Returns here, with the domain still typed in, so the order can be
+      // placed in one more click rather than started from scratch.
+      const r = await referralApi.topup(current?.id, "/dashboard/links");
+      window.location.href = r.checkout_url;
+    } catch (e: any) {
+      setErr(errText(e?.data, e?.message) || "Could not open the top-up page.");
+      setBusy(false);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -91,8 +106,10 @@ export default function RequestDomain({ label, variant = "outline", className }:
         try {
           await linkApi.privateDomainFromWallet(current.id, { requested_host: wanted });
         } catch (payErr: any) {
-          // 402 = not enough in the wallet. The team has the request either
-          // way, so say what is missing rather than pretending it failed.
+          // 402 = not enough in the wallet. Telling someone to top up without
+          // giving them a way to do it is a dead end: they would have to go
+          // and find the wallet, top up, come back and retype the domain.
+          if (payErr?.status === 402) setShort(true);
           setErr(errText(payErr?.data, payErr?.message) ||
             "We have your request, but we couldn't take payment from your wallet. "
             + "Top up and order again, or contact support.");
@@ -164,7 +181,17 @@ export default function RequestDomain({ label, variant = "outline", className }:
               We'll reply to <b>{user?.email || "your account email"}</b>. If the exact name is
               already taken we'll come back with the closest alternatives.
             </p>
-            {err && <p className="text-xs text-red-600">{err}</p>}
+            {err && (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2.5">
+                <p className="text-xs leading-relaxed text-red-600">{err}</p>
+                {short && (
+                  <button type="button" onClick={addFunds} disabled={busy}
+                    className="mt-2 rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60">
+                    {busy ? "Opening…" : "Add funds to your wallet"}
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={close} disabled={busy}>Cancel</Button>
               <Button type="submit" disabled={busy || !host.trim()}>
