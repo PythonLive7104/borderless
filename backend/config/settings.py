@@ -269,6 +269,12 @@ PRIVATE_DOMAIN_PRICE = int(os.getenv("PRIVATE_DOMAIN_PRICE", "10"))
 PRIVATE_DOMAIN_PERIOD_DAYS = int(os.getenv("PRIVATE_DOMAIN_PERIOD_DAYS", "30"))
 BACHS_PRODUCT_PRIVATE_DOMAIN = os.getenv("BACHS_PRODUCT_PRIVATE_DOMAIN", "")
 
+# Wallet top-ups: one "pay what you want" Bachs product, so the customer
+# chooses the amount at checkout and we credit whatever Bachs says they
+# actually paid. Blank disables top-ups rather than offering a button that
+# takes money nothing can credit.
+BACHS_PRODUCT_WALLET_TOPUP = os.getenv("BACHS_WALLET_ID", "")
+
 BACHS_PRODUCTS_YEARLY = {
     "basic": os.getenv("BACHS_PRODUCT_BASIC_YEARLY", ""),
     "plus": os.getenv("BACHS_PRODUCT_PLUS_YEARLY", ""),

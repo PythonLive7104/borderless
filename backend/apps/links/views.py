@@ -448,3 +448,90 @@ class TLSAllowedView(views.APIView):
         ok = bool(host) and ShortDomain.objects.filter(
             host=host, byod=True, active=True, verified_at__isnull=False).exists()
         return Response(status=200 if ok else 404)
+
+
+class PrivateDomainWalletView(views.APIView):
+    """POST {organization, domain?|renew_domain?|requested_host?} — pay from the wallet.
+
+    The same purchase as PrivateDomainCheckoutView, settled from the customer's
+    balance instead of a card. Three shapes:
+
+      domain          buy a specific one from stock
+      renew_domain    extend one they already own
+      requested_host  ORDER a host we do not have yet
+
+    That last one is the point of this endpoint. A "preferred domain" used to be
+    a contact-form email: we sourced the name, then asked for money, and people
+    walked. Now it is an order — paid before we spend anything, delivered
+    automatically by the existing paid-but-no-stock backlog once the host
+    exists, and refunded in full if we cannot get it.
+    """
+    permission_classes = [IsAuthenticated, HasWorkspaceAccess]
+
+    def post(self, request):
+        from apps.billing.models import link_shortener_enabled
+        from apps.organizations.models import OrganizationMember
+        from apps.referrals.models import CreditEntry
+        from apps.referrals.service import RedeemError, debit
+        from .customdomains import valid_host
+        from .models import PrivateDomainPurchase, ShortDomain
+        from .purchases import mark_paid
+
+        org_id = request.data.get("organization")
+        m = OrganizationMember.objects.filter(organization_id=org_id, user=request.user).first()
+        if not m or not m.can_manage:
+            return Response({"detail": "Only Owners and Admins can buy a domain."}, status=403)
+        if not link_shortener_enabled(org_id):
+            return Response({"detail": "A private domain is an add-on to a paid plan. "
+                                       "Start a plan first."}, status=403)
+
+        renew_domain = None
+        if renew_id := request.data.get("renew_domain"):
+            renew_domain = ShortDomain.private_for(org_id).filter(pk=renew_id).first()
+            if not renew_domain:
+                return Response({"detail": "That domain isn't one of yours to renew."}, status=400)
+
+        requested_domain = None
+        if (requested_id := request.data.get("domain")) and not renew_domain:
+            requested_domain = ShortDomain.private_stock().filter(pk=requested_id).first()
+            if not requested_domain:
+                return Response(
+                    {"detail": "That domain is no longer available. Pick another."}, status=400)
+
+        requested_host = ""
+        if not renew_domain and not requested_domain:
+            requested_host = str(request.data.get("requested_host", "")).strip().lower()
+            requested_host = requested_host.replace("https://", "").replace("http://", "").split("/")[0]
+            if requested_host and not valid_host(requested_host):
+                return Response({"detail": "That doesn't look like a valid domain "
+                                           "(e.g. go-acme.com)."}, status=400)
+            if requested_host and ShortDomain.objects.filter(host=requested_host).exists():
+                return Response({"detail": "That domain is already on the platform. "
+                                           "Pick it from the list instead."}, status=409)
+
+        price = int(getattr(settings, "PRIVATE_DOMAIN_PRICE", 25))
+
+        # Money first. The purchase row is only created once the balance has
+        # actually moved, so a failed debit cannot leave an order looking paid.
+        label = requested_host or (renew_domain.host if renew_domain else "private domain")
+        try:
+            entry = debit(request.user, price * 100,
+                          kind=CreditEntry.Kind.SPENT,
+                          note=f"Private domain: {label}"[:200])
+        except RedeemError as exc:
+            return Response({"detail": str(exc)}, status=402)
+
+        purchase = PrivateDomainPurchase.objects.create(
+            organization_id=org_id, user=request.user, amount=price,
+            renew_domain=renew_domain, requested_domain=requested_domain,
+            requested_host=requested_host,
+            note=f"Paid from wallet (entry {entry.id})"[:200])
+
+        domain = mark_paid(purchase)
+        purchase.refresh_from_db()
+        return Response({
+            "paid": True,
+            "host": domain.host if domain else "",
+            "awaiting_stock": domain is None,
+            "requested_host": requested_host,
+        }, status=201)

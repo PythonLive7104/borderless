@@ -178,6 +178,47 @@ PAID_STATES = {"paid", "succeeded", "success", "completed", "complete", "settled
 UNPAID_STATES = {"failed", "cancelled", "canceled", "expired", "refunded", "chargeback"}
 
 
+def amount_cents(data) -> int | None:
+    """How much was actually paid, in cents, or None if we cannot tell.
+
+    Only the wallet needs this. Every other purchase is a fixed-price product,
+    so the amount is known before the customer pays; a wallet top-up is "pay
+    what you want", and crediting an amount WE chose rather than the one they
+    paid is the one bug in this feature that silently loses or invents money.
+
+    Bachs's field name is not documented to us, so the plausible paths are
+    tried in order, the same defensive approach as session_is_paid(). Returning
+    None rather than guessing is deliberate: the caller refuses to credit and
+    raises an alert, which is recoverable. Crediting the wrong number is not.
+    """
+    if not isinstance(data, dict):
+        return None
+    node = data.get("data") if isinstance(data.get("data"), dict) else data
+
+    # Minor units first — if Bachs reports cents, that is exact and needs no
+    # float arithmetic anywhere near a balance.
+    for key in ("amount_cents", "amount_total", "total_cents", "amount_in_cents"):
+        v = node.get(key)
+        if isinstance(v, int) and v > 0:
+            return v
+
+    # Then major units, which may arrive as a number or as "20.00".
+    for key in ("amount", "total", "price", "amount_paid", "paid_amount", "subtotal"):
+        v = node.get(key)
+        if isinstance(v, dict):                      # {"amount": "20.00", ...}
+            v = v.get("amount") or v.get("value")
+        if isinstance(v, (int, float)) and v > 0:
+            return int(round(float(v) * 100))
+        if isinstance(v, str):
+            try:
+                f = float(v.replace(",", "").strip().lstrip("$"))
+            except ValueError:
+                continue
+            if f > 0:
+                return int(round(f * 100))
+    return None
+
+
 def session_is_paid(data) -> bool:
     """Whether a retrieved session represents a completed payment.
 

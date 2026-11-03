@@ -524,6 +524,28 @@ class BachsWebhookView(views.APIView):
                             "(purchase_id=%r session=%r)", meta.get("purchase_id"), session_id)
             return Response({"received": True})
 
+        # A wallet top-up is neither a plan nor a domain. Without this branch it
+        # would fall through to the subscription logic, activate nothing, and
+        # leave the customer with money taken and no balance.
+        if (meta.get("kind") or "") == "wallet_topup":
+            from apps.referrals.models import WalletTopup
+            from apps.referrals.service import complete_topup
+            topup = None
+            if meta.get("topup_id"):
+                topup = WalletTopup.objects.filter(pk=meta["topup_id"]).first()
+            if not topup and session_id:
+                topup = WalletTopup.objects.filter(bachs_session_id=session_id).first()
+            if topup:
+                # The event itself carries the amount; no need to re-fetch.
+                entry = complete_topup(topup, event)
+                log.info("bachs webhook: wallet topup user=%s credited=%s",
+                         topup.user_id, bool(entry))
+            else:
+                log.error("bachs webhook: wallet topup with NO MATCHING ROW "
+                          "(topup_id=%r session=%r) — money taken, nothing credited",
+                          meta.get("topup_id"), session_id)
+            return Response({"received": True})
+
         # Find the subscription: prefer our metadata org id, else the checkout
         # session id we saved. Find the plan: metadata, else the pending plan.
         sub = _get_subscription(meta["organization_id"]) if meta.get("organization_id") else None

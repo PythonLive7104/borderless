@@ -172,3 +172,135 @@ class WalletTest(TestCase):
     def test_codes_are_unique(self):
         codes = {wallet_for(make_user(f"u{i}@example.com")).code for i in range(25)}
         self.assertEqual(len(codes), 25)
+
+
+class MoneyPrimitivesTest(TestCase):
+    """credit / debit / refund. The locking discipline lives here, so the
+    guarantees are pinned here rather than inferred from the call sites."""
+
+    def setUp(self):
+        from apps.referrals.service import credit
+        self.u = make_user("money@example.com")
+        self.credit = credit
+
+    def test_credit_adds_to_the_balance(self):
+        self.credit(self.u, 2500, kind=CreditEntry.Kind.TOPUP)
+        self.assertEqual(wallet_for(self.u).balance_cents, 2500)
+
+    def test_credit_is_idempotent_on_source_ref(self):
+        """The webhook and the settle-on-return poll both fire, by design."""
+        ref = "bachs:topup:sess_1"
+        first = self.credit(self.u, 2500, kind=CreditEntry.Kind.TOPUP, source_ref=ref)
+        second = self.credit(self.u, 2500, kind=CreditEntry.Kind.TOPUP, source_ref=ref)
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(wallet_for(self.u).balance_cents, 2500)
+
+    def test_credit_without_a_ref_is_not_deduplicated(self):
+        """Two genuine manual adjustments must both land."""
+        self.credit(self.u, 100, kind=CreditEntry.Kind.ADJUSTMENT)
+        self.credit(self.u, 100, kind=CreditEntry.Kind.ADJUSTMENT)
+        self.assertEqual(wallet_for(self.u).balance_cents, 200)
+
+    def test_debit_takes_the_money(self):
+        from apps.referrals.service import debit
+        self.credit(self.u, 5000, kind=CreditEntry.Kind.TOPUP)
+        debit(self.u, 2500, kind=CreditEntry.Kind.SPENT, note="domain")
+        self.assertEqual(wallet_for(self.u).balance_cents, 2500)
+
+    def test_debit_refuses_to_overdraw(self):
+        from apps.referrals.service import debit
+        self.credit(self.u, 1000, kind=CreditEntry.Kind.TOPUP)
+        with self.assertRaises(RedeemError):
+            debit(self.u, 2500, kind=CreditEntry.Kind.SPENT)
+        self.assertEqual(wallet_for(self.u).balance_cents, 1000)
+
+    def test_a_refused_debit_writes_no_ledger_entry(self):
+        """A balance that disagrees with its ledger is unauditable."""
+        from apps.referrals.service import debit
+        self.credit(self.u, 1000, kind=CreditEntry.Kind.TOPUP)
+        before = CreditEntry.objects.count()
+        with self.assertRaises(RedeemError):
+            debit(self.u, 2500, kind=CreditEntry.Kind.SPENT)
+        self.assertEqual(CreditEntry.objects.count(), before)
+
+    def test_the_ledger_always_sums_to_the_balance(self):
+        from django.db.models import Sum
+        from apps.referrals.service import debit, refund
+        self.credit(self.u, 5000, kind=CreditEntry.Kind.TOPUP)
+        debit(self.u, 1500, kind=CreditEntry.Kind.SPENT)
+        refund(self.u, 1500, note="could not source it")
+        debit(self.u, 2000, kind=CreditEntry.Kind.SPENT)
+        w = wallet_for(self.u)
+        total = CreditEntry.objects.filter(wallet=w).aggregate(s=Sum("amount_cents"))["s"]
+        self.assertEqual(total, w.balance_cents)
+        self.assertEqual(w.balance_cents, 3000)
+
+    def test_zero_and_negative_amounts_are_rejected(self):
+        from apps.referrals.service import debit
+        for bad in (0, -100):
+            with self.assertRaises(ValueError):
+                self.credit(self.u, bad, kind=CreditEntry.Kind.TOPUP)
+            with self.assertRaises(ValueError):
+                debit(self.u, bad, kind=CreditEntry.Kind.SPENT)
+
+
+class AmountExtractionTest(TestCase):
+    """Reading the paid amount out of whatever shape Bachs sends.
+
+    This is the one place in the wallet where a wrong answer silently loses or
+    invents money, so the accepted shapes are pinned and the unreadable case is
+    required to return None rather than a guess.
+    """
+
+    def test_reads_minor_units_exactly(self):
+        from apps.billing.bachs import amount_cents
+        self.assertEqual(amount_cents({"amount_cents": 2500}), 2500)
+        self.assertEqual(amount_cents({"data": {"amount_total": 1999}}), 1999)
+
+    def test_reads_major_units_as_number_or_string(self):
+        from apps.billing.bachs import amount_cents
+        self.assertEqual(amount_cents({"amount": 20}), 2000)
+        self.assertEqual(amount_cents({"amount": 20.5}), 2050)
+        self.assertEqual(amount_cents({"total": "20.00"}), 2000)
+        self.assertEqual(amount_cents({"amount": "$1,250.50"}), 125050)
+        self.assertEqual(amount_cents({"amount": {"amount": "35.00"}}), 3500)
+
+    def test_unreadable_returns_none_rather_than_guessing(self):
+        from apps.billing.bachs import amount_cents
+        for payload in ({}, None, "nope", {"status": "paid"},
+                        {"amount": 0}, {"amount": "free"}, {"amount": -5}):
+            self.assertIsNone(amount_cents(payload), payload)
+
+
+class CompleteTopupTest(TestCase):
+    def setUp(self):
+        from apps.referrals.models import WalletTopup
+        self.u = make_user("topup@example.com")
+        self.topup = WalletTopup.objects.create(user=self.u, bachs_session_id="sess_9")
+        self.WalletTopup = WalletTopup
+
+    def test_credits_the_amount_bachs_reports(self):
+        from apps.referrals.service import complete_topup
+        complete_topup(self.topup, {"amount": "40.00"})
+        self.topup.refresh_from_db()
+        self.assertEqual(self.topup.status, self.WalletTopup.Status.CREDITED)
+        self.assertEqual(self.topup.amount_cents, 4000)
+        self.assertEqual(wallet_for(self.u).balance_cents, 4000)
+
+    def test_an_unreadable_amount_credits_nothing(self):
+        """Money taken with no balance added must fail loudly, not quietly —
+        and must never be papered over with an assumed figure."""
+        from apps.referrals.service import complete_topup
+        self.assertIsNone(complete_topup(self.topup, {"status": "paid"}))
+        self.topup.refresh_from_db()
+        self.assertEqual(self.topup.status, self.WalletTopup.Status.PENDING)
+        self.assertEqual(wallet_for(self.u).balance_cents, 0)
+
+    def test_the_webhook_and_the_poll_cannot_both_credit(self):
+        from apps.referrals.service import complete_topup
+        payload = {"amount": "40.00"}
+        complete_topup(self.topup, payload)
+        self.topup.refresh_from_db()
+        self.assertIsNone(complete_topup(self.topup, payload))
+        self.assertEqual(wallet_for(self.u).balance_cents, 4000)

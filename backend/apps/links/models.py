@@ -384,6 +384,15 @@ class PrivateDomainPurchase(models.Model):
     # rather than failing a sale that has already been paid for.
     requested_domain = models.ForeignKey(ShortDomain, on_delete=models.SET_NULL, null=True,
                                          blank=True, related_name="requested_by")
+    # A host the customer asked us to go and register for them, when nothing in
+    # stock suited. Requests used to be a contact-form email with no record and
+    # no obligation: we would source the domain and then ask for money, and
+    # people walked. Holding it here makes a request an ORDER — paid up front,
+    # refundable if we cannot source it — and means the existing
+    # paid-but-no-stock backlog delivers it automatically once it exists.
+    requested_host = models.CharField(
+        max_length=253, blank=True, default="",
+        help_text="A domain the customer asked us to register, if not from stock.")
     note = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)

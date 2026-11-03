@@ -92,6 +92,15 @@ def assign_domain(purchase: PrivateDomainPurchase) -> ShortDomain | None:
     domain = None
     if p.requested_domain_id:
         domain = stock.filter(pk=p.requested_domain_id).first()
+    # A host the customer asked us to register, now that it exists in stock.
+    # Matched by name because the row did not exist when they ordered it.
+    if domain is None and p.requested_host:
+        domain = stock.filter(host__iexact=p.requested_host.strip()).first()
+    if domain is None and p.requested_host:
+        # Named a host we have not sourced yet: leave the order in the backlog
+        # rather than handing them a different domain from stock. They asked
+        # and paid for a specific name; substituting one is not fulfilment.
+        return None
     if domain is None:
         domain = stock.order_by("sort", "host").first()
     if not domain:
@@ -212,6 +221,8 @@ def _notify_operator_no_stock(purchase):
         "[action needed] Private domain paid for, no stock",
         f"{purchase.organization.name} paid ${purchase.amount} for a private domain and "
         f"there is none in stock.\n\n"
+        + (f"THEY ASKED FOR THIS EXACT HOST: {purchase.requested_host}\nRegister that one — the order will NOT be filled from stock, because substituting a different name is not what they paid for.\n\n"
+           if purchase.requested_host else "") +
         f"Register one, point its DNS, issue the certificate, add it to SHORT_DOMAINS, run "
         f"sync_short_domains, then mark it as private stock. It will be assigned "
         f"automatically on the next reconcile, or use the admin action.\n\n"

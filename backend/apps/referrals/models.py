@@ -104,6 +104,13 @@ class CreditEntry(models.Model):
         EARNED = "earned", "Earned from a referral"
         REDEEMED = "redeemed", "Redeemed against a plan"
         ADJUSTMENT = "adjustment", "Manual adjustment"
+        # The wallet started as referral credit only. It now also holds money
+        # the customer put in themselves, which is why the kinds below exist:
+        # a balance that mixes "we gave you this" with "you paid us this" has
+        # to be able to say which is which, for refunds and for accounting.
+        TOPUP = "topup", "Added by the customer"
+        SPENT = "spent", "Spent on a domain or add-on"
+        REFUND = "refund", "Refunded to the wallet"
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name="entries")
     amount_cents = models.IntegerField(help_text="Positive = earned, negative = spent.")
@@ -124,6 +131,46 @@ class CreditEntry(models.Model):
 
     def __str__(self):
         return f"{self.wallet_id} {self.amount_cents:+d} ({self.kind})"
+
+
+class WalletTopup(models.Model):
+    """Money the customer is putting into their own wallet.
+
+    Held as its own row for the same reason PrivateDomainPurchase is: the
+    payment and the crediting are separate events, and the webhook is not
+    allowed to be the only path that completes one. The browser also polls on
+    return from checkout, because a webhook that never arrives would otherwise
+    mean money taken and no balance — which is the worst failure this product
+    can have.
+
+    amount_cents is written only once the payment is CONFIRMED, from the amount
+    Bachs reports. It is not set at checkout time: this is a "pay what you
+    want" product, so what we would record then is a guess.
+    """
+    class Status(models.TextChoices):
+        PENDING = "pending", "Awaiting payment"
+        CREDITED = "credited", "Paid and credited"
+        FAILED = "failed", "Payment did not complete"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="wallet_topups")
+    # Which workspace the customer was in when they topped up. The balance is
+    # per USER, not per workspace, but support questions arrive as "my team's
+    # wallet", so the context is worth keeping.
+    organization = models.ForeignKey("organizations.Organization", on_delete=models.SET_NULL,
+                                     null=True, blank=True, related_name="wallet_topups")
+    bachs_session_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    amount_cents = models.IntegerField(default=0, help_text="Confirmed amount; 0 until paid.")
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING,
+                              db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    credited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user_id} +${self.amount_cents / 100:.2f} ({self.status})"
 
 
 def wallet_for(user) -> Wallet:
