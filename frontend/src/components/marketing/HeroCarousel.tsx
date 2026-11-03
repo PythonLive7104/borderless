@@ -41,7 +41,10 @@ export default function HeroCarousel({ slides, interval = 5500 }: { slides: Slid
       <div className="mt-7 flex gap-2">
         {slides.map((_, n) => (
           <button key={n} aria-label={`Slide ${n + 1}`} onClick={() => go(n)}
-            className={`h-1.5 rounded-full transition-all ${n === i ? "w-8 bg-white" : "w-4 bg-white/30 hover:bg-white/50"}`} />
+            /* Literal white, not bg-white: that token is the card surface in
+               dark theme, which made the active dot near-black against a hero
+               band that is dark in both themes. */
+            className={`h-1.5 rounded-full transition-all ${n === i ? "w-8 bg-[#ffffff]" : "w-4 bg-[#ffffff]/30 hover:bg-[#ffffff]/50"}`} />
         ))}
       </div>
     </div>

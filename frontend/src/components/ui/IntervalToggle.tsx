@@ -18,7 +18,10 @@ export default function IntervalToggle({ value, onChange, savings, dark = false 
   dark?: boolean;
 }) {
   const track = dark ? "border-white/20 bg-white/10" : "border-line bg-bg-mute";
-  const on = dark ? "bg-white text-navy-900" : "bg-white text-fg shadow-soft";
+  // dark = sitting on a navy band, which stays navy in BOTH themes, so the
+  // selected pill needs a literal white. Plain bg-white would not do: it is
+  // remapped to the card surface in dark theme (see index.css).
+  const on = dark ? "bg-[#ffffff] text-navy-900" : "bg-white text-fg shadow-soft";
   const off = dark ? "text-slate-300 hover:text-white" : "text-fg-muted hover:text-fg";
   const badge = savings?.[value];
 

@@ -30,7 +30,12 @@ export default function DemoVideo({ className = "" }: { className?: string }) {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)}
-        className={`demo-glow group inline-flex items-center gap-2.5 rounded-full bg-white px-6 py-3 text-base font-semibold text-navy-950 transition hover:bg-slate-100 ${className}`}>
+        /* bg-[#fff], not bg-white. index.css remaps --color-white to the card
+           surface in dark theme (it means "card", not "white", in 119 places),
+           which turned this pill near-black with near-black text on it. The
+           hero band is dark in BOTH themes, so this button has to stay
+           literally white and ignore the theme entirely. */
+        className={`demo-glow group inline-flex items-center gap-2.5 rounded-full bg-[#ffffff] px-6 py-3 text-base font-semibold text-navy-950 transition hover:bg-slate-100 ${className}`}>
         {/* A filled play disc rather than a bare triangle: at this size the
             triangle alone reads as a decorative chevron, and the point of the
             button is that something will actually play. */}
