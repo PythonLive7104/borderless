@@ -179,6 +179,16 @@ export const referralApi = {
   redeem: (orgId: number, plan: string, interval: BillingInterval, signal?: AbortSignal) =>
     http.post<Subscription & { paid_with_credit: boolean }>(
       "/billing/redeem/", { organization: orgId, plan, interval }, true, signal),
+  /** Start a top-up. The AMOUNT is chosen on Bachs's own checkout page, because
+   *  the product is "pay what you want" — we never assume a figure, and only
+   *  the one Bachs confirms reaches the balance. */
+  topup: (orgId?: number) =>
+    http.post<{ checkout_url: string }>("/referrals/topup/", { organization: orgId ?? null }),
+  /** Settle on return from checkout. The webhook cannot be the only path: one
+   *  that never arrives would mean money taken and no balance. */
+  topupVerify: () =>
+    http.post<{ paid: boolean; amount_cents: number; balance_cents: number }>(
+      "/referrals/topup/verify/", {}),
 };
 
 // ---- testimonials ----
@@ -334,6 +344,13 @@ export const linkApi = {
   create: (p: { organization: number; destination_url: string; title?: string; slug?: string; domain?: number | null; bot_action?: BotAction; website?: number | null }) =>
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
+  /** Buy, renew or ORDER a private domain from the wallet balance.
+   *  `requested_host` orders a name we do not stock yet — paid up front, which
+   *  is the whole point: requests used to be an email and people walked. */
+  privateDomainFromWallet: (orgId: number, opts: {
+    domain?: number; renew_domain?: number; requested_host?: string;
+  }) => http.post<{ paid: boolean; host: string; awaiting_stock: boolean; requested_host: string }>(
+    "/links/private-domain/wallet/", { organization: orgId, ...opts }),
   remove: (id: number) => http.del(`/links/${id}/`),
   buyPrivateDomain: (orgId: number, renewDomain?: number, domain?: number) =>
     http.post<{ checkout_url?: string; activated?: boolean }>("/links/private-domain/checkout/",

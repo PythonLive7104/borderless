@@ -2,7 +2,7 @@ import { useState } from "react";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Field from "../auth/Field";
-import { contactApi, errText } from "../../lib/api";
+import { contactApi, errText, linkApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
 
@@ -77,6 +77,29 @@ export default function RequestDomain({ label, variant = "outline", className }:
           `Note: ${note.trim() || "—"}\n`,
       });
       if (!res.ok) throw new Error(res.error || "");
+
+      // Take the money NOW, from the wallet.
+      //
+      // This used to end here: an email to the team, and the page promised
+      // "nothing is charged until it's live in your account". We would source
+      // the domain, then ask for payment, and people walked — leaving us out of
+      // pocket for a registration nobody wanted to pay for. A request is now an
+      // order: paid before we spend anything, refunded in full if we cannot get
+      // the name. The email still goes, because a human has to go and register
+      // it; the order is what makes that work worth doing.
+      if (current?.id) {
+        try {
+          await linkApi.privateDomainFromWallet(current.id, { requested_host: wanted });
+        } catch (payErr: any) {
+          // 402 = not enough in the wallet. The team has the request either
+          // way, so say what is missing rather than pretending it failed.
+          setErr(errText(payErr?.data, payErr?.message) ||
+            "We have your request, but we couldn't take payment from your wallet. "
+            + "Top up and order again, or contact support.");
+          setBusy(false);
+          return;
+        }
+      }
       setSent(true);
     } catch (e: any) {
       // Never show "sent" on a failure: this screen promises a reply on a
@@ -115,7 +138,8 @@ export default function RequestDomain({ label, variant = "outline", className }:
             <p className="text-sm text-fg-muted">
               Not seeing one you like? Tell us the domain you want for your redirects and we'll
               register it for you — normally in <b>under {SOURCING_HOURS} hours</b>, at the same
-              price as the ones in stock. Nothing is charged until it's live in your account.
+              price as the ones in stock. We take the cost from your wallet now and
+              <b> refund it in full</b> if we can't get that exact name.
             </p>
             <Field
               label="Domain you want"

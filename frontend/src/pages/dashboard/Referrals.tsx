@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { referralApi, type CreditEntryRow, type ReferralSummary } from "../../lib/api";
 import PageNote from "../../components/dashboard/PageNote";
 import Button from "../../components/ui/Button";
+import { useDialog } from "../../context/DialogContext";
 
 const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
@@ -21,6 +22,8 @@ export default function Referrals() {
   const [showLedger, setShowLedger] = useState(false);
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
+  const [topping, setTopping] = useState(false);
+  const { notify } = useDialog();
 
   useEffect(() => {
     let live = true;
@@ -34,6 +37,40 @@ export default function Referrals() {
     if (!showLedger || ledger.length) return;
     referralApi.ledger().then(setLedger).catch(() => { /* non-critical */ });
   }, [showLedger, ledger.length]);
+
+  // Returning from a top-up: ask the server to confirm with Bachs rather than
+  // waiting on the webhook, which may be rejected or never arrive. Money taken
+  // with no balance added is the worst outcome this feature has.
+  useEffect(() => {
+    if (!window.location.search.includes("topup=success")) return;
+    let tries = 0;
+    const iv = setInterval(async () => {
+      tries++;
+      try {
+        const r = await referralApi.topupVerify();
+        if (r.paid) {
+          clearInterval(iv);
+          window.history.replaceState({}, "", "/dashboard/referrals");
+          setData((d) => (d ? { ...d, balance_cents: r.balance_cents } : d));
+          setLedger([]);
+          notify(`${usd(r.amount_cents)} added to your wallet.`);
+        }
+      } catch { /* keep trying */ }
+      if (tries >= 10) clearInterval(iv);
+    }, 2000);
+    return () => clearInterval(iv);
+  }, []);
+
+  async function topUp() {
+    setTopping(true);
+    try {
+      const r = await referralApi.topup();
+      window.location.href = r.checkout_url;
+    } catch (e: any) {
+      notify(e?.data?.detail || "Could not start the top-up.", "danger");
+      setTopping(false);
+    }
+  }
 
   if (err) return <div className="card shadow-soft p-6 text-sm text-red-600">{err}</div>;
   if (!data) return <div className="card shadow-soft p-6 text-sm text-fg-muted">Loading…</div>;
@@ -94,12 +131,24 @@ export default function Referrals() {
           <div className="mt-1 text-xs text-fg-dim">
             {usd(data.earned_cents)} earned in total
           </div>
-          {data.balance_cents > 0 && (
-            <Link to="/dashboard/billing"
-              className="mt-4 inline-block text-sm font-semibold text-brand hover:underline">
-              Use it on a plan →
-            </Link>
-          )}
+          {/* The balance started as referral credit only. It is now a wallet:
+              money the customer puts in sits beside what they earned, and both
+              spend the same way — on a plan, or on a private domain. */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button onClick={topUp} disabled={topping}>
+              {topping ? "Opening…" : "Add funds"}
+            </Button>
+            {data.balance_cents > 0 && (
+              <Link to="/dashboard/billing"
+                className="text-sm font-semibold text-brand hover:underline">
+                Use it on a plan →
+              </Link>
+            )}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-fg-dim">
+            Top up any amount from $10. Your balance pays for plans, renewals and
+            private domains — including ones you ask us to register for you.
+          </p>
         </div>
 
         <div className="card shadow-soft p-6 lg:col-span-2">
