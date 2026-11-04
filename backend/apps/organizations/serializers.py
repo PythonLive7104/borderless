@@ -9,7 +9,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
         fields = ["id", "name", "slug", "role", "member_count", "link_scan_optout", "created_at"]
-        read_only_fields = ["slug", "created_at"]
+        read_only_fields = ["slug", "link_scan_optout", "created_at"]
 
     def get_role(self, obj):
         m = getattr(obj, "_member", None)
@@ -17,6 +17,13 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     def get_member_count(self, obj):
         return obj.members.count()
+
+    def validate(self, attrs):
+        if "link_scan_optout" in self.initial_data:
+            raise serializers.ValidationError({"link_scan_optout": (
+                "Workspace-wide scan overrides are no longer available. Verify destination "
+                "domains and use the fresh safety recheck for flagged redirects.")})
+        return attrs
 
 
 class MemberSerializer(serializers.ModelSerializer):

@@ -59,17 +59,19 @@ def _vt_min() -> int:
     """How many VirusTotal engines must agree before we call a URL unsafe."""
     from django.conf import settings
     try:
-        return max(1, int(getattr(settings, "THREATSCAN_VT_MIN_DETECTIONS", 3)))
+        return max(1, int(getattr(settings, "THREATSCAN_VT_MIN_DETECTIONS", 5)))
     except (TypeError, ValueError):
-        return 3
+        return 5
 
 
 def scan_url(url: str) -> dict:
-    """Scan a URL. Returns {safe, flagged_by, threats, checked}. Never raises."""
+    """Scan a URL and report whether every configured scanner completed."""
     if not url or not is_enabled():
-        return {"safe": None, "flagged_by": [], "threats": [], "checked": False}
+        return {"safe": None, "flagged_by": [], "threats": [],
+                "checked": False, "complete": False}
     flagged_by = []
     threats = []
+    complete = True
     if _sb_key():
         try:
             t = _safe_browsing(url)
@@ -77,7 +79,7 @@ def scan_url(url: str) -> dict:
                 flagged_by.append("google_safe_browsing")
                 threats.extend(t)
         except Exception:
-            pass
+            complete = False
     if _vt_key():
         try:
             hits = _vt_scan(url)
@@ -91,12 +93,14 @@ def scan_url(url: str) -> dict:
                 flagged_by.append("virustotal")
                 threats.append(f"virustotal:{hits}_engines")
         except Exception:
-            pass
+            complete = False
+    safe = False if flagged_by else (True if complete else None)
     return {
-        "safe": len(flagged_by) == 0,
+        "safe": safe,
         "flagged_by": flagged_by,
         "threats": threats,
         "checked": True,
+        "complete": complete,
     }
 
 

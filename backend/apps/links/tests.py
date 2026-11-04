@@ -1250,8 +1250,7 @@ class DefangTest(TestCase):
 
 
 class ScanOptoutPolicyTest(TestCase):
-    """The safety opt-out: flagged links stay live when a workspace opts out —
-    except a Google Safe Browsing hit, which always disables, on any domain."""
+    """Legacy opt-out fields cannot bypass active scanner findings."""
 
     def setUp(self):
         self.org = _workspace("scan@optout.example")
@@ -1278,32 +1277,22 @@ class ScanOptoutPolicyTest(TestCase):
         self.assertTrue(self._apply(link, ["virustotal"]))
         self.assertTrue(self._apply(link, ["google_safe_browsing"]))
 
-    def test_optout_keeps_vt_flags_live_on_shared(self):
+    def test_legacy_optout_does_not_override_vt_flags_on_shared(self):
         self.org.link_scan_optout = True; self.org.save()
         link = self._link(self._domain(shared=True))
-        self.assertFalse(self._apply(link, ["virustotal"]))
+        self.assertTrue(self._apply(link, ["virustotal"]))
 
     def test_optout_cannot_lift_safe_browsing_on_shared(self):
         self.org.link_scan_optout = True; self.org.save()
         link = self._link(self._domain(shared=True))
         self.assertTrue(self._apply(link, ["google_safe_browsing"]))  # floor holds
 
-    def test_optout_applies_to_virustotal_on_private_domain(self):
+    def test_legacy_optout_does_not_override_vt_flags_on_private_domain(self):
         self.org.link_scan_optout = True; self.org.save()
         link = self._link(self._domain(shared=False))
-        # A VirusTotal flag is a second opinion, and on their own domain the
-        # owner is entitled to overrule it.
-        self.assertFalse(self._apply(link, ["virustotal"]))
+        self.assertTrue(self._apply(link, ["virustotal"]))
 
     def test_optout_cannot_lift_safe_browsing_on_a_private_domain_either(self):
-        """The hole that let a phishing link stay live.
-
-        This used to return False: the owner of a private domain could tick the
-        safety opt-out and keep serving a page Google had confirmed as phishing,
-        from our infrastructure, with our bot filtering hiding it from the
-        crawlers that would otherwise catch it. "It is only their own domain's
-        reputation" was never true of phishing.
-        """
         self.org.link_scan_optout = True; self.org.save()
         link = self._link(self._domain(shared=False), scan_optout=True)
         self.assertTrue(self._apply(link, ["google_safe_browsing"]))
@@ -1333,14 +1322,14 @@ class ReevaluateOnOptoutTest(TestCase):
             destination_url="https://dest.example", active=False,
             url_safe=False, url_threats=threats)
 
-    def test_optout_reactivates_a_vt_flagged_private_link(self):
+    def test_legacy_optout_does_not_reactivate_from_a_stored_scan(self):
         from apps.links.sync import reevaluate_workspace_links
         link = self._flagged_link(self._domain(shared=False), ["virustotal:3_engines"])
         self.org.link_scan_optout = True; self.org.save()
         n = reevaluate_workspace_links(self.org)
         link.refresh_from_db()
-        self.assertTrue(link.active)
-        self.assertEqual(n, 1)
+        self.assertFalse(link.active)
+        self.assertEqual(n, 0)
 
     def test_optout_does_not_reactivate_safe_browsing_on_shared(self):
         from apps.links.sync import reevaluate_workspace_links
@@ -1350,21 +1339,20 @@ class ReevaluateOnOptoutTest(TestCase):
         link.refresh_from_db()
         self.assertFalse(link.active)  # floor holds even with opt-out
 
-    def test_patch_endpoint_reactivates(self):
+    def test_workspace_override_is_rejected(self):
         from rest_framework.test import APIClient
         from apps.organizations.models import OrganizationMember
         link = self._flagged_link(self._domain(shared=False), ["virustotal:2_engines"])
         user = OrganizationMember.objects.get(organization=self.org, role="owner").user
         c = APIClient(); c.force_authenticate(user=user)
         r = c.patch(f"/api/organizations/{self.org.id}/", {"link_scan_optout": True}, format="json")
-        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.status_code, 400, r.content)
         link.refresh_from_db()
-        self.assertTrue(link.active)
+        self.assertFalse(link.active)
 
 
 class PerLinkScanOptoutTest(TestCase):
-    """A single link can be kept live despite a flag, without changing the
-    workspace setting — subject to the same shared-domain Safe Browsing floor."""
+    """The compatibility field cannot bypass scanner findings."""
 
     def setUp(self):
         self.org = _workspace("perlink@example.com")
@@ -1381,10 +1369,10 @@ class PerLinkScanOptoutTest(TestCase):
                                         slug=f"s{ShortLink.objects.count()}",
                                         destination_url="https://d.example", **kw)
 
-    def test_per_link_optout_keeps_a_vt_flag_live(self):
+    def test_per_link_optout_does_not_override_a_vt_flag(self):
         from apps.links.sync import _should_disable
         link = self._link(self._domain(shared=True), scan_optout=True)
-        self.assertFalse(_should_disable(link, ["virustotal"]))
+        self.assertTrue(_should_disable(link, ["virustotal"]))
 
     def test_per_link_optout_cannot_lift_safe_browsing_on_shared(self):
         from apps.links.sync import _should_disable
@@ -1662,7 +1650,84 @@ class SafeBrowsingLockTest(TestCase):
         self.link.save(update_fields=["url_threats"])
         from apps.links.serializers import ShortLinkSerializer
         self.assertFalse(ShortLinkSerializer(self.link).data["scan_locked"])
-        self.assertEqual(self._patch({"active": True}).status_code, 200)
+        self.assertEqual(self._patch({"active": True}).status_code, 400)
+
+
+class MakeLiveAnywayTest(TestCase):
+    def setUp(self):
+        self.org = _workspace("make-live@example.com")
+        self.short_domain = _domain()
+        self.link = ShortLink.objects.create(
+            organization=self.org, domain=self.short_domain, slug="flagged1",
+            destination_url="https://landing.brand.example/login",
+            active=False, url_safe=False, url_threats=["virustotal:3_engines"])
+        self.owner_client = APIClient()
+        self.owner_client.force_authenticate(user=self.org.owner)
+
+    def _activate(self, client=None):
+        return (client or self.owner_client).post(
+            f"/api/links/{self.link.id}/make-live-anyway/", {}, format="json")
+
+    def test_any_workspace_member_can_activate_with_one_fresh_clean_scan(self):
+        from apps.organizations.models import OrganizationMember
+        analyst = get_user_model().objects.create_user(
+            username="make-live-analyst", email="make-live-analyst@example.com",
+            password="test-password")
+        OrganizationMember.objects.create(
+            organization=self.org, user=analyst, role="analyst")
+        client = APIClient()
+        client.force_authenticate(user=analyst)
+        clean = {"safe": True, "flagged_by": [], "threats": [],
+                 "checked": True, "complete": True}
+        with patch("apps.intelligence.threatscan.scan_url", return_value=clean) as scan, \
+             patch("apps.links.views.publish_link") as publish:
+            response = self._activate(client)
+        self.assertEqual(response.status_code, 200, response.data)
+        scan.assert_called_once_with(self.link.destination_url)
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.active)
+        self.assertTrue(self.link.url_safe)
+        publish.assert_called_once_with(self.link)
+
+    def test_fresh_threat_finding_keeps_the_redirect_off(self):
+        flagged = {"safe": False, "flagged_by": ["google_safe_browsing"],
+                   "threats": ["SOCIAL_ENGINEERING"], "checked": True,
+                   "complete": True}
+        with patch("apps.intelligence.threatscan.scan_url", return_value=flagged), \
+             patch("apps.links.views.publish_link"):
+            response = self._activate()
+        self.assertEqual(response.status_code, 409)
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.active)
+        self.assertIn("SOCIAL_ENGINEERING", self.link.url_threats)
+
+    def test_incomplete_fresh_scan_never_activates(self):
+        incomplete = {"safe": True, "flagged_by": [], "threats": [],
+                      "checked": True, "complete": False}
+        with patch("apps.intelligence.threatscan.scan_url", return_value=incomplete):
+            with self.assertLogs("django.request", level="ERROR"):
+                response = self._activate()
+        self.assertEqual(response.status_code, 503)
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.active)
+        self.assertFalse(self.link.url_safe)
+
+    def test_destination_change_during_scan_cannot_be_activated(self):
+        clean = {"safe": True, "flagged_by": [], "threats": [],
+                 "checked": True, "complete": True}
+
+        def change_destination(url, **kwargs):
+            ShortLink.objects.filter(pk=self.link.pk).update(
+                destination_url="https://different.example/malware")
+            return clean
+
+        with patch("apps.intelligence.threatscan.scan_url",
+                   side_effect=change_destination):
+            response = self._activate()
+        self.assertEqual(response.status_code, 409)
+        self.link.refresh_from_db()
+        self.assertEqual(self.link.destination_url, "https://different.example/malware")
+        self.assertFalse(self.link.active)
 
 
 class DisabledLinkNoticeTest(TestCase):
@@ -1685,14 +1750,14 @@ class DisabledLinkNoticeTest(TestCase):
         n = Notification.objects.filter(channel__organization=self.org).first()
         self.assertIsNotNone(n)
         self.assertIn("notice.cc/n1", n.title)
-        self.assertIn("cannot be switched back on", n.message)
+        self.assertIn("fresh scan clears it", n.message)
 
     def test_a_reversible_flag_says_how_to_undo_it(self):
         from apps.links.sync import _announce_disabled
         from apps.notifications.models import Notification
         _announce_disabled(self.link, ["virustotal:suspicious"], permanent=False)
         n = Notification.objects.filter(channel__organization=self.org).first()
-        self.assertIn("allow it", n.message)
+        self.assertIn("fresh safety recheck", n.message)
 
     def test_the_system_channel_cannot_be_published_to(self):
         """Its key is generated and discarded, so no request can match the hash."""

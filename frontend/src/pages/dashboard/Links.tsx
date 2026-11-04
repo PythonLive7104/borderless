@@ -343,6 +343,7 @@ export default function Links() {
   const [domains, setDomains] = useState<ShortDomain[]>([]);
   const [priv, setPriv] = useState<PrivateDomains>({ owned: [], available: 0 });
   const [busy, setBusy] = useState(false);
+  const [recheckingId, setRecheckingId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
   const [sites, setSites] = useState<Website[]>([]);
@@ -446,12 +447,19 @@ export default function Links() {
     });
     setOpen(true);
   }
-  async function toggleScanOptout(l: ShortLink) {
+  async function makeLiveAnyway(l: ShortLink) {
+    if (recheckingId === l.id) return;
+    setRecheckingId(l.id);
     try {
-      await linkApi.update(l.id, { scan_optout: !l.scan_optout } as any);
-      notify(l.scan_optout ? "Safety scan back on for this link." : "This link will stay live even if flagged.");
+      const result = await linkApi.makeLiveAnyway(l.id);
+      notify(result.detail);
       load();
-    } catch (e: any) { notify(e?.data?.detail || "Could not change that.", "danger"); }
+    } catch (e: any) {
+      notify(e?.data?.detail || "Could not complete the fresh safety check.", "danger");
+      load();
+    } finally {
+      setRecheckingId(null);
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -630,18 +638,20 @@ export default function Links() {
                   <div className="mt-1 min-w-0 truncate text-xs text-fg-dim">→ {l.destination_url}</div>
                   {l.url_safe === false && (
                     <div className={`mt-1 text-xs ${l.active ? "text-fg-muted" : "text-red-600"}`}>
-                      {/* A Safe Browsing verdict is final, so don't offer a way
-                          out of it. The API refuses the change regardless; a
-                          button that always errors is worse than no button. */}
                       {l.scan_locked
-                        ? `Google flagged this destination as phishing or malware, so this redirect is off and can't be switched back on. Point it at a safe destination and it goes live again after the next scan.`
+                        ? `Google Safe Browsing flagged this destination in the last scan. The fresh safety recheck must clear it before the redirect can go live.`
                         : l.active
-                          ? `We flagged this destination as possibly unsafe — it's live because you allowed it.`
+                          ? `We flagged this destination as possibly unsafe — this link is live from an earlier override.`
                           : `We flagged this destination as possibly unsafe, so it's switched off.`}
-                      {canManage && !l.scan_locked && (
-                        <button onClick={() => toggleScanOptout(l)}
+                      <button onClick={() => makeLiveAnyway(l)}
+                        disabled={recheckingId === l.id}
+                        className="ml-2 font-semibold text-brand underline hover:no-underline">
+                        {recheckingId === l.id ? "Checking…" : l.active ? "Recheck safety" : "Make it live anyway"}
+                      </button>
+                      {canManage && l.active && (
+                        <button onClick={() => toggle(l)}
                           className="ml-2 font-semibold text-brand underline hover:no-underline">
-                          {l.active ? "Turn it off" : "Make it live anyway"}
+                          Turn it off
                         </button>
                       )}
                     </div>

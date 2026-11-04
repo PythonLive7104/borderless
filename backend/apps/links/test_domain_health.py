@@ -53,6 +53,20 @@ class DomainHealthTest(TestCase):
         self.assertEqual(self.d.health, ShortDomain.Health.FLAGGED)
         self.assertIn("google_safe_browsing", self.d.health_detail)
 
+    def test_incomplete_blacklist_scan_is_not_recorded_as_clean(self):
+        with patch("apps.links.management.commands.check_domain_health._resolves",
+                   return_value=(True, "")), \
+             patch("apps.links.management.commands.check_domain_health._serves",
+                   return_value=(True, "HTTP 200")), \
+             patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan.scan_url",
+                   return_value={"safe": None, "flagged_by": [], "threats": [],
+                                 "checked": True, "complete": False}):
+            _run()
+        self.d.refresh_from_db()
+        self.assertEqual(self.d.health, ShortDomain.Health.UNKNOWN)
+        self.assertIn("did not complete", self.d.health_detail)
+
     def test_notify_emails_only_about_unhealthy_domains(self):
         from django.core import mail
         ShortDomain.objects.create(host="fine.cc", active=True, verified_at=timezone.now())

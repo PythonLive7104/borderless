@@ -18,7 +18,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                   "os_mode", "operating_systems", "max_risk", "scan_optout", "clicks", "human_clicks", "bot_clicks", "reviewer_clicks", "url_safe",
                   "url_threats", "url_scanned_at", "short_url", "quality", "scan_locked", "created_at"]
         read_only_fields = ["clicks", "human_clicks", "bot_clicks", "reviewer_clicks", "url_safe", "url_threats",
-                            "url_scanned_at", "created_at"]
+                            "url_scanned_at", "scan_optout", "created_at"]
 
     def get_short_url(self, obj) -> str:
         # A dedicated short domain serves bare-slug links at the root
@@ -35,10 +35,10 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         return round(obj.human_clicks / obj.clicks, 4) if obj.clicks else 0.0
 
     def get_scan_locked(self, obj) -> bool:
-        """True when Google confirmed phishing/malware and this cannot be undone.
+        """True when the most recent scan included a Google threat finding.
 
-        The dashboard uses it to drop the "make it live anyway" control, so the
-        UI stops offering something the API will refuse.
+        The dashboard uses it to explain the finding; activation still requires
+        a fresh scan.
         """
         from .sync import _flagged_by_from_threats
         if obj.url_safe is not False:
@@ -69,32 +69,31 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         return domain
 
     def validate(self, attrs):
+        if "scan_optout" in self.initial_data:
+            raise serializers.ValidationError({"scan_optout": (
+                "Scan overrides are no longer available. Use the fresh safety recheck.")})
         website = attrs.get("website")
         org = attrs.get("organization") or getattr(self.instance, "organization", None)
         if website and org and website.organization_id != org.id:
             raise serializers.ValidationError({"website": "That website isn't in this workspace."})
 
-        # A link Google has confirmed as phishing or malware stays off.
-        #
-        # Enforced here and not only in the UI: hiding the button stops an
-        # honest mistake, it does not stop someone sending the PATCH by hand,
-        # and the whole point is that this particular lock cannot be picked.
-        # Changing the destination is allowed and is the way back — the next
-        # scan re-enables the link if the new destination is clean.
+        # A flagged link cannot be activated with PATCH. Destination changes
+        # remain allowed, but activation must use the fresh safety-recheck path.
+        changing_destination = (
+            self.instance is not None
+            and "destination_url" in attrs
+            and attrs["destination_url"] != self.instance.destination_url
+        )
         if self.instance is not None and self.get_scan_locked(self.instance):
-            changing_destination = (
-                "destination_url" in attrs
-                and attrs["destination_url"] != self.instance.destination_url)
             if not changing_destination:
                 if attrs.get("active") and not self.instance.active:
                     raise serializers.ValidationError({"active": (
-                        "Google Safe Browsing flagged this destination as phishing or "
-                        "malware, so this redirect can't be switched back on. Point it "
-                        "at a safe destination instead.")})
-                if attrs.get("scan_optout") and not self.instance.scan_optout:
-                    raise serializers.ValidationError({"scan_optout": (
-                        "The safety scan can't be skipped for a destination Google has "
-                        "confirmed as phishing or malware.")})
+                        "Google Safe Browsing flagged this destination. Use the fresh "
+                        "safety recheck; activation succeeds only if the finding clears.")})
+        if (self.instance is not None and attrs.get("active") is True
+                and self.instance.url_safe is False):
+            raise serializers.ValidationError({"active": (
+                "Use the fresh safety recheck to activate a flagged redirect.")})
         return attrs
 
     def create(self, validated_data):

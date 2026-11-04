@@ -345,6 +345,8 @@ export const linkApi = {
   create: (p: { organization: number; destination_url: string; title?: string; slug?: string; domain?: number | null; bot_action?: BotAction; website?: number | null }) =>
     http.post<ShortLink>("/links/", p),
   update: (id: number, p: Partial<ShortLink>) => http.patch<ShortLink>(`/links/${id}/`, p),
+  makeLiveAnyway: (id: number) =>
+    http.post<{ active: boolean; detail: string }>(`/links/${id}/make-live-anyway/`, {}),
   /** Buy, renew or ORDER a private domain from the wallet balance.
    *  `requested_host` orders a name we do not stock yet — paid up front, which
    *  is the whole point: requests used to be an email and people walked. */

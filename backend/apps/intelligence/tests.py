@@ -53,7 +53,7 @@ class VirusTotalThresholdTest(TestCase):
     """One VirusTotal engine out of ~90 is usually a false positive. Disabling a
     customer's live link on that costs them real traffic."""
 
-    def _scan(self, vt_hits, sb_threats=None, minimum=3):
+    def _scan(self, vt_hits, sb_threats=None, minimum=5):
         from unittest.mock import patch
         from django.test import override_settings
         with override_settings(THREATSCAN_VT_MIN_DETECTIONS=minimum), \
@@ -67,11 +67,11 @@ class VirusTotalThresholdTest(TestCase):
     def test_a_single_detection_no_longer_disables(self):
         self.assertTrue(self._scan(1)["safe"])
 
-    def test_two_is_still_below_the_default_bar(self):
-        self.assertTrue(self._scan(2)["safe"])
+    def test_four_detections_are_below_the_default_bar(self):
+        self.assertTrue(self._scan(4)["safe"])
 
-    def test_corroborated_detections_are_unsafe(self):
-        r = self._scan(3)
+    def test_five_detections_are_unsafe(self):
+        r = self._scan(5)
         self.assertFalse(r["safe"])
         self.assertIn("virustotal", r["flagged_by"])
 
@@ -82,6 +82,24 @@ class VirusTotalThresholdTest(TestCase):
 
     def test_the_bar_is_configurable(self):
         self.assertFalse(self._scan(1, minimum=1)["safe"])
+
+    def test_google_safe_browsing_is_not_affected_by_vt_threshold(self):
+        result = self._scan(0, sb_threats=["SOCIAL_ENGINEERING"])
+        self.assertFalse(result["safe"])
+        self.assertIn("google_safe_browsing", result["flagged_by"])
+
+    def test_failed_scanners_do_not_pass_a_fresh_check(self):
+        from unittest.mock import patch
+        with patch("apps.intelligence.threatscan.is_enabled", return_value=True), \
+             patch("apps.intelligence.threatscan._sb_key", return_value="k"), \
+             patch("apps.intelligence.threatscan._vt_key", return_value="k"), \
+             patch("apps.intelligence.threatscan._safe_browsing",
+                   side_effect=RuntimeError("scanner unavailable")), \
+             patch("apps.intelligence.threatscan._vt_scan",
+                   side_effect=RuntimeError("scanner unavailable")):
+            result = run_scan("https://example.test/x")
+        self.assertIsNone(result["safe"])
+        self.assertFalse(result["complete"])
 
 
 class JA4BlocklistTest(TestCase):

@@ -1,5 +1,7 @@
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import permissions, viewsets, views
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
@@ -20,7 +22,8 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
         return OrganizationMember.objects.filter(user=self.request.user).values_list("organization_id", flat=True)
 
     def get_queryset(self):
-        qs = ShortLink.objects.filter(organization_id__in=self._member_org_ids()).select_related("website")
+        qs = ShortLink.objects.filter(organization_id__in=self._member_org_ids()).select_related(
+            "website", "organization")
         org = self.request.query_params.get("organization")
         return qs.filter(organization_id=org) if org else qs
 
@@ -124,6 +127,63 @@ class ShortLinkViewSet(viewsets.ModelViewSet):
             unpublish_link(old_slug, old_host)
         scan_and_flag(link)
         publish_link(link)
+
+    @action(detail=True, methods=["post"], url_path="make-live-anyway")
+    def make_live_anyway(self, request, pk=None):
+        link = self.get_object()
+        if link.url_safe is not False:
+            return Response(
+                {"detail": "This redirect is not currently flagged. Refresh the link list and try again."},
+                status=409)
+
+        from apps.intelligence.threatscan import scan_url
+        scanned_destination_url = link.destination_url
+        scanned_decoy_url = link.decoy_url
+        destination_scan = scan_url(scanned_destination_url)
+        scans = [destination_scan]
+        if scanned_decoy_url:
+            scans.append(scan_url(scanned_decoy_url))
+        threats = []
+        for result in scans:
+            threats.extend(result.get("threats", []) or [])
+        if any(result.get("safe") is False for result in scans):
+            updated = ShortLink.objects.filter(
+                pk=link.pk, destination_url=scanned_destination_url,
+                decoy_url=scanned_decoy_url,
+            ).update(
+                url_safe=False, url_threats=threats, url_scanned_at=timezone.now(),
+                active=False)
+            if not updated:
+                return Response(
+                    {"detail": "The redirect destination changed during the safety scan. "
+                               "Refresh and recheck it."},
+                    status=409)
+            link.refresh_from_db()
+            publish_link(link)
+            return Response(
+                {"detail": "The fresh safety scan still flags this destination. "
+                           "The redirect remains off."},
+                status=409)
+        if any(not result.get("checked") or not result.get("complete")
+               or result.get("safe") is not True for result in scans):
+            return Response(
+                {"detail": "A fresh safety scan couldn't return a complete verdict. "
+                           "This redirect remains off; please try again shortly."},
+                status=503)
+
+        updated = ShortLink.objects.filter(
+            pk=link.pk, destination_url=scanned_destination_url,
+            decoy_url=scanned_decoy_url,
+        ).update(
+            url_safe=True, url_threats=[], url_scanned_at=timezone.now(), active=True)
+        if not updated:
+            return Response(
+                {"detail": "The redirect destination changed during the safety scan. "
+                           "Refresh and recheck it."},
+                status=409)
+        link.refresh_from_db()
+        publish_link(link)
+        return Response({"active": True, "detail": "Fresh safety scan passed; redirect is live."})
 
     def perform_destroy(self, instance):
         self._require_manager(instance.organization_id)

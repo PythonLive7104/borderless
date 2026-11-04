@@ -108,7 +108,7 @@ def unpublish_link(slug: str, host: str = ""):
 
 
 def scan_and_flag(link):
-    """Scan the destination for malware/phishing; auto-disable if unsafe."""
+    """Scan the destination and auto-disable findings at its applicable threshold."""
     from apps.intelligence.threatscan import scan_url, is_enabled
     if not is_enabled() or not link.destination_url:
         return
@@ -119,17 +119,22 @@ def scan_and_flag(link):
     threats = list(result.get("threats", []) or [])
     flagged_by = list(result.get("flagged_by", []) or [])
     safe = result.get("safe")
+    if result.get("complete") is False and not flagged_by:
+        return
     # A custom decoy is a second destination the link can serve, so it gets the
     # same scrutiny — otherwise it's an unscanned way to deliver a payload.
     if link.decoy_url:
         try:
             decoy = scan_url(link.decoy_url)
+            decoy_flagged_by = list(decoy.get("flagged_by", []) or [])
+            if decoy.get("complete") is False and not decoy_flagged_by:
+                return
             if decoy.get("safe") is False:
                 safe = False
                 threats.extend(f"decoy:{t}" for t in (decoy.get("threats") or []))
-                flagged_by.extend(decoy.get("flagged_by", []) or [])
+                flagged_by.extend(decoy_flagged_by)
         except Exception:
-            pass
+            return
     was_active = link.active
     link.url_safe = safe
     link.url_threats = threats
@@ -155,12 +160,10 @@ def _announce_disabled(link, threats, permanent: bool) -> None:
         what = ", ".join(str(t) for t in (threats or [])[:3]) or "an unsafe destination"
         where = f"{link.host()}/{link.slug}" if link.host() else f"/{link.slug}"
         if permanent:
-            tail = ("Google Safe Browsing confirmed this, so the redirect cannot be "
-                    "switched back on. Point it at a safe destination and it will go "
-                    "live again after the next scan.")
+            tail = ("Google Safe Browsing found a threat. It stays off unless a fresh "
+                    "scan clears it; use the fresh safety recheck from the redirect's row.")
         else:
-            tail = ("Change the destination, or allow it from the redirect's row if "
-                    "you are certain the warning is wrong.")
+            tail = "Run the fresh safety recheck from the redirect's row."
         notify_workspace(
             link.organization,
             f"Redirect switched off: {where}",
@@ -184,20 +187,18 @@ def _flagged_by_from_threats(threats) -> list:
 
 
 def reevaluate_workspace_links(organization) -> int:
-    """Re-apply the disable policy to a workspace's flagged links after its
-    safety setting changed. Reactivates links the new policy allows (and would
-    re-disable any that it no longer allows), republishing each to the engine.
-    Uses the stored scan result — no new scan, no API cost. Returns the number
-    of links whose state changed."""
+    """Disable already-flagged links after a legacy workspace setting changes.
+
+    Stored results are not fresh enough to reactivate a redirect; activation
+    must go through the verified-domain recheck.
+    """
     from .models import ShortLink
     changed = 0
     qs = ShortLink.objects.filter(organization=organization, url_safe=False).select_related("domain")
     for link in qs:
         flagged_by = _flagged_by_from_threats(link.url_threats)
-        should_disable = _should_disable(link, flagged_by)
-        want_active = not should_disable
-        if link.active != want_active:
-            link.active = want_active
+        if flagged_by and link.active:
+            link.active = False
             link.save(update_fields=["active"])
             publish_link(link)
             changed += 1
@@ -205,26 +206,5 @@ def reevaluate_workspace_links(organization) -> int:
 
 
 def _should_disable(link, flagged_by) -> bool:
-    """Whether a flagged destination auto-disables the link.
-
-    Default is strict: any flag disables. A workspace can opt out
-    (link_scan_optout) — then flagged links stay live — with one floor that no
-    opt-out can lift: a Google Safe Browsing hit always disables, wherever the
-    link lives. That verdict means phishing or malware, and nobody gets to keep
-    serving one of those from here.
-    """
-    sb_flagged = "google_safe_browsing" in flagged_by
-    if sb_flagged:
-        # No opt-out survives a Google Safe Browsing verdict, on ANY domain.
-        #
-        # This used to exempt a workspace's own private domain, reasoning that
-        # the only reputation at stake there was theirs. That does not hold for
-        # phishing: the owner of a private domain could tick 'stay live even if
-        # flagged' and keep a confirmed credential-harvesting page serving
-        # indefinitely, on our infrastructure, with our own bot filtering hiding
-        # it from the crawlers that would otherwise catch it. It also blackens
-        # the whole platform with Google, not just the one host.
-        return True
-    optout = bool(getattr(link, "scan_optout", False)) or \
-        bool(getattr(link.organization, "link_scan_optout", False))
-    return not optout
+    """Any finding at the active scan threshold disables the redirect."""
+    return bool(flagged_by)

@@ -90,6 +90,9 @@ class Command(BaseCommand):
                     if r.get("safe") is False:
                         health = ShortDomain.Health.FLAGGED
                         detail = "flagged by " + ", ".join(r.get("flagged_by") or ["a scanner"])
+                    elif not r.get("checked") or not r.get("complete"):
+                        health = ShortDomain.Health.UNKNOWN
+                        detail = "blacklist scan did not complete"
 
             d.health, d.health_detail = health, detail[:300]
             d.health_checked_at = timezone.now()
