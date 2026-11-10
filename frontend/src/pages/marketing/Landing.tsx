@@ -129,6 +129,20 @@ export default function Landing() {
               <DemoVideo />
             </div>
             <p className="mt-4 text-sm text-slate-400">No credit card required · 7-day trial · Cancel anytime</p>
+            <a
+              href="https://launchbuff.com/products/trynobot-9rgbgq"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Featured on LaunchBuff"
+              className="mt-5 inline-block"
+            >
+              <img
+                src="https://launchbuff.com/badge-featured-dark.svg"
+                alt="Featured on LaunchBuff"
+                width="256"
+                height="80"
+              />
+            </a>
           </div>
           <div id="demo" className="fade-up lg:pl-4"><DashboardPreview /></div>
         </div>
