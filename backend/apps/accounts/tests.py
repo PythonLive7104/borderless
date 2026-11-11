@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 User = get_user_model()
@@ -66,6 +69,22 @@ class AttributionTest(TestCase):
         self.assertEqual(u.attribution["utm_campaign"], "brand")
         self.assertEqual(u.attribution["landing_path"], "/compare/clickcease")
 
+    def test_meta_click_id_is_stored_and_shown_in_acquisition(self):
+        r = self._register("meta@example.com", {
+            "fbclid": "meta-click-id", "utm_source": "facebook",
+            "utm_medium": "paid_social", "utm_campaign": "launch",
+        })
+        self.assertEqual(r.status_code, 201)
+        user = User.objects.get(email="meta@example.com")
+        self.assertEqual(user.attribution["fbclid"], "meta-click-id")
+        self.assertEqual(user.acquisition_source, "meta ads / paid_social / launch")
+        self.assertTrue(user.is_paid_acquisition)
+
+    def test_fbclid_without_paid_campaign_markers_is_not_mislabelled_as_an_ad(self):
+        user = User(attribution={"fbclid": "meta-click-id"})
+        self.assertEqual(user.acquisition_source, "facebook click / unclassified")
+        self.assertFalse(user.is_paid_acquisition)
+
     def test_unknown_keys_are_dropped(self):
         """Anyone can POST here, so an arbitrary key must not reach the column."""
         r = self._register("junk@example.com", {
@@ -104,6 +123,7 @@ class AttributionTest(TestCase):
             ({}, "—"),
             ({"gclid": "x"}, "google / cpc"),
             ({"msclkid": "x"}, "microsoft / cpc"),
+            ({"fbclid": "x"}, "facebook click / unclassified"),
             ({"gclid": "x", "utm_source": "google", "utm_medium": "cpc",
               "utm_campaign": "brand"}, "google / cpc / brand"),
             ({"utm_source": "reddit"}, "reddit"),
@@ -117,6 +137,72 @@ class AttributionTest(TestCase):
     def test_is_paid_acquisition(self):
         self.assertTrue(User(attribution={"gclid": "x"}).is_paid_acquisition)
         self.assertTrue(User(attribution={"msclkid": "x"}).is_paid_acquisition)
+        self.assertFalse(User(attribution={"fbclid": "x"}).is_paid_acquisition)
         self.assertTrue(User(attribution={"utm_medium": "cpc"}).is_paid_acquisition)
         self.assertFalse(User(attribution={"utm_medium": "organic"}).is_paid_acquisition)
         self.assertFalse(User(attribution={}).is_paid_acquisition)
+
+
+class SignupIPLimitTest(TestCase):
+    def setUp(self):
+        self.c = APIClient()
+
+    def _register(self, email, ip, **extra):
+        return self.c.post(
+            "/api/auth/register/",
+            {"email": email, "password": "testpass123", **extra},
+            format="json",
+            HTTP_X_REAL_IP=ip,
+        )
+
+    def test_three_accounts_from_same_ip_are_allowed_and_fourth_is_rejected(self):
+        responses = [
+            self._register(f"shared-{n}@example.com", "203.0.113.10")
+            for n in range(1, 5)
+        ]
+
+        self.assertEqual([response.status_code for response in responses],
+                         [201, 201, 201, 400])
+        self.assertIn("last 30 days", str(responses[3].json()["email"]))
+        self.assertEqual(
+            User.objects.filter(signup_ip_hash__isnull=False).count(), 3)
+
+    def test_signup_ip_limit_uses_a_rolling_30_day_window(self):
+        for n in range(3):
+            self.assertEqual(
+                self._register(f"old-{n}@example.com", "203.0.113.10").status_code,
+                201,
+            )
+        User.objects.filter(signup_ip_hash__isnull=False).update(
+            date_joined=timezone.now() - timedelta(days=31))
+
+        response = self._register("new@example.com", "203.0.113.10")
+        self.assertEqual(response.status_code, 201)
+
+    def test_different_ips_can_register_and_raw_ip_is_not_stored(self):
+        first = self._register("first@example.com", "203.0.113.10")
+        second = self._register("second@example.com", "203.0.113.11")
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        user = User.objects.get(email="first@example.com")
+        self.assertIsNotNone(user.signup_ip_hash)
+        self.assertNotEqual(user.signup_ip_hash, "203.0.113.10")
+
+    def test_client_supplied_forwarded_for_does_not_override_real_ip(self):
+        first = self.c.post(
+            "/api/auth/register/",
+            {"email": "first@example.com", "password": "testpass123"},
+            format="json",
+            HTTP_X_REAL_IP="203.0.113.10",
+        )
+        second = self.c.post(
+            "/api/auth/register/",
+            {"email": "second@example.com", "password": "testpass123"},
+            format="json",
+            HTTP_X_REAL_IP="203.0.113.11",
+            HTTP_X_FORWARDED_FOR="203.0.113.10",
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)

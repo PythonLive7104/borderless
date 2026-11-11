@@ -1,5 +1,15 @@
+import hashlib
+import hmac
+import ipaddress
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 from rest_framework import serializers
+
+from .models import SignupIPLock
 
 User = get_user_model()
 
@@ -11,10 +21,32 @@ DEFAULT_PREFS = {"email": True, "high_risk": True, "usage": True, "conversions":
 # storing the object as sent would let anyone write arbitrary JSON of any size
 # into a user row.
 ATTRIBUTION_KEYS = frozenset({
-    "gclid", "msclkid", "utm_source", "utm_medium", "utm_campaign",
+    "gclid", "msclkid", "fbclid", "utm_source", "utm_medium", "utm_campaign",
     "utm_term", "utm_content", "referrer", "landing_path", "first_seen",
 })
 ATTRIBUTION_MAX_LEN = 200
+SIGNUP_IP_WINDOW = timedelta(days=30)
+MAX_SIGNUPS_PER_IP = 3
+SIGNUP_IP_LIMIT_REACHED = (
+    "Too many accounts have been created from this IP in the last 30 days. "
+    "Please sign in or contact support if you believe this is an error."
+)
+
+
+def _signup_ip_hash(request) -> str | None:
+    """Hash the trusted proxy IP header, falling back to the direct peer."""
+    if request is None:
+        return None
+    raw_ip = request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR")
+    try:
+        address = ipaddress.ip_address(raw_ip.strip())
+    except (AttributeError, ValueError):
+        return None
+    return hmac.new(
+        settings.SECRET_KEY.encode(),
+        address.packed,
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def clean_attribution(raw) -> dict:
@@ -58,12 +90,40 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_attribution(self, value):
         return clean_attribution(value)
 
+    def validate(self, attrs):
+        attrs["_signup_ip_hash"] = _signup_ip_hash(self.context.get("request"))
+        return attrs
+
     def create(self, validated_data):
         email = validated_data["email"]
-        user = User.objects.create_user(
-            username=email, email=email, password=validated_data["password"],
-            first_name=validated_data.get("first_name", ""), last_name=validated_data.get("last_name", ""),
-        )
+        ip_hash = validated_data.pop("_signup_ip_hash", None)
+        try:
+            with transaction.atomic():
+                if ip_hash:
+                    lock, _ = SignupIPLock.objects.get_or_create(ip_hash=ip_hash)
+                    SignupIPLock.objects.select_for_update().get(pk=lock.pk)
+                    cutoff = timezone.now() - SIGNUP_IP_WINDOW
+                    recent_signups = User.objects.filter(
+                        signup_ip_hash=ip_hash,
+                        date_joined__gte=cutoff,
+                    ).count()
+                    if recent_signups >= MAX_SIGNUPS_PER_IP:
+                        raise serializers.ValidationError(
+                            {"email": SIGNUP_IP_LIMIT_REACHED})
+                user = User.objects.create_user(
+                    username=email, email=email, password=validated_data["password"],
+                    first_name=validated_data.get("first_name", ""),
+                    last_name=validated_data.get("last_name", ""),
+                    signup_ip_hash=ip_hash,
+                )
+        except IntegrityError:
+                if ip_hash and User.objects.filter(
+                        signup_ip_hash=ip_hash,
+                        date_joined__gte=timezone.now() - SIGNUP_IP_WINDOW,
+                ).count() >= MAX_SIGNUPS_PER_IP:
+                    raise serializers.ValidationError(
+                        {"email": SIGNUP_IP_LIMIT_REACHED})
+                raise
         attribution = validated_data.get("attribution") or {}
         if attribution:
             user.attribution = attribution

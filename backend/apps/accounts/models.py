@@ -18,6 +18,9 @@ class User(AbstractUser):
     # click if we can hand back the gclid, and by the time a trial converts the
     # cookie that carried it is long gone. Blank for organic and direct signups.
     attribution = models.JSONField(default=dict, blank=True)
+    # A keyed digest, not the raw address, supports signup-abuse limits.
+    signup_ip_hash = models.CharField(
+        max_length=64, null=True, blank=True, editable=False, db_index=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
@@ -42,7 +45,21 @@ class User(AbstractUser):
             paid = None
         source = a.get("utm_source")
         medium = a.get("utm_medium")
-        if source:
+        normalized_source = (source or "").strip().lower()
+        normalized_medium = (medium or "").strip().lower().replace("-", "_")
+        from apps.traffic.paid_click import PAID_MEDIUMS
+        meta_source = normalized_source in {
+            "facebook", "instagram", "meta", "fb", "ig", "messenger",
+            "audience_network", "an", "msg",
+        }
+        paid_medium = normalized_medium in PAID_MEDIUMS
+        if a.get("fbclid") and not source:
+            label = "meta ads / paid social" if paid_medium else "facebook click / unclassified"
+        elif meta_source and paid_medium:
+            label = f"meta ads / {medium}" if medium else "meta ads / paid social"
+        elif meta_source and a.get("fbclid") and not medium:
+            label = "facebook click / unclassified"
+        elif source:
             label = f"{source} / {medium}" if medium else source
         elif paid:
             label = paid
@@ -59,8 +76,15 @@ class User(AbstractUser):
     def is_paid_acquisition(self) -> bool:
         """True when we paid for the click that produced this account."""
         a = self.attribution or {}
+        from apps.traffic.paid_click import PAID_MEDIUMS
         return bool(a.get("gclid") or a.get("msclkid")
-                    or a.get("utm_medium") in {"cpc", "ppc", "paid", "paidsearch"})
+                    or (a.get("utm_medium") or "").strip().lower().replace("-", "_")
+                    in PAID_MEDIUMS)
+
+
+class SignupIPLock(models.Model):
+    """Per-IP row used to serialize concurrent signup-limit checks."""
+    ip_hash = models.CharField(max_length=64, unique=True, editable=False)
 
 
 def _token() -> str:

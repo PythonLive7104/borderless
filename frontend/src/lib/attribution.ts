@@ -24,6 +24,8 @@ export interface Attribution {
   gclid?: string;
   /** Microsoft Ads click id. */
   msclkid?: string;
+  /** Meta Ads click id. */
+  fbclid?: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -37,7 +39,7 @@ export interface Attribution {
   first_seen?: string;
 }
 
-const PARAMS = ["gclid", "msclkid", "utm_source", "utm_medium",
+const PARAMS = ["gclid", "msclkid", "fbclid", "utm_source", "utm_medium",
                 "utm_campaign", "utm_term", "utm_content"] as const;
 
 function read(): Attribution | null {
@@ -106,7 +108,8 @@ export function getAttribution(): Attribution | null {
 /** True when the visitor arrived from a paid click we are paying for. */
 export function isPaidClick(): boolean {
   const a = getAttribution();
-  return !!(a?.gclid || a?.msclkid || a?.utm_medium === "cpc" || a?.utm_medium === "ppc");
+  return !!(a?.gclid || a?.msclkid
+    || ["cpc", "ppc", "paid_social", "paid-social", "social_paid"].includes(a?.utm_medium || ""));
 }
 
 // ---------------------------------------------------------------------------
