@@ -41,7 +41,13 @@ class Command(BaseCommand):
 
         extended = skipped = 0
         for d in qs:
-            if d.private_until and d.private_until >= target:
+            # Compared by date, not by instant. `target` is derived from
+            # timezone.now(), so a second run computes a target a few
+            # microseconds later than the one the first run stored — and an
+            # instant-exact `>=` would therefore find every domain a hair
+            # short and "extend" it to the date it already holds, forever.
+            # Day granularity is also the granularity this command reports in.
+            if d.private_until and d.private_until.date() >= target.date():
                 skipped += 1
                 continue
 

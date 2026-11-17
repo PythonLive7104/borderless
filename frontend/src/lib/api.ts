@@ -261,7 +261,10 @@ export interface Invitation { id: number; email: string; role: Role; created_at:
 export type WebsiteStatus = "not_installed" | "detected" | "active" | "error";
 // What the badge shows: derived from when we last heard from the site, so a
 // site that goes quiet stops claiming to be protected.
-export type WebsiteState = "waiting" | "active" | "idle" | "error";
+// "installed" = we have read our tag out of the page the site serves, but no
+// visitor has arrived yet. Distinct from "waiting", which means we have no
+// evidence at all and the customer still has something to do.
+export type WebsiteState = "waiting" | "installed" | "active" | "idle" | "error";
 export interface Website {
   id: number; organization: number; name: string; domain: string; url: string;
   tracking_id: string; status: WebsiteStatus; live_state: WebsiteState;
@@ -271,6 +274,9 @@ export interface Website {
   strict_mode: boolean;
   safe_browsing_flagged: boolean; safe_browsing_threats: string[];
   safe_browsing_checked_at: string | null;
+  /** When we last saw our tag in the site's served HTML. Set on its own
+   *  proves the install, with or without traffic. */
+  snippet_seen_at: string | null;
   created_at: string; snippet: string;
 }
 

@@ -63,17 +63,24 @@ class Command(BaseCommand):
                             help="Email the abuse address about anything unhealthy.")
         parser.add_argument("--skip-scan", action="store_true",
                             help="Skip the blacklist scan (no external API calls).")
+        parser.add_argument("--skip-email-blocklists", action="store_true",
+                            help="Skip the Spamhaus/SURBL/URIBL lookups (plain DNS, no API key).")
 
     def handle(self, *args, **opts):
         from apps.intelligence.threatscan import is_enabled, scan_url
+        from ... import uriblocklist
 
         qs = ShortDomain.objects.filter(active=True).order_by("host")
         if opts["host"]:
             qs = qs.filter(host=opts["host"].lower())
         scan_on = is_enabled() and not opts["skip_scan"]
+        email_lists_on = not opts["skip_email_blocklists"]
         if not scan_on:
             self.stdout.write(self.style.WARNING(
                 "  blacklist scan off — reachability only"))
+        if not email_lists_on:
+            self.stdout.write(self.style.WARNING(
+                "  email blocklist lookups off — a listed domain will read as healthy"))
 
         unhealthy = []
         for d in qs:
@@ -93,6 +100,23 @@ class Command(BaseCommand):
                     elif not r.get("checked") or not r.get("complete"):
                         health = ShortDomain.Health.UNKNOWN
                         detail = "blacklist scan did not complete"
+
+                # A URI-blocklist listing outranks a clean browser scan, because
+                # it is the more expensive failure and the one nothing else here
+                # can see: the domain resolves, serves a perfect redirect and
+                # passes every browser-safety vendor, while every message
+                # carrying a link on it is refused at the recipient's gateway
+                # and never reaches a mailbox at all. Only a conclusive hit
+                # changes the verdict — these zones refuse queries from open
+                # resolvers, and reading a refusal as a listing would retire
+                # healthy domains.
+                if health != ShortDomain.Health.UNREACHABLE and email_lists_on:
+                    bl = uriblocklist.check_domain(d.host)
+                    if bl["listed"]:
+                        health = ShortDomain.Health.FLAGGED
+                        detail = bl["detail"]
+                    elif bl["unavailable"] and health == ShortDomain.Health.OK:
+                        detail = f"{detail}; {bl['detail']}"
 
             d.health, d.health_detail = health, detail[:300]
             d.health_checked_at = timezone.now()
@@ -127,7 +151,14 @@ class Command(BaseCommand):
                          f"  used by: {who}; {d.links.count()} link(s) affected")
         send_mail(
             f"[action needed] {len(unhealthy)} short domain(s) unhealthy",
-            "These domains are not serving normally. Links on them are failing for\n"
-            "customers right now.\n\n" + "\n\n".join(lines),
+            "These domains are not working normally. Links on them are failing for\n"
+            "customers right now.\n\n"
+            "Note the two different failures. 'DNS or HTTPS failed' means the links\n"
+            "themselves are dead. An 'email blocklist' line means the opposite: the\n"
+            "domain serves perfectly, and every email carrying a link on it is being\n"
+            "refused at the recipient's mail server, so the message never arrives —\n"
+            "not even in junk. Nothing in the app can fix that one; the domain has to\n"
+            "be delisted or retired, and customers moved to another.\n\n"
+            + "\n\n".join(lines),
             settings.DEFAULT_FROM_EMAIL, [to], fail_silently=True)
         self.stdout.write(f"  emailed {to}")

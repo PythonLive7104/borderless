@@ -435,7 +435,7 @@ export default function Links() {
     setForm({
       destination_url: l.destination_url, title: l.title || "", slug: l.slug,
       bot_action: l.bot_action, website: l.website ? String(l.website) : "",
-      challenge: !!l.challenge, challenge_style: l.challenge_style || "hold",
+      challenge: !!l.challenge && !l.deep_check, challenge_style: l.challenge_style || "hold",
       forward_params: !!l.forward_params,
       forward_param_keys: l.forward_param_keys || "", block_vpn: !!l.block_vpn, block_datacenter: !!l.block_datacenter, deep_check: !!l.deep_check,
       domain: l.domain ? String(l.domain) : "",
@@ -469,7 +469,7 @@ export default function Links() {
       title: form.title || "",
       slug: form.slug || undefined,
       bot_action: form.bot_action,
-      challenge: form.challenge,
+      challenge: form.challenge && !form.deep_check,
       challenge_style: form.challenge_style,
       block_vpn: form.block_vpn,
       block_datacenter: form.block_datacenter,
@@ -868,26 +868,29 @@ export default function Links() {
 
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.deep_check ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
             <input type="checkbox" checked={form.deep_check} className="mt-0.5"
-              onChange={(e) => setForm({ ...form, deep_check: e.target.checked })} />
+              onChange={(e) => setForm({ ...form, deep_check: e.target.checked, challenge: e.target.checked ? false : form.challenge })} />
             <span>
               <span className="block text-sm font-semibold">Deep browser check</span>
               <span className="block text-xs text-fg-muted">
                 Shows a split-second "checking your browser…" screen before the redirect, to catch
                 automated browsers real people never use. No clicking for the visitor. Strongest
-                setting — adds about a second, so best for high-value campaigns.
+                setting — adds about a second, so best for high-value campaigns. It can't be combined
+                with the interactive human confirmation below.
               </span>
             </span>
           </label>
 
-          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}>
-            <input type="checkbox" checked={form.challenge} className="mt-0.5"
+          <label className={`flex items-start gap-3 rounded-xl border p-3.5 transition ${form.deep_check ? "cursor-not-allowed border-line opacity-60" : `cursor-pointer ${form.challenge ? "border-brand bg-brand/5" : "border-line hover:border-brand/40"}`}`}>
+            <input type="checkbox" checked={form.challenge} disabled={form.deep_check} className="mt-0.5"
               onChange={(e) => setForm({ ...form, challenge: e.target.checked })} />
             <span>
               <span className="block text-sm font-semibold">Ask visitors to confirm they're human</span>
               <span className="block text-xs text-fg-muted">
-                Shows a "I'm not a robot" button before the redirect. Only people we'd already let
-                through see it — bots still get the handling above — so it catches automation the
-                score missed. Confirmed visitors aren't asked again for 30 minutes.
+                {form.deep_check
+                  ? "Unavailable while Deep browser check is enabled."
+                  : `Shows a "I'm not a robot" button before the redirect. Only people we'd already let
+                    through see it — bots still get the handling above — so it catches automation the
+                    score missed. Confirmed visitors aren't asked again for 30 minutes.`}
               </span>
             </span>
           </label>

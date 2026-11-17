@@ -12,8 +12,8 @@ Schedule daily (see deploy/README.md).
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.links import rentals
 from apps.links.models import ShortDomain
-from apps.links.sync import publish_link
 
 
 class Command(BaseCommand):
@@ -63,38 +63,12 @@ class Command(BaseCommand):
                     f"  would reclaim {d.host} ({d.links.count()} link(s) would stop)"))
                 continue
 
-            links = list(d.links.all())
-            org = d.organization        # captured before it is cleared below
-            d.organization = None
-            d.private_until = None
-            d.is_shared = False          # back to sellable stock, not the public pool
-            d.save(update_fields=["organization", "private_until", "is_shared"])
-            for link in links:
-                publish_link(link)       # withdraws them — the domain is no longer theirs
-            if email:
-                send_mail(
-                    f"{d.host} has been released",
-                    f"The rental on {d.host} wasn't renewed, so the domain has been released "
-                    f"and its links no longer resolve.\n\n"
-                    f"Your links and their click history are still in your account, and you can "
-                    f"point new ones at a shared domain any time.\n\n{front}/dashboard/links",
-                    settings.DEFAULT_FROM_EMAIL, [email], fail_silently=True)
-            # A bell notice as well as the email. The email can be filtered,
-            # sent to an address nobody reads, or land in spam — and the first
-            # thing the owner notices otherwise is that their links are broken.
-            try:
-                from apps.notifications.system import notify_workspace
-                notify_workspace(
-                    org,
-                    f"{d.host} has been released",
-                    f"The rental on {d.host} was not renewed, so the domain has been "
-                    f"released and the {len(links)} link(s) on it no longer resolve. "
-                    f"Your links and their click history are still in your account — "
-                    f"point new ones at a shared domain, or buy another private domain, "
-                    f"whenever you like.",
-                )
-            except Exception:  # pragma: no cover - a notice must not block the reclaim
-                pass
+            # The release itself — clear the owner and term, back to sellable
+            # stock, withdraw the links, tell the former owner — lives in
+            # apps.links.rentals, because an admin can also release a domain by
+            # hand from the Short domains page and the two must do the same
+            # thing. See that module for why it is only correct as a whole.
+            rentals.release_to_stock(d)
             self.stdout.write(self.style.WARNING(f"  reclaimed {d.host} — grace period ended"))
 
         self.stdout.write(self.style.SUCCESS(

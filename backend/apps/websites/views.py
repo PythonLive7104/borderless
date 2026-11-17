@@ -68,20 +68,29 @@ class WebsiteViewSet(viewsets.ModelViewSet):
     def verify(self, request, pk=None):
         """Report installation status.
 
-        Two signals, in order of certainty:
-          1. If any event has ever arrived, it's installed and working — done.
-          2. Otherwise actively fetch the customer's live page and look for the
-             snippet, so we can say WHY nothing has arrived: the tag isn't on
-             the served page (the usual cause — edited the wrong file), it's
-             there but no one has visited, or the page can't be reached.
-        The active fetch is best-effort: any failure falls back to the old
-        passive message rather than erroring the button.
+        Either signal is proof on its own:
+
+          1. An event has arrived — a browser ran the script.
+          2. Our tag is in the HTML the site serves right now.
+
+        (2) used to be reported as *not* installed: the customer was told
+        "now open it in a browser to send the first event, then verify again",
+        so a correct install still needed a visitor before we would admit it
+        worked. On a site with no traffic yet that is a loop with no exit, and
+        it is why verification felt like it took many attempts to pass. Reading
+        our own tag out of the served page is the stronger of the two signals —
+        a pageview says the script ran once, the tag says it is on the page
+        now — so it verifies the install by itself, and is recorded so the
+        answer sticks instead of being re-derived on every visit to the page.
+
+        The active fetch is best-effort: any failure falls back to the passive
+        signal rather than erroring the button.
         """
         from apps.websites import snippet_check
 
         w = self.get_object()
-        installed = w.last_event_at is not None
-        if installed and not w.strict_mode:
+        by_event = w.last_event_at is not None
+        if by_event and not w.strict_mode:
             return Response({
                 "status": w.status,
                 "live_state": w.live_state(),
@@ -92,81 +101,90 @@ class WebsiteViewSet(viewsets.ModelViewSet):
                 "message": "Installation detected — you're receiving traffic.",
             })
 
-        if installed:
-            # Traffic is arriving, so the tag is definitely on the page — but
-            # strict mode needs a DIFFERENT tag from the one that merely
-            # collects traffic, and an async tag collects traffic perfectly
-            # well while hiding nothing. Short-circuiting here on "we're
-            # receiving traffic" is why a customer could turn strict mode on,
-            # be told everything was fine, and still watch their page flash in
-            # front of every blocked visitor. So we look at the real tag.
-            try:
-                probe = snippet_check.check(w)
-            except Exception:
-                probe = {"state": snippet_check.FOUND,
-                         "strict_state": snippet_check.STRICT_UNKNOWN}
-            st = probe.get("strict_state", snippet_check.STRICT_UNKNOWN)
-            strict_messages = {
-                snippet_check.STRICT_OK:
-                    "Installation detected, and your tag is set up for the loader — "
-                    "blocked visitors won't see your page.",
-                snippet_check.STRICT_ASYNC:
-                    "Your traffic is arriving, but the tag on your page still has "
-                    "`async`. An async script can't hide the page before the browser "
-                    "draws it, so blocked visitors see your content flash first. "
-                    "Copy the snippet above again and replace the old tag.",
-                snippet_check.STRICT_MISSING:
-                    "Your traffic is arriving, but the tag on your page is missing "
-                    '`data-strict="1"`, so the loader never runs and blocked visitors '
-                    "see your page. Copy the snippet above again and replace the old tag.",
-                snippet_check.STRICT_UNKNOWN:
-                    "Installation detected. We couldn't re-read your page to confirm "
-                    "the loader is set up — check that the tag is the one shown above.",
+        try:
+            probe = snippet_check.check(w)
+        except Exception:
+            probe = {"state": snippet_check.UNREACHABLE, "url": w.url or w.domain}
+
+        state = probe.get("state", snippet_check.UNREACHABLE)
+        on_page = state == snippet_check.FOUND
+        if on_page:
+            # Persist it. This is what stops the customer being asked to verify
+            # the same working install over and over.
+            w.mark_snippet_seen()
+
+        if not (by_event or on_page):
+            messages = {
+                snippet_check.MISSING:
+                    f"We loaded {probe.get('checked_url') or probe.get('url')} but the "
+                    "snippet isn't in the page. Make sure you pasted it before </head> "
+                    "on the page that's actually served — not a backup or a different file.",
+                snippet_check.UNREACHABLE:
+                    f"We couldn't load {probe.get('url') or 'your site'}. Check the "
+                    "website URL in settings, then try again.",
+                snippet_check.NO_URL:
+                    "Add your site's URL in settings so we can check the snippet for you.",
             }
             return Response({
                 "status": w.status,
                 "live_state": w.live_state(),
-                # Not "ok" when the tag can't deliver what strict mode promises:
-                # the dashboard shows this amber rather than green.
-                "installed": st in (snippet_check.STRICT_OK, snippet_check.STRICT_UNKNOWN),
-                "snippet_state": snippet_check.FOUND,
-                "strict_state": st,
+                "installed": False,
+                "snippet_state": state,
+                "strict_state": probe.get("strict_state", snippet_check.STRICT_UNKNOWN),
                 "found_tag": probe.get("tag", ""),
-                "last_event_at": w.last_event_at,
-                "message": strict_messages.get(st, strict_messages[snippet_check.STRICT_UNKNOWN]),
+                "checked_url": probe.get("checked_url") or probe.get("url", ""),
+                "last_event_at": None,
+                "message": messages.get(state, "No events received yet. "
+                                               "Make sure the snippet is on your site."),
             })
 
-        try:
-            probe = snippet_check.check(w)
-        except Exception:
-            probe = {"state": "unreachable", "url": w.url or w.domain}
+        # Installed. The only question left is whether the tag on the page can
+        # deliver what strict mode promises — strict mode lives in OUR database
+        # but is enforced by an attribute in THEIR HTML, so the two drift apart
+        # silently. Traffic arriving proves nothing here: an async tag collects
+        # traffic perfectly well while hiding nothing.
+        if not w.strict_mode:
+            st = snippet_check.STRICT_NA
+        else:
+            st = probe.get("strict_state", snippet_check.STRICT_UNKNOWN)
 
-        state = probe["state"]
-        messages = {
-            snippet_check.FOUND:
-                "Snippet found on your page — now open it in a browser to send "
-                "the first event, then verify again.",
-            snippet_check.MISSING:
-                f"We loaded {probe.get('checked_url') or probe.get('url')} but the "
-                "snippet isn't in the page. Make sure you pasted it before </head> "
-                "on the page that's actually served — not a backup or a different file.",
-            snippet_check.UNREACHABLE:
-                f"We couldn't load {probe.get('url') or 'your site'}. Check the "
-                "website URL in settings, then try again.",
-            snippet_check.NO_URL:
-                "Add your site's URL in settings so we can check the snippet for you.",
-        }
+        # Said once, so each branch below can append its own next step.
+        confirmed = ("Verified — the snippet is live on your page."
+                     if on_page else "Installation detected — you're receiving traffic.")
+        traffic_note = "" if by_event else (
+            " Your first visitor will show up on the dashboard automatically; "
+            "there's nothing else for you to do.")
+
+        if st in (snippet_check.STRICT_NA, snippet_check.STRICT_OK):
+            ok, message = True, confirmed + traffic_note
+        elif st == snippet_check.STRICT_ASYNC:
+            ok, message = False, (
+                confirmed + " But the tag on your page still has `async`. An async "
+                "script can't hide the page before the browser draws it, so blocked "
+                "visitors see your content flash first. Copy the snippet above again "
+                "and replace the old tag.")
+        elif st == snippet_check.STRICT_MISSING:
+            ok, message = False, (
+                confirmed + ' But the tag on your page is missing `data-strict="1"`, '
+                "so the loader never runs and blocked visitors see your page. Copy "
+                "the snippet above again and replace the old tag.")
+        else:   # STRICT_UNKNOWN — we couldn't read the page back
+            ok, message = True, (
+                confirmed + " We couldn't re-read your page to confirm the loader is "
+                "set up — check that the tag is the one shown above.")
+
         return Response({
             "status": w.status,
             "live_state": w.live_state(),
-            "installed": False,
-            "snippet_state": state,
-            "strict_state": probe.get("strict_state", snippet_check.STRICT_UNKNOWN),
+            # Not "ok" when the tag can't deliver what strict mode promises:
+            # the dashboard shows this amber rather than green.
+            "installed": ok,
+            "snippet_state": snippet_check.FOUND if on_page else state,
+            "strict_state": st,
             "found_tag": probe.get("tag", ""),
             "checked_url": probe.get("checked_url") or probe.get("url", ""),
-            "last_event_at": None,
-            "message": messages.get(state, "No events received yet. "
-                                            "Make sure the snippet is on your site."),
+            "last_event_at": w.last_event_at,
+            "message": message,
         })
 
     @action(detail=True, methods=["post"], url_path="check-safebrowsing")

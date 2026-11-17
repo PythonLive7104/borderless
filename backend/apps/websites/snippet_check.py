@@ -15,9 +15,35 @@ allow-list, private-IP rejection, redirect re-validation). We only read the
 homepage HTML — nothing is scanned or stored.
 """
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
 from urllib.parse import urlparse
 
-from apps.intelligence.botcheck import _fetch, _validate
+from apps.intelligence.botcheck import _fetch
+
+# How long a verification may take.
+#
+# The Bot Check report can afford to be patient: someone asked for a scan and
+# expects to wait. Verification is a button on the install page, pressed by
+# someone who just pasted a snippet, so the costs are reversed — an answer in
+# two seconds that is occasionally "we could not reach your site, try again"
+# beats a correct answer after a minute.
+#
+# What it used to cost, worst case: four candidate URLs, each allowed three
+# redirect hops, each hop allowed eight seconds, and the alternatives only
+# started after the first had finished — about a minute of spinner before the
+# page said anything, which is the "verifying takes forever" complaint. The
+# numbers below bound it at PROBE_BUDGET no matter how slow the site is.
+PROBE_TIMEOUT = 4          # seconds per HTTP request
+PROBE_MAX_REDIRECTS = 2    # a site needing more than two hops to its homepage is broken
+PROBE_MAX_BYTES = 262_144  # the tag is in the head; 256KB is already generous
+PROBE_BUDGET = 7.0         # total wall clock for the whole check
+# How long the most likely URL gets to answer on its own before the
+# alternatives are tried as well. A correct install on a healthy site answers
+# inside this, so it still costs exactly one request to the customer's server;
+# past it, latency matters more than tidiness and they all go out together.
+HEDGE_DELAY = 0.7
 
 # Outcomes the caller turns into a message. Kept as plain strings so the API
 # shape is obvious and testable.
@@ -84,6 +110,47 @@ def _candidate_url(website) -> str:
     return raw
 
 
+def _candidate_urls(website) -> list:
+    """Every address worth trying, best first.
+
+    One URL was not enough in practice. The two addresses that burned the most
+    verification attempts:
+
+      * www vs apex. A customer types "example.com" and the snippet is on
+        "www.example.com" (or the reverse). We fetched one, got MISSING or
+        UNREACHABLE, and told them the snippet wasn't on their page — while it
+        was, on the host their visitors actually use.
+      * a URL with a path. "example.com/landing" is what they gave us, but the
+        tag may only be in the site-wide template reached at the root.
+
+    Neither is a mistake worth a failed check, so we try the alternatives
+    ourselves instead of making the customer guess and press the button again.
+    """
+    first = _candidate_url(website)
+    if not first:
+        return []
+
+    out = [first]
+
+    def add(u):
+        if u and u not in out:
+            out.append(u)
+
+    p = urlparse(first)
+    host, scheme = p.hostname or "", p.scheme or "https"
+    if host:
+        # The other half of the www/apex pair.
+        alt = host[4:] if host.startswith("www.") else "www." + host
+        port = f":{p.port}" if p.port else ""
+        if p.path not in ("", "/"):
+            add(f"{scheme}://{host}{port}/")        # same host, site root
+        add(f"{scheme}://{alt}{port}{p.path or '/'}")
+        if p.path not in ("", "/"):
+            add(f"{scheme}://{alt}{port}/")
+
+    return out[:4]   # a ceiling, so a weird URL can't fan out
+
+
 def _snippet_present(html: str, tracking_id: str) -> bool:
     """True when the page carries our tag for THIS site.
 
@@ -98,20 +165,45 @@ def _snippet_present(html: str, tracking_id: str) -> bool:
     return (f'data-site-id="{tid}"' in body) or (f"data-site-id='{tid}'" in body)
 
 
-def check(website) -> dict:
-    """Return {state, url, checked_url, status_code?} for the site's live page."""
-    url = _candidate_url(website)
-    if not url:
-        return {"state": NO_URL, "url": ""}
+def _stop_when(tracking_id: str):
+    """A predicate for _fetch that ends the read once the answer is settled.
 
-    ok, err = _validate(url)
-    if err:
+    Stops only after the site-id attribute AND the `>` that closes its tag have
+    arrived, because strict_state() has to read the whole opening tag. Stopping
+    at `</head>` would have been simpler and wrong: plenty of customers paste
+    the snippet before `</body>`, and we would have reported their working
+    install as missing.
+    """
+    tid = (tracking_id or "").lower().encode()
+    if not tid:
+        return None
+    needles = (b'data-site-id="' + tid + b'"', b"data-site-id='" + tid + b"'")
+
+    def stop(buf: bytes) -> bool:
+        low = buf.lower()
+        for n in needles:
+            i = low.find(n)
+            if i >= 0 and low.find(b">", i) >= 0:
+                return True
+        return False
+
+    return stop
+
+
+def _probe_one(website, url: str) -> dict:
+    """Fetch one address and report what the snippet looks like on it."""
+    try:
+        # _fetch validates every hop itself and raises ValueError with the same
+        # message _validate would have returned, so calling _validate here as
+        # well only bought a second DNS lookup per probe.
+        status_code, _headers, body, final_url = _fetch(
+            url, timeout=PROBE_TIMEOUT, max_bytes=PROBE_MAX_BYTES,
+            max_redirects=PROBE_MAX_REDIRECTS,
+            stop_when=_stop_when(website.tracking_id))
+    except ValueError as e:
         # A bad/blocked address is, from the customer's point of view, a page we
         # can't reach — same next step (fix the URL), so don't leak SSRF detail.
-        return {"state": UNREACHABLE, "url": url, "reason": err}
-
-    try:
-        status_code, _headers, body, final_url = _fetch(url)
+        return {"state": UNREACHABLE, "url": url, "reason": str(e)}
     except Exception:
         return {"state": UNREACHABLE, "url": url}
 
@@ -125,3 +217,82 @@ def check(website) -> dict:
                                      bool(getattr(website, "strict_mode", False))),
         "tag": tag_for(body, website.tracking_id),
     }
+
+
+def check(website) -> dict:
+    """Return {state, url, checked_url, status_code?} for the site's live page.
+
+    The most likely address gets a head start on its own, so a correct install
+    on a healthy site still costs exactly one request to the customer's server.
+    If it has not answered within HEDGE_DELAY the alternatives (www/apex, site
+    root) go out alongside it rather than after it, and the first address that
+    carries the tag wins — so a wrong guess about www costs one page-load of
+    latency instead of two rounds of them.
+
+    The whole thing is bounded by PROBE_BUDGET. Past that we answer with the
+    best result in hand, because a customer watching a spinner is better served
+    by "we could not reach your site" than by a correct answer they have
+    already given up on. This is what the old version could not do: it waited
+    on every probe to completion, and its `with ThreadPoolExecutor` block
+    blocked on exit even when an early FOUND had already been returned.
+    """
+    urls = _candidate_urls(website)
+    if not urls:
+        return {"state": NO_URL, "url": ""}
+    if len(urls) == 1:
+        return _probe_one(website, urls[0])
+
+    # Rank: a page carrying the tag always wins; a page that loaded without it
+    # beats one we couldn't reach, because "it's not on this page" is a real
+    # answer and "couldn't connect" usually just means that host doesn't exist.
+    rank = {FOUND: 3, MISSING: 2, UNREACHABLE: 1, NO_URL: 0}
+    order = {u: i for i, u in enumerate(urls)}
+
+    def better(candidate, incumbent) -> bool:
+        if incumbent is None:
+            return True
+        cr, ir = rank.get(candidate["state"], 0), rank.get(incumbent["state"], 0)
+        if cr != ir:
+            return cr > ir
+        # Same quality of answer: report the address we considered most likely,
+        # not whichever thread happened to finish first, so the "we loaded X but
+        # the snippet isn't in it" message names the URL they expect.
+        return order.get(candidate["url"], 99) < order.get(incumbent["url"], 99)
+
+    deadline = time.monotonic() + PROBE_BUDGET
+    best = None
+    pool = ThreadPoolExecutor(max_workers=len(urls))
+    try:
+        primary = pool.submit(_probe_one, website, urls[0])
+        try:
+            r = primary.result(timeout=HEDGE_DELAY)
+            if r["state"] == FOUND:
+                return r
+            best, primary = r, None
+        except FuturesTimeout:
+            pass                      # still running; it joins the fan-out below
+
+        pending = [pool.submit(_probe_one, website, u) for u in urls[1:]]
+        if primary is not None:
+            pending.append(primary)
+
+        try:
+            for fut in as_completed(pending,
+                                    timeout=max(0.05, deadline - time.monotonic())):
+                try:
+                    r = fut.result()
+                except Exception:
+                    continue
+                if r["state"] == FOUND:
+                    return r
+                if better(r, best):
+                    best = r
+        except FuturesTimeout:
+            pass                      # out of budget: answer with what we have
+    finally:
+        # wait=False so returning early actually returns early, and
+        # cancel_futures so probes that never started are dropped rather than
+        # run for nobody.
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    return best or {"state": UNREACHABLE, "url": urls[0]}

@@ -119,13 +119,11 @@ class SnippetCheckTest(TestCase):
 
     @contextmanager
     def _patch_fetch(self, *, status=200, body="", final="https://site.example/"):
-        """Stub BOTH _validate and _fetch. site.example doesn't resolve, so
-        without stubbing _validate the check bails as 'unreachable' before the
-        fetch we're trying to exercise. Yields the _fetch mock for call asserts."""
+        """Stub _fetch, which validates its own hops — site.example does not
+        resolve, so the real one would bail as 'unreachable' before the fetch we
+        are trying to exercise. Yields the mock for call asserts."""
         from unittest.mock import patch
-        with patch("apps.websites.snippet_check._validate",
-                   return_value=("https://site.example/", None)), \
-             patch("apps.websites.snippet_check._fetch",
+        with patch("apps.websites.snippet_check._fetch",
                    return_value=(status, {}, body, final)) as m:
             yield m
 
@@ -185,11 +183,168 @@ class SnippetCheckTest(TestCase):
         self.assertEqual(r.json()["snippet_state"], "missing")
         self.assertIn("isn't in the page", r.json()["message"])
 
-    def test_verify_reports_found_but_waiting(self):
+    def test_the_snippet_on_the_page_verifies_the_install_by_itself(self):
+        """The regression that made verification feel endless.
+
+        A correct install used to be reported as NOT installed until a visitor
+        happened to arrive, so the customer was told to go and load their own
+        site and press the button again — on a site with no traffic yet, a loop
+        with no exit. Reading our tag out of the served page settles it.
+        """
+        self.site.strict_mode = False
+        self.site.save(update_fields=["strict_mode"])
         with self._patch_fetch(body=self._page()):
             r = self._verify()
         self.assertEqual(r.json()["snippet_state"], "found")
-        self.assertFalse(r.json()["installed"])
+        self.assertTrue(r.json()["installed"])
+        # And it must not tell them to go and generate traffic first.
+        self.assertNotIn("verify again", r.json()["message"].lower())
+
+    def test_a_verified_install_stays_verified_without_pressing_the_button_again(self):
+        """It is recorded, so the next page load already knows. Without this the
+        customer re-verifies the same working install every visit."""
+        self.site.strict_mode = False
+        self.site.save(update_fields=["strict_mode"])
+        with self._patch_fetch(body=self._page()):
+            self._verify()
+        self.site.refresh_from_db()
+        self.assertIsNotNone(self.site.snippet_seen_at)
+        self.assertEqual(self.site.status, Website.Status.DETECTED)
+        self.assertEqual(self.site.live_state(), "installed")
+
+    def test_a_found_snippet_is_not_reported_as_waiting_for_a_visitor(self):
+        """The badge must stop saying "waiting for first visitor" once we can
+        see the tag — that phrasing reads as "your install didn't work"."""
+        self.site.snippet_seen_at = timezone.now()
+        self.site.save(update_fields=["snippet_seen_at"])
+        self.assertEqual(self.site.live_state(), "installed")
+
+    def test_strict_mode_problems_still_surface_on_a_snippet_only_verify(self):
+        """Verifying without traffic must not become a way to skip the strict
+        check — an async tag collects traffic fine and hides nothing."""
+        async_page = (f'<script async src="https://trynobot.com/bl.js" '
+                      f'data-site-id="{self.site.tracking_id}"></script>')
+        with self._patch_fetch(body=async_page):
+            r = self._verify()
+        self.assertEqual(r.json()["snippet_state"], "found")
+        self.assertEqual(r.json()["strict_state"], "async")
+        self.assertFalse(r.json()["installed"])     # amber, not green
+
+    def test_the_www_variant_is_tried_before_giving_up(self):
+        """A customer who typed the apex while the tag is on www had a correct
+        install reported as missing. We try the other half of the pair rather
+        than making them guess."""
+        from apps.websites import snippet_check
+        from unittest.mock import patch
+        self.site.url = "https://site.example/"
+
+        def fake_fetch(url, **kw):
+            if url.startswith("https://www.site.example"):
+                return 200, {}, self._page(), url
+            return 200, {}, "<html><head></head><body>nope</body></html>", url
+
+        with patch("apps.websites.snippet_check._fetch", side_effect=fake_fetch):
+            out = snippet_check.check(self.site)
+        self.assertEqual(out["state"], snippet_check.FOUND)
+        self.assertIn("www.site.example", out["checked_url"])
+
+    def test_a_correct_install_still_costs_a_single_fetch(self):
+        """The fallbacks must not slow down the common case: when the first
+        address has the tag, nothing else is fetched."""
+        from apps.websites import snippet_check
+        with self._patch_fetch(body=self._page()) as m:
+            snippet_check.check(self.site)
+        self.assertEqual(m.call_count, 1)
+
+    # --- how long it takes -------------------------------------------------
+    #
+    # Verification is a button someone presses right after pasting a snippet,
+    # and the complaint about it was never that it was wrong — it was that it
+    # took far longer than expected. These lock the bounds that fixed that, so
+    # a later change to the probe cannot quietly give the minute back.
+
+    def test_the_probe_is_given_a_tight_budget_not_the_report_one(self):
+        """The Bot Check report can afford to wait eight seconds a hop and three
+        hops a URL. This cannot: four URLs at that budget is about a minute of
+        spinner."""
+        from apps.websites import snippet_check
+        with self._patch_fetch(body=self._page()) as m:
+            snippet_check.check(self.site)
+        kw = m.call_args.kwargs
+        self.assertLessEqual(kw["timeout"], 5)
+        self.assertLessEqual(kw["max_redirects"], 2)
+        self.assertLessEqual(kw["max_bytes"], 300_000)
+
+    def test_an_early_match_does_not_wait_for_the_slow_siblings(self):
+        """The old version returned as soon as it found the tag, then blocked on
+        the thread pool's exit until every other probe had finished anyway — so
+        a www alternative on a dead host still cost the full timeout."""
+        import time
+        from unittest.mock import patch
+        from apps.websites import snippet_check
+
+        page = self._page()
+
+        def fetch(url, **kw):
+            if url.startswith("https://site.example"):
+                return 200, {}, page, url
+            time.sleep(3)           # the alternative host hangs
+            raise OSError("timeout")
+
+        started = time.monotonic()
+        with patch("apps.websites.snippet_check._fetch", side_effect=fetch):
+            out = snippet_check.check(self.site)
+        elapsed = time.monotonic() - started
+
+        self.assertEqual(out["state"], snippet_check.FOUND)
+        self.assertLess(elapsed, 3, "a found install waited on an unrelated slow probe")
+
+    def test_a_hanging_site_cannot_outlast_the_budget(self):
+        """Every probe hanging must still produce an answer, because a customer
+        watching a spinner is better served by 'we could not reach your site'
+        than by a correct answer they have given up waiting for."""
+        import time
+        from unittest.mock import patch
+        from apps.websites import snippet_check
+
+        def fetch(url, **kw):
+            # Kept modest rather than realistic: the worker threads outlive the
+            # call by design (that is the point of the budget), and the test
+            # process should not sit waiting for them at exit.
+            time.sleep(3)
+            raise OSError("timeout")
+
+        started = time.monotonic()
+        with patch("apps.websites.snippet_check._fetch", side_effect=fetch), \
+             patch.object(snippet_check, "PROBE_BUDGET", 1.2):
+            out = snippet_check.check(self.site)
+        elapsed = time.monotonic() - started
+
+        self.assertEqual(out["state"], snippet_check.UNREACHABLE)
+        self.assertLess(elapsed, 6, "the budget did not bound the check")
+
+    def test_the_read_stops_once_the_tag_is_complete(self):
+        """A 600KB page cost seconds of transfer to answer a question the first
+        few KB had already settled."""
+        from apps.websites import snippet_check
+        stop = snippet_check._stop_when(self.site.tracking_id)
+        tag = f'<script src="/bl.js" data-site-id="{self.site.tracking_id}"'
+
+        # Mid-tag: the id is there but strict_state still needs the closing '>'.
+        self.assertFalse(stop(tag.encode()))
+        self.assertTrue(stop((tag + "></script>").encode()))
+
+    def test_a_snippet_in_the_body_is_still_found(self):
+        """The obvious early stop — halt at </head> — would have been wrong:
+        plenty of customers paste the snippet before </body>, and we would have
+        reported their working install as missing."""
+        from apps.websites import snippet_check
+        body_page = (
+            '<!doctype html><html><head><title>t</title></head><body><p>hi</p>'
+            f'<script src="https://trynobot.com/bl.js" data-site-id="{self.site.tracking_id}"'
+            ' data-strict="1"></script></body></html>')
+        with self._patch_fetch(body=body_page):
+            self.assertEqual(snippet_check.check(self.site)["state"], snippet_check.FOUND)
 
     def test_verify_short_circuits_once_an_event_arrived(self):
         """A live event is proof enough — don't even fetch the page."""

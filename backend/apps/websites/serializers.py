@@ -13,8 +13,9 @@ class WebsiteSerializer(serializers.ModelSerializer):
         fields = ["id", "organization", "name", "domain", "url", "tracking_id",
                   "status", "live_state", "last_event_at", "created_at", "strict_mode",
                   "safe_browsing_flagged", "safe_browsing_threats", "safe_browsing_checked_at",
-                  "snippet"]
-        read_only_fields = ["tracking_id", "status", "last_event_at", "created_at"]
+                  "snippet_seen_at", "snippet"]
+        read_only_fields = ["tracking_id", "status", "last_event_at", "created_at",
+                            "snippet_seen_at"]
 
     def get_live_state(self, obj) -> str:
         return obj.live_state()

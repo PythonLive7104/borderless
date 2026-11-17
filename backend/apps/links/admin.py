@@ -1,20 +1,145 @@
 from django.contrib import admin
 from django.utils import timezone
 
+from . import rentals
 from .models import AbuseReport, PrivateDomainPurchase, ShortDomain, ShortLink
 from .sync import publish_link
 
 
+def _skipped_sentence(skipped: dict) -> str:
+    """Say which rows were left alone and why.
+
+    A bare "3 skipped" sends the admin back to the list to work out which three
+    and what to do about them, so each reason is named and the ones that will
+    become releasable on their own say so.
+    """
+    if not skipped:
+        return ""
+    reasons = {
+        rentals.PAID: "still paid up — leave them alone",
+        rentals.GRACE: "lapsed but still in grace — their links are meant to keep working",
+        rentals.NO_TERM: "owned with no end date — set one, or use Reclaim",
+        rentals.UNOWNED: "nobody rents them",
+    }
+    parts = [f"{n} {reasons.get(state, state)}"
+             for state, n in sorted(skipped.items(), key=lambda kv: -kv[1])]
+    return "Skipped: " + "; ".join(parts) + "."
+
+
+class RentalStateFilter(admin.SimpleListFilter):
+    """Find the domains sitting idle on a lapsed rental.
+
+    Rental state is a comparison between two dates and a grace period, so it
+    cannot be a plain field filter — and without it, finding the domains that
+    are ready to go back on sale means opening rows one at a time.
+    """
+    title = "rental"
+    parameter_name = "rental"
+
+    def lookups(self, request, model_admin):
+        # Most actionable first: this filter is opened to answer "what can I
+        # put back on sale?", not to browse.
+        return [(s, rentals.LABELS[s]) for s in
+                (rentals.RELEASABLE, rentals.GRACE, rentals.PAID,
+                 rentals.NO_TERM, rentals.UNOWNED)]
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        return rentals.releasable_filter(queryset, self.value())
+
+
 @admin.register(ShortDomain)
 class ShortDomainAdmin(admin.ModelAdmin):
-    list_display = ("host", "health_badge", "active", "is_shared", "organization",
-                    "is_default", "health_checked_at")
+    list_display = ("host", "health_badge", "rental", "active", "is_shared",
+                    "organization", "is_default", "health_checked_at")
     # health first: "which domain is broken?" is the question this page gets
     # opened to answer, and scanning a status column beats opening each row.
-    list_filter = ("health", "active", "is_shared", "is_default")
+    list_filter = ("health", RentalStateFilter, "active", "is_shared", "is_default")
     readonly_fields = ("health", "health_detail", "health_checked_at")
-    actions = ("reclaim_for_abuse", "hold_as_private_stock",
+    actions = ("release_lapsed_rentals", "reclaim_for_abuse", "hold_as_private_stock",
                "return_to_shared_pool", "check_health")
+
+    def get_queryset(self, request):
+        # organization is rendered for every row by both the rental column and
+        # the built-in one; without this the list costs a query per domain.
+        return super().get_queryset(request).select_related("organization")
+
+    @admin.display(description="Rental")
+    def rental(self, obj):
+        state = rentals.rental_state(obj)
+        if state == rentals.UNOWNED:
+            return "—"
+        if state == rentals.NO_TERM:
+            return "⚠️ owned, no end date"
+        if state == rentals.PAID:
+            return f"✅ paid to {obj.private_until:%Y-%m-%d}"
+        if state == rentals.GRACE:
+            return (f"⏳ lapsed {obj.private_until:%Y-%m-%d} — "
+                    f"links work until {obj.private_grace_ends:%Y-%m-%d}")
+        return f"🔁 lapsed {obj.private_until:%Y-%m-%d} — ready to release"
+
+    @admin.action(description="Release lapsed rental — back on sale, notifies the owner")
+    def release_lapsed_rentals(self, request, queryset):
+        """Put an idle, unrenewed private domain back into purchasable stock.
+
+        This is what the nightly job does, on demand and for chosen rows — for
+        when the job is not running yet, or an admin is looking at a specific
+        domain and wants it on sale now rather than tomorrow.
+
+        Only domains whose grace period has already run out are touched.
+        Everything else is skipped and counted, because the two ways to get this
+        wrong are both unrecoverable for the customer: releasing a domain that
+        is still paid up kills live campaigns someone has paid for, and
+        releasing one still inside grace breaks links while the owner is still
+        being told they have time to renew. An admin who needs to take a domain
+        back regardless has "Reclaim from the workspace (abuse)" for that.
+        """
+        released = withdrawn = 0
+        skipped = {}
+        not_sellable = []
+
+        for d in queryset:
+            state = rentals.rental_state(d)
+            if state != rentals.RELEASABLE:
+                skipped[state] = skipped.get(state, 0) + 1
+                continue
+            withdrawn += rentals.release_to_stock(d)
+            released += 1
+            # Back in stock, but stock is only offered when the domain is live
+            # and verified — so say so rather than let it sit unsold and
+            # unexplained.
+            if not (d.active and d.verified_at):
+                not_sellable.append(d.host)
+
+        if not released:
+            self.message_user(
+                request,
+                "Nothing released. " + _skipped_sentence(skipped),
+                level="WARNING")
+            return
+
+        msg = (f"{released} domain(s) released and back on sale"
+               f" — {withdrawn} link(s) withdrawn, former owners notified.")
+        if skipped:
+            msg += " " + _skipped_sentence(skipped)
+        self.message_user(request, msg)
+
+        if not_sellable:
+            self.message_user(
+                request,
+                "Not yet offered for purchase: " + ", ".join(not_sellable) +
+                " — stock must be Active with a verification date.",
+                level="WARNING")
+
+        waiting = PrivateDomainPurchase.objects.filter(
+            status=PrivateDomainPurchase.Status.PAID, domain__isnull=True).count()
+        if waiting:
+            self.message_user(
+                request,
+                f"{waiting} paid order(s) are waiting on stock — "
+                f'select them on the Private domain purchases page and run "Fulfil now".',
+                level="INFO")
 
     @admin.action(description="Reclaim from the workspace (abuse) — notifies them")
     def reclaim_for_abuse(self, request, queryset):

@@ -106,7 +106,12 @@ func main() {
 
 	go geo.Init(env("GEOIP_DB", "")) // real-time IP->country (free DB-IP lite)
 
-	h := &handler{st: st, allowCrawlers: env("ALLOW_VERIFIED_CRAWLERS", "1") != "0"}
+	h := &handler{
+		st:             st,
+		allowCrawlers:  env("ALLOW_VERIFIED_CRAWLERS", "1") != "0",
+		allowScanners:  env("ALLOW_LINK_SCANNERS", "1") != "0",
+		trustScannerUA: env("ALLOW_LINK_SCANNER_UA", "1") != "0",
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("/bl.js", serveTracker)
@@ -156,6 +161,18 @@ type handler struct {
 	// cloaking and gets sites flagged by Safe Browsing. On unless explicitly
 	// disabled (ALLOW_VERIFIED_CRAWLERS=0).
 	allowCrawlers bool
+	// Let email-security scanners and link-preview fetchers see what real
+	// visitors see. Serving them a decoy/404/403/interstitial is cloaking in
+	// exactly the sense a mail gateway tests for, and the message carrying the
+	// link is then refused at SMTP — so the recipient never receives it at all,
+	// not even in junk, while the same letter with the customer's own long URL
+	// arrives normally. On unless explicitly disabled (ALLOW_LINK_SCANNERS=0).
+	allowScanners bool
+	// Accept a scanner that only names itself in its user-agent, with no DNS
+	// proof. Required for the vendors that publish no stable PTR records
+	// (Mimecast, Barracuda); the cost is that a spoofed user-agent reaches the
+	// real destination. On unless disabled (ALLOW_LINK_SCANNER_UA=0).
+	trustScannerUA bool
 }
 
 func serveTracker(w http.ResponseWriter, _ *http.Request) {
@@ -307,6 +324,22 @@ func (h *handler) collect(w http.ResponseWriter, r *http.Request) {
 			if platform != "" {
 				reviewerPlatform = platform
 			}
+		}
+	}
+	// Same treatment on the tracker's ingestion path: a scanner that renders the
+	// page and runs our script must not be written into the shared bad-IP corpus
+	// (these vendors scan from a handful of addresses that every customer's mail
+	// passes through, so one poisoned entry degrades every link and site in the
+	// platform).
+	//
+	// String-only tier: /v1/collect takes an event from every pageview on every
+	// protected site, so it must not grow a DNS lookup. The reverse-DNS tier
+	// stays where it is affordable — on the redirect, and only when the
+	// alternative is to cloak.
+	if !verifiedCrawler && h.allowScanners && h.trustScannerUA {
+		if vendor, ok := crawler.ScannerClaims(fp.UserAgent); ok {
+			verifiedCrawler = true
+			result.Signals = append(result.Signals, "link_scanner", "scanner:"+vendor)
 		}
 	}
 	// NOT appended here. risk.Evaluate already emits "timezone_country_mismatch"
@@ -498,6 +531,20 @@ func (h *handler) score(ctx context.Context, siteID, ip, ua, ja3, ja4, country, 
 			if platform != "" {
 				reviewerPlatform = platform
 			}
+		}
+	}
+	// A mail gateway that follows the link through to the protected page must see
+	// what a human sees there too, or it reaches the same verdict one hop later
+	// and refuses the message anyway. This is the shared scoring routine behind
+	// both /v1/decide and /v1/guard, so setting it here covers the server-side
+	// Shield and the nginx auth_request path at once.
+	//
+	// String-only tier: this runs for every request to a protected site, so it
+	// must not grow a DNS lookup.
+	if !verifiedCrawler && h.allowScanners && h.trustScannerUA {
+		if vendor, ok := crawler.ScannerClaims(fp.UserAgent); ok {
+			verifiedCrawler = true
+			result.Signals = append(result.Signals, "link_scanner", "scanner:"+vendor)
 		}
 	}
 	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
@@ -765,8 +812,18 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// A link filters more eagerly than a page: known-bot UAs, automation tools,
 	// and anything suspicious+ (risk >= 40) — but never a verified crawler.
 	isBot := !verifiedCrawler && (fp.IsBot || fp.IsHeadless || result.Score >= 40)
+	// A fetcher that names itself an email scanner or a link-preview bot is kept
+	// out of the shared corpus, for the same reason Googlebot is: Microsoft,
+	// Proofpoint and Mimecast scan from a small number of addresses that every
+	// customer's mail passes through, so remembering one as a "bad IP" poisons
+	// every other link and site in the platform. This is the string-only tier on
+	// purpose — it runs for every click, and must not cost a DNS round trip.
+	claimedScanner := false
+	if h.allowScanners {
+		_, claimedScanner = crawler.ScannerClaims(fp.UserAgent)
+	}
 	// Remember clear bots so every other link/site sees this IP as suspicious.
-	if !verifiedCrawler && (result.Classification == "bot" || result.Classification == "fraud") {
+	if !verifiedCrawler && !claimedScanner && (result.Classification == "bot" || result.Classification == "fraud") {
 		h.rememberBot(fp.IP)
 		h.rememberBadFingerprint(fp.IP, ja3, ja4, "")
 	}
@@ -904,6 +961,47 @@ func (h *handler) shortlink(w http.ResponseWriter, r *http.Request) {
 	// block_datacenter, which matches EVERY crawler there is, since Googlebot
 	// and AdsBot all run from datacenter ranges. Any of those could serve a
 	// reviewer a decoy while a human got the destination, which is cloaking.
+	// Email-security scanners and link-preview fetchers are folded into the same
+	// chokepoint, because the failure they cause is worse than a Safe Browsing
+	// flag and far faster to arrive.
+	//
+	// A link that travels in an email is fetched before any human sees it: by
+	// the sending platform, by the receiving gateway (Microsoft Defender for
+	// Office 365 rewrites and fetches every URL in every message; so do
+	// Proofpoint, Mimecast, Barracuda, Cisco and the rest), and by the mail
+	// client drawing a preview. None of them is a browser, all of them come from
+	// datacenter ranges, and most send no useful user-agent — so by the time
+	// execution reaches here the engine has scored them as bots and `mode` is a
+	// 404, a 403, a blank body, a decoy or a JavaScript interstitial, while a
+	// human gets a 302 to the real destination.
+	//
+	// A mail gateway does not read that as traffic filtering. A shortened URL
+	// that answers the scanner differently from the browser is the textbook
+	// signature of a malicious redirect, so the message is refused at SMTP
+	// instead of being filed as spam — which is why the recipient sees nothing
+	// at all, not even in junk, and why the same letter arrives the moment the
+	// customer swaps our short link for their own long URL.
+	//
+	// Done lazily, and only when the engine was about to serve something other
+	// than the real destination: a visitor already being allowed through needs no
+	// decision here, so a genuine human click never pays for the DNS lookup.
+	if h.allowScanners && !verifiedCrawler && mode != "allow" && mode != "redirect" {
+		// Its own context, not the 400ms request budget: this is only reached
+		// for traffic that is about to be turned away, nothing latency-sensitive
+		// is waiting, and getting the answer wrong costs the customer a whole
+		// mailing list.
+		sctx, scancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
+		if vendor, ok := crawler.VerifiedScanner(sctx, fp.IP, fp.UserAgent,
+			h.trustScannerUA, true); ok {
+			verifiedCrawler = true
+			// Recorded in the click's signals (which are persisted), so a
+			// customer looking at an unexpected click can see it was their
+			// recipient's mail gateway and not a human opening the link.
+			result.Signals = append(result.Signals, "link_scanner", "scanner:"+vendor)
+		}
+		scancel()
+	}
+
 	mode, dest = enforceCrawlerPolicy(verifiedCrawler, mode, dest, link.Destination)
 
 	sigJSON, _ := json.Marshal(result.Signals)

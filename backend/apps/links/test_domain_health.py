@@ -9,6 +9,15 @@ from apps.links.models import ShortDomain
 
 
 def _run(**kw):
+    """Run the command with the email-blocklist lookups off by default.
+
+    Those lookups are plain DNS against Spamhaus/SURBL/URIBL, so leaving them
+    on here would make every test in this file hit the network: slow, flaky,
+    and answered differently depending on whose resolver the test host uses.
+    The lookups have their own hermetic tests in test_uriblocklist.py; a case
+    that wants them passes skip_email_blocklists=False.
+    """
+    kw.setdefault("skip_email_blocklists", True)
     out = StringIO()
     call_command("check_domain_health", stdout=out, stderr=out, **kw)
     return out.getvalue()

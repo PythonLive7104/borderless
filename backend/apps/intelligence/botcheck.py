@@ -69,8 +69,39 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None  # never auto-follow; we handle hops manually
 
 
-def _fetch(url):
-    """Fetch a URL with manual, validated redirects. Returns (status, headers, body, final_url) or raises."""
+def _read_body(resp, max_bytes, stop_when=None):
+    """Read up to max_bytes, stopping early when stop_when says we have enough.
+
+    The whole-body read is what made the snippet check slow on real sites: a
+    600KB page over a slow origin costs several seconds of transfer to answer a
+    question the first few KB already settled. stop_when is handed the bytes so
+    far and returns True once the answer cannot change, so a correct install on
+    a heavy page finishes as soon as the tag arrives instead of after the
+    footer, the inlined CSS and the analytics bundle.
+
+    Left at None — every existing caller — this reads exactly as before.
+    """
+    chunks, total = [], 0
+    while total < max_bytes:
+        chunk = resp.read(min(32_768, max_bytes - total))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if stop_when is not None and stop_when(b"".join(chunks)):
+            break
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
+def _fetch(url, *, timeout=TIMEOUT, max_bytes=MAX_BYTES,
+           max_redirects=MAX_REDIRECTS, stop_when=None):
+    """Fetch a URL with manual, validated redirects. Returns (status, headers, body, final_url) or raises.
+
+    The keyword arguments default to this module's constants, so the Bot Check
+    report is unaffected. They exist for the snippet check, which runs while a
+    customer waits on a button and so trades a little patience for latency: a
+    shorter timeout, fewer hops, and an early stop once the tag is in hand.
+    """
     opener = urllib.request.build_opener(_NoRedirect)
     seen = 0
     while True:
@@ -79,9 +110,9 @@ def _fetch(url):
             raise ValueError(err)
         req = urllib.request.Request(url, headers={"User-Agent": UA})
         try:
-            resp = opener.open(req, timeout=TIMEOUT)
+            resp = opener.open(req, timeout=timeout)
         except urllib.error.HTTPError as e:
-            if e.code in (301, 302, 303, 307, 308) and seen < MAX_REDIRECTS:
+            if e.code in (301, 302, 303, 307, 308) and seen < max_redirects:
                 loc = e.headers.get("Location")
                 if not loc:
                     raise ValueError("Redirect without a location.")
@@ -89,9 +120,9 @@ def _fetch(url):
                 seen += 1
                 continue
             # non-redirect HTTP error still has headers/body worth reading
-            body = e.read(MAX_BYTES).decode("utf-8", "replace")
+            body = _read_body(e, max_bytes, stop_when)
             return e.code, {k.lower(): v for k, v in e.headers.items()}, body, url
-        body = resp.read(MAX_BYTES).decode("utf-8", "replace")
+        body = _read_body(resp, max_bytes, stop_when)
         headers = {k.lower(): v for k, v in resp.headers.items()}
         return resp.status, headers, body, url
 

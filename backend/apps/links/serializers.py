@@ -72,6 +72,11 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         if "scan_optout" in self.initial_data:
             raise serializers.ValidationError({"scan_optout": (
                 "Scan overrides are no longer available. Use the fresh safety recheck.")})
+        challenge = attrs.get("challenge", getattr(self.instance, "challenge", False))
+        deep_check = attrs.get("deep_check", getattr(self.instance, "deep_check", False))
+        if challenge and deep_check:
+            raise serializers.ValidationError({"challenge": (
+                "Human confirmation can't be enabled while Deep browser check is enabled.")})
         website = attrs.get("website")
         org = attrs.get("organization") or getattr(self.instance, "organization", None)
         if website and org and website.organization_id != org.id:

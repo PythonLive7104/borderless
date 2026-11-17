@@ -341,6 +341,15 @@ class ChallengeFlagTest(TestCase):
                                         destination_url="https://example.com")
         self.assertFalse(json.loads(_payload(link))["challenge"])
 
+    def test_api_rejects_enabling_both_human_checks(self):
+        from apps.links.serializers import ShortLinkSerializer
+        link = ShortLink.objects.create(domain=_domain(), organization=self.org, slug="c5",
+                                        destination_url="https://example.com")
+        serializer = ShortLinkSerializer(
+            link, data={"challenge": True, "deep_check": True}, partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("challenge", serializer.errors)
+
 
 @override_settings(SHORTLINK_BASE=SHORT)
 class ForwardParamsTest(TestCase):
