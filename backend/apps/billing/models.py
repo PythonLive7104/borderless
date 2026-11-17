@@ -276,7 +276,12 @@ def link_shortener_enabled(organization_id) -> bool:
 
 def is_pro(organization_id) -> bool:
     """True when the workspace is on an ACTIVE Pro plan (weekly or monthly).
-    Gates Pro-only add-ons like bring-your-own-domain."""
+
+    Gates the Pro-only *perks*: the uncapped redirect allowance on a BYOD domain,
+    and private domains. Note it no longer gates ACCESS to bring-your-own-domain
+    itself — that moved to any paid plan (link_shortener_enabled), because
+    running redirects on your own domain is what makes them deliverable in email
+    and holding that back for the top tier hurt the honest customers it helps."""
     sub = Subscription.objects.filter(organization_id=organization_id).select_related("plan").first()
     return bool(_paid_active(sub) and sub.plan and sub.plan.slug == "pro")
 

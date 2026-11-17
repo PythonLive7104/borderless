@@ -1615,12 +1615,23 @@ class CustomDomainTest(TestCase):
                                  destination_url="https://e.example")
         self.assertEqual(self.c.delete(f"/api/links/domains/{did}/").status_code, 409)
 
-    def test_non_pro_plan_cannot_add(self):
+    def test_a_lower_paid_plan_can_now_add(self):
+        """BYOD is what makes redirects deliverable in email, so it's available
+        on any paid plan — not held back for Pro. A Basic subscriber must be
+        able to add their own domain."""
         from apps.billing.models import Plan, Subscription
         basic = Plan.objects.filter(slug="basic").first() or Plan.objects.create(
             slug="basic", name="Basic", price=25, monthly_events=100000, max_redirects=2, sort=1)
         Subscription.objects.filter(organization=self.org).update(plan=basic)
-        self.assertEqual(self._add("go.basic.com").status_code, 403)
+        self.assertEqual(self._add("go.basic.com").status_code, 201)
+
+    def test_an_unpaid_plan_still_cannot_add(self):
+        """Still payment-gated: redirects themselves are paid-only, so a trial
+        or lapsed workspace cannot add a domain. This is the abuse deterrent."""
+        from apps.billing.models import Subscription
+        Subscription.objects.filter(organization=self.org).update(
+            status=Subscription.Status.TRIALING)
+        self.assertEqual(self._add("go.trial.com").status_code, 403)
 
 
 class ValidHostTest(TestCase):

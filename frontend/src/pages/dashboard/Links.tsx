@@ -572,6 +572,7 @@ export default function Links() {
       {linkEnabled && current && <PrivateDomainPanel priv={priv} canManage={canManage}
         orgId={current.id} onChanged={load} perDomainCap={perDomainCap} />}
       {linkEnabled && current && <CustomDomainPanel orgId={current.id} canManage={canManage} onChanged={load}
+        available={linkEnabled}
         isPro={sub?.plan.slug === "pro" && sub?.status === "active"} />}
 
 

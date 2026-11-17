@@ -9,8 +9,10 @@
  *
  * Keep this honest against the backend. Detection features are NOT gated by
  * plan — tiers differ on caps (ad clicks, redirects, sites, retention, team)
- * and on support. The only code-gated entitlement is bring-your-own-domain,
- * which billing/models.py restricts to Pro via is_pro().
+ * and on support. Bring-your-own-domain is included on every PAID tier
+ * (link_shortener_enabled() in billing/models.py) — it's what makes redirects
+ * deliverable in email, so it isn't held back for the top tier. What stays
+ * Pro-only is the UNCAPPED redirect allowance on a BYOD domain (is_pro()).
  */
 
 /** Included on every paid tier. */
@@ -23,6 +25,7 @@ export const PLAN_BASE: string[] = [
   "Cross-surface bot memory — caught once, flagged everywhere",
   "Filtering funnel & campaign analytics",
   "IP allow / deny rules",
+  "Bring your own domain — the reliable way to send redirect links in email",
 ];
 
 /** What each tier adds on top of the one below it. */
@@ -36,7 +39,7 @@ export const PLAN_ADD: Record<string, string[]> = {
   pro: [
     "Highest ad-click, redirect & antibot-site limits",
     "Longest data retention",
-    "Bring your own domain — unlimited redirects on it, no cap",
+    "Unlimited redirects on your own domain — no per-domain cap",
     "Private domains available",
     "Dedicated support",
   ],

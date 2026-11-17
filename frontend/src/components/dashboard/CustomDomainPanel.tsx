@@ -8,8 +8,16 @@ import Button from "../ui/Button";
  * redirects on it. Kept deliberately step-by-step because the DNS part trips up
  * non-technical users — add, copy two records, verify.
  */
-export default function CustomDomainPanel({ orgId, canManage, onChanged, isPro }: {
-  orgId: number; canManage: boolean; onChanged: () => void; isPro: boolean;
+export default function CustomDomainPanel({ orgId, canManage, onChanged, available, isPro }: {
+  orgId: number; canManage: boolean; onChanged: () => void;
+  // available: may this workspace use its own domain at all. Now true on any
+  // paid plan, not just Pro — running redirects on your own domain is the thing
+  // that makes them deliver in email, so gating it behind the top tier punished
+  // the honest customers it was meant to help.
+  available: boolean;
+  // isPro only tweaks the copy: the UNCAPPED redirect allowance on a BYOD
+  // domain stays a Pro perk, while access to BYOD itself does not.
+  isPro: boolean;
 }) {
   const { confirm, notify } = useDialog();
   const [domains, setDomains] = useState<CustomDomain[]>([]);
@@ -20,7 +28,7 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged, isPro }
   async function load() {
     try { setDomains((await linkApi.customDomains(orgId)).domains); } catch { /* ignore */ }
   }
-  useEffect(() => { if (canManage && isPro) load(); /* eslint-disable-next-line */ }, [orgId, canManage, isPro]);
+  useEffect(() => { if (canManage && available) load(); /* eslint-disable-next-line */ }, [orgId, canManage, available]);
 
   async function add() {
     setErr(""); setBusy(true);
@@ -54,17 +62,28 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged, isPro }
       <div className="text-sm font-bold">Use your own domain</div>
       <p className="mt-1 text-sm text-fg-muted">
         Prefer your own brand? Point a domain you own (like <span className="font-mono">go.yourbrand.com</span>)
-        at us and run redirects on it. Its reputation is entirely yours — no rental to pay,
-        and <b>no limit on how many redirects you create on it</b>.
+        at us and run redirects on it. Its reputation is entirely yours — no rental to pay
+        {isPro && <>, and <b>no limit on how many redirects you create on it</b></>}.
       </p>
-      {!isPro && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/30 bg-brand/5 p-3">
-          <span className="text-sm text-fg-muted">Using your own domain is a <b>Pro</b> feature.</span>
-          <a href="/dashboard/billing" className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-600">Upgrade to Pro</a>
+
+      {/* Why this matters, said plainly. The shared domain has a ceiling in
+          email that reputation work can't lift, so an honest sender needs to
+          know the fix before they blame the product. */}
+      <div className="mt-3 rounded-xl border border-brand/30 bg-brand/5 p-3 text-sm text-fg-muted">
+        <b className="text-fg">Sending redirects in an email campaign?</b> Use your own domain.
+        Shared domains are filtered more heavily by email providers — true of every
+        link-tracking tool, not just TryNoBot. Your own domain carries your reputation
+        and delivers like your direct links.
+      </div>
+
+      {!available && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-bg-soft p-3">
+          <span className="text-sm text-fg-muted">Using your own domain is included on <b>every paid plan</b>.</span>
+          <a href="/dashboard/billing" className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-600">Choose a plan</a>
         </div>
       )}
 
-      {isPro && domains.length > 0 && (
+      {available && domains.length > 0 && (
         <div className="mt-3 space-y-3">
           {domains.map((d) => (
             <div key={d.id} className="rounded-xl border border-line p-3">
@@ -93,14 +112,14 @@ export default function CustomDomainPanel({ orgId, canManage, onChanged, isPro }
         </div>
       )}
 
-      {isPro && <div className="mt-4 flex flex-wrap items-center gap-2">
+      {available && <div className="mt-4 flex flex-wrap items-center gap-2">
         <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="go.yourbrand.com"
           className="min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
         <Button onClick={add} disabled={busy || !host.trim()} variant="outline">
           {busy ? "…" : "Add domain"}
         </Button>
       </div>}
-      {isPro && err && <div className="mt-2 text-xs text-red-600">{err}</div>}
+      {available && err && <div className="mt-2 text-xs text-red-600">{err}</div>}
     </div>
   );
 }

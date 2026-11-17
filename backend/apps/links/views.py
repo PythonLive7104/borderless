@@ -414,15 +414,24 @@ class CustomDomainView(views.APIView):
                                      ShortDomain.byod_for(org_id).order_by("host")]})
 
     def post(self, request):
-        from apps.billing.models import is_pro
+        from apps.billing.models import link_shortener_enabled
         from .customdomains import new_token, valid_host, txt_name
 
         org_id = request.data.get("organization")
         if not self._manager(org_id):
             raise PermissionDenied("Only Owners and Admins can add a domain.")
-        if not is_pro(org_id):
-            return Response({"detail": "Using your own domain is a Pro-plan feature. "
-                                       "Upgrade to Pro on the Billing page to add one."}, status=403)
+        # Available on any paid plan, not just Pro. Running redirects on your own
+        # domain is the thing that makes them deliverable in email — a shared
+        # shortener is filtered more heavily by mailbox providers whatever its
+        # reputation — so gating the deliverability fix behind the top tier
+        # mostly punished the honest customers it was meant to help. Still
+        # payment-gated (redirects themselves are paid-only), which keeps the
+        # abuse deterrence; what Pro keeps to itself is the UNCAPPED link
+        # allowance on a BYOD domain (see the redirect-create view), not access.
+        if not link_shortener_enabled(org_id):
+            return Response({"detail": "Using your own domain for redirects is available on any "
+                                       "paid plan. Start or renew a plan on the Billing page to "
+                                       "add one."}, status=403)
 
         host = str(request.data.get("host", "")).strip().lower()
         # tolerate a pasted URL
