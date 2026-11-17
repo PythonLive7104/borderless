@@ -112,11 +112,47 @@ class ShortDomain(models.Model):
         return cls.objects.filter(active=True, verified_at__isnull=False).filter(
             Q(is_shared=True, organization__isnull=True) | Q(organization_id=organization_id))
 
+    # Health states that make a domain unfit to sell. Both mean the buyer would
+    # be paying for something that does not work: FLAGGED puts a browser
+    # interstitial in front of every link on it and gets mail carrying it
+    # refused at the recipient's gateway, UNREACHABLE means it does not resolve
+    # or serve at all.
+    #
+    # UNKNOWN is deliberately NOT here. It only means the scheduled check has
+    # not run yet, and excluding it would make every freshly registered domain
+    # unsellable until the next cron — turning a missing check into lost sales.
+    UNSELLABLE_HEALTH = (Health.FLAGGED, Health.UNREACHABLE)
+
+    @property
+    def sale_blocker(self) -> str:
+        """Why this domain cannot be sold right now, or "" if it can.
+
+        Shared with the admin so a release action can say "this one will not be
+        offered, and here is why" instead of letting it sit in stock unsold and
+        unexplained.
+        """
+        if not self.active:
+            return "retired (Active is unticked)"
+        if not self.verified_at:
+            return "not verified"
+        if self.health in self.UNSELLABLE_HEALTH:
+            return self.get_health_display().lower()
+        return ""
+
     @classmethod
     def private_stock(cls):
-        """Registered, verified domains held back for private sale."""
+        """Registered, verified, working domains held back for private sale.
+
+        Health is part of the definition, not a detail. A domain can re-enter
+        stock long after it was last checked — a lapsed rental is released, an
+        abuse reclaim hands one back — and without this, a host that was
+        blocklisted while somebody else was renting it goes straight back on the
+        shelf and the next customer pays for a name whose links are already
+        broken everywhere that matters.
+        """
         return cls.objects.filter(active=True, verified_at__isnull=False,
-                                  is_shared=False, organization__isnull=True)
+                                  is_shared=False, organization__isnull=True) \
+                          .exclude(health__in=cls.UNSELLABLE_HEALTH)
 
     @classmethod
     def private_for(cls, organization_id):

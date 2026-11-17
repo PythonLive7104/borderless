@@ -55,6 +55,21 @@ class OrganizationDetailView(generics.RetrieveUpdateAPIView):
         org._member = ensure_membership(self.request.user, org)
         return org
 
+class ActivationView(views.APIView):
+    """Setup progress for one workspace.
+
+    IsOrgMember, not IsOrgManager: an analyst looking at an empty dashboard
+    needs to know why it is empty just as much as the owner does, and this
+    exposes nothing beyond what that member can already see on the pages it
+    links to.
+    """
+    permission_classes = [IsAuthenticated, IsOrgMember]
+
+    def get(self, request, org_id):
+        from .activation import activation_state
+        return Response(activation_state(org_id))
+
+
 class MemberListView(generics.ListAPIView):
     serializer_class = MemberSerializer
     permission_classes = [IsOrgMember]

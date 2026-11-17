@@ -241,11 +241,37 @@ export type Role = "owner" | "admin" | "analyst";
 export interface Organization { id: number; name: string; slug: string; role: Role; member_count: number; link_scan_optout: boolean; created_at: string; }
 export interface Member { id: number; email: string; first_name: string; last_name: string; role: Role; created_at: string; }
 
+/** One setup milestone. `at` is when it happened, null if it has not. */
+export interface ActivationStep {
+  key: "target" | "install" | "traffic" | "detection" | "protection" | "shield";
+  title: string;
+  detail: string;
+  done: boolean;
+  at: string | null;
+  optional: boolean;
+  cta_label: string;
+  cta_path: string;
+  meta: Record<string, unknown>;
+}
+
+export interface ActivationState {
+  steps: ActivationStep[];
+  completed: number;
+  total: number;
+  percent: number;
+  complete: boolean;
+  next: ActivationStep | null;
+  has_website: boolean;
+  has_link: boolean;
+}
+
 export const orgApi = {
   list: (signal?: AbortSignal) => http.get<{ results: Organization[] } | Organization[]>("/organizations/", signal),
   create: (name: string, signal?: AbortSignal) => http.post<Organization>("/organizations/", { name }, true, signal),
   update: (id: number, patch: Partial<Organization>, signal?: AbortSignal) => http.patch<Organization>(`/organizations/${id}/`, patch, signal),
   members: (orgId: number, signal?: AbortSignal) => http.get<{ results: Member[] }>(`/organizations/${orgId}/members/`, signal),
+  activation: (orgId: number, signal?: AbortSignal) =>
+    http.get<ActivationState>(`/organizations/${orgId}/activation/`, signal),
   invite: (orgId: number, email: string, role: Role, signal?: AbortSignal) =>
     http.post(`/organizations/${orgId}/invitations/`, { email, role }, true, signal),
   changeRole: (orgId: number, memberId: number, role: Role, signal?: AbortSignal) =>

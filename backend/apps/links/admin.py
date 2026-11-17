@@ -120,11 +120,14 @@ class ShortDomainAdmin(admin.ModelAdmin):
                 continue
             withdrawn += rentals.release_to_stock(d, reason=state)
             released += 1
-            # Back in stock, but stock is only offered when the domain is live
-            # and verified — so say so rather than let it sit unsold and
-            # unexplained.
-            if not (d.active and d.verified_at):
-                not_sellable.append(d.host)
+            # Back in stock is not the same as on sale: a retired, unverified,
+            # blocklisted or dead domain is excluded from private_stock(). Say
+            # so, with the reason, rather than let it sit unsold and
+            # unexplained — the blocklisted case especially, because the row
+            # otherwise looks completely normal.
+            blocker = d.sale_blocker
+            if blocker:
+                not_sellable.append(f"{d.host} ({blocker})")
 
         if not released:
             self.message_user(
@@ -142,8 +145,8 @@ class ShortDomainAdmin(admin.ModelAdmin):
         if not_sellable:
             self.message_user(
                 request,
-                "Not yet offered for purchase: " + ", ".join(not_sellable) +
-                " — stock must be Active with a verification date.",
+                "Released, but NOT offered for purchase: " + ", ".join(not_sellable) +
+                ". Fix the cause or retire the domain — do not sell it as is.",
                 level="WARNING")
 
         waiting = PrivateDomainPurchase.objects.filter(

@@ -274,8 +274,88 @@ class AdminActionTest(TestCase):
         d = _domain("idle.cc", self.org, self.now - timedelta(days=GRACE + 1))
         ShortDomain.objects.filter(pk=d.pk).update(active=False)
         out = self._run("idle.cc")
-        self.assertIn("Not yet offered", out)
+        self.assertIn("NOT offered", out)
         self.assertIn("idle.cc", out)
+
+    def test_a_blocklisted_domain_is_released_but_not_put_back_on_sale(self):
+        """The case from the admin list: a flagged domain whose renter left.
+
+        It has to come back — the workspace is not entitled to it — but selling
+        it on is worse than not selling anything. The links on it get a browser
+        interstitial, and mail carrying them is refused at the recipient's
+        gateway, so the next customer pays for a name that is already broken
+        everywhere that matters. The row looks completely normal otherwise,
+        which is why the warning names the reason.
+        """
+        d = _domain("burned.cc", self.org, self.now - timedelta(days=GRACE + 1))
+        ShortDomain.objects.filter(pk=d.pk).update(
+            health=ShortDomain.Health.FLAGGED,
+            health_detail="flagged by virustotal")
+        out = self._run("burned.cc")
+
+        released = ShortDomain.objects.get(host="burned.cc")
+        self.assertIsNone(released.organization_id)      # taken back
+        self.assertNotIn(released, ShortDomain.private_stock())   # but not for sale
+        self.assertIn("NOT offered", out)
+        self.assertIn("burned.cc", out)
+        self.assertIn("flagged", out.lower())
+
+
+class SellableStockTest(TestCase):
+    """What may be offered for private sale.
+
+    private_stock() is the single gate every purchase path goes through —
+    checkout, admin fulfilment, the buyer's own pick — so a domain that should
+    not be sold has to be excluded here rather than at each call site.
+    """
+
+    def setUp(self):
+        self.d = _domain("stock.cc")
+
+    def test_a_healthy_unsold_domain_is_for_sale(self):
+        self.assertIn(self.d, ShortDomain.private_stock())
+
+    def test_an_unchecked_domain_is_still_for_sale(self):
+        """UNKNOWN means the cron has not run, not that anything is wrong.
+        Excluding it would make every freshly registered domain unsellable
+        until the next check — a missing check turning into lost sales."""
+        ShortDomain.objects.filter(pk=self.d.pk).update(
+            health=ShortDomain.Health.UNKNOWN)
+        self.assertIn(self.d, ShortDomain.private_stock())
+
+    def test_a_flagged_domain_is_withheld(self):
+        ShortDomain.objects.filter(pk=self.d.pk).update(
+            health=ShortDomain.Health.FLAGGED)
+        self.assertNotIn(self.d, ShortDomain.private_stock())
+
+    def test_a_dead_domain_is_withheld(self):
+        ShortDomain.objects.filter(pk=self.d.pk).update(
+            health=ShortDomain.Health.UNREACHABLE)
+        self.assertNotIn(self.d, ShortDomain.private_stock())
+
+    def test_the_blocker_reason_is_reportable(self):
+        for state, expect in ((ShortDomain.Health.FLAGGED, "flagged"),
+                              (ShortDomain.Health.UNREACHABLE, "dns")):
+            ShortDomain.objects.filter(pk=self.d.pk).update(health=state)
+            self.assertIn(expect, ShortDomain.objects.get(pk=self.d.pk).sale_blocker.lower())
+        ShortDomain.objects.filter(pk=self.d.pk).update(health=ShortDomain.Health.OK)
+        self.assertEqual(ShortDomain.objects.get(pk=self.d.pk).sale_blocker, "")
+
+    def test_a_flagged_domain_cannot_be_handed_to_a_paid_order(self):
+        """The gate that matters most: assign_domain() sources from
+        private_stock(), so a blocklisted name must never reach a buyer who has
+        already paid."""
+        from apps.links.models import PrivateDomainPurchase
+        from apps.links.purchases import assign_domain
+        org = _org("buyer@rentals.example")
+        ShortDomain.objects.filter(pk=self.d.pk).update(
+            health=ShortDomain.Health.FLAGGED)
+        order = PrivateDomainPurchase.objects.create(
+            organization=org, amount=5, status=PrivateDomainPurchase.Status.PAID)
+
+        self.assertIsNone(assign_domain(order))
+        order.refresh_from_db()
+        self.assertIsNone(order.domain_id)   # still waiting, not fulfilled badly
 
 
 class NightlyJobTest(TestCase):

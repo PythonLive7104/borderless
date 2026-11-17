@@ -347,14 +347,48 @@ class SnippetCheckTest(TestCase):
             self.assertEqual(snippet_check.check(self.site)["state"], snippet_check.FOUND)
 
     def test_verify_short_circuits_once_an_event_arrived(self):
-        """A live event is proof enough — don't even fetch the page."""
+        """A live event is proof enough — don't even fetch the page.
+
+        Only with strict mode off, which is the condition the view actually
+        tests. This used to assert it unconditionally, from before strict mode
+        became the default for new sites, and it hung rather than failed: the
+        bare MagicMock stood in for a probe result, reached the JSON renderer,
+        and DRF's encoder duck-types NumPy with `hasattr(obj, "tolist")` —
+        which a MagicMock answers yes to, forever, returning a fresh mock each
+        time. Any full run of this suite stopped here. Hence the real return
+        value below, in both cases.
+        """
         from unittest.mock import patch
+        self.site.strict_mode = False
         self.site.last_event_at = timezone.now()
-        self.site.save(update_fields=["last_event_at"])
+        self.site.save(update_fields=["strict_mode", "last_event_at"])
         with patch("apps.websites.snippet_check.check") as probe:
             r = self._verify()
         probe.assert_not_called()
         self.assertTrue(r.json()["installed"])
+
+    def test_with_strict_mode_on_it_still_reads_the_page(self):
+        """The deliberate exception, and the reason the test above is narrower
+        than it looks: traffic proves the script ran, but says nothing about
+        whether the tag on the page can hide it. An async tag collects traffic
+        perfectly well while hiding nothing, so strict mode has to be checked
+        against the real page even when events are already arriving."""
+        from unittest.mock import patch
+        from apps.websites import snippet_check
+        self.assertTrue(self.site.strict_mode)        # the default for new sites
+        self.site.last_event_at = timezone.now()
+        self.site.save(update_fields=["last_event_at"])
+        with patch("apps.websites.snippet_check.check",
+                   return_value={"state": snippet_check.FOUND,
+                                 "url": "https://site.example/",
+                                 "checked_url": "https://site.example/",
+                                 "status_code": 200,
+                                 "strict_state": snippet_check.STRICT_OK,
+                                 "tag": ""}) as probe:
+            r = self._verify()
+        probe.assert_called_once()
+        self.assertTrue(r.json()["installed"])
+        self.assertEqual(r.json()["strict_state"], snippet_check.STRICT_OK)
 
 
 class StrictModeTest(TestCase):
