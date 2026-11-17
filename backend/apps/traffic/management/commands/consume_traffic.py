@@ -12,7 +12,7 @@ from django.core.management.base import BaseCommand
 
 from apps.websites.models import Website
 from apps.traffic.models import Visitor, Session, TrafficEvent, Conversion
-from apps.traffic.paid_click import classify as classify_paid
+from apps.traffic.paid_click import campaign_ref, classify as classify_paid
 from apps.integrations.dispatch import dispatch
 from apps.intelligence.service import enrich
 
@@ -146,6 +146,10 @@ class Command(BaseCommand):
         # per event would undercount to zero.
         is_paid, ad_platform = classify_paid(
             f.get("url", ""), f.get("utm_medium", ""), f.get("utm_source", ""))
+        # Read from the same first-event landing URL and for the same reason:
+        # later pageviews have lost the ValueTrack parameters, so reading them
+        # per event would blank the campaign on everything after the entry hit.
+        ad_campaign_id, ad_click_id = campaign_ref(f.get("url", ""))
         session, _ = Session.objects.get_or_create(
             website=site, session_id=f.get("session_id", "")[:64],
             defaults={
@@ -153,6 +157,7 @@ class Command(BaseCommand):
                 "utm_source": f.get("utm_source", ""), "utm_medium": f.get("utm_medium", ""),
                 "utm_campaign": f.get("utm_campaign", ""),
                 "is_paid_click": is_paid, "ad_platform": ad_platform,
+                "ad_campaign_id": ad_campaign_id, "ad_click_id": ad_click_id,
             },
         )
 

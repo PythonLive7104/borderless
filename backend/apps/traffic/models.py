@@ -38,6 +38,16 @@ class Session(models.Model):
     # session, however many pages the visitor then reads.
     is_paid_click = models.BooleanField(default=False, db_index=True)
     ad_platform = models.CharField(max_length=24, blank=True)
+    # The ad platform's OWN campaign id, read from the landing URL (ValueTrack
+    # `{campaignid}` via our final-URL suffix). Not utm_campaign, which is a
+    # name the advertiser typed: an IP exclusion is a CampaignCriterion and has
+    # to be addressed to a campaign by id, so without this there is nothing to
+    # push an exclusion to. Indexed because the exclusion allocator groups by it.
+    ad_campaign_id = models.CharField(max_length=40, blank=True, db_index=True)
+    # The click id, kept as the fallback route to a campaign for accounts that
+    # never added the suffix — it can be resolved through the platform API once
+    # a developer token exists.
+    ad_click_id = models.CharField(max_length=40, blank=True)
 
     class Meta:
         unique_together = ("website", "session_id")

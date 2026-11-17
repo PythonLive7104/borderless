@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
+import AdTrackingSuffix from "../../components/dashboard/AdTrackingSuffix";
 
 const CARDS = [
   { title: "JavaScript Tracker", desc: "The snippet you paste into your website to start collecting traffic.", to: "/dashboard/websites", cta: "Manage websites", status: "Set up per website" },
@@ -26,6 +27,8 @@ export default function Integrations() {
           </div>
         ))}
       </div>
+
+      <AdTrackingSuffix />
     </div>
   );
 }

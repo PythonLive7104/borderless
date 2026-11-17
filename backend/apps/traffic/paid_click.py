@@ -46,6 +46,53 @@ PAID_MEDIUMS = {
 
 UNKNOWN = "other_paid"
 
+# Where the ad platform's own campaign id arrives, best first.
+#
+# Why this is needed at all: a Google Ads IP exclusion is a CampaignCriterion —
+# it attaches to ONE campaign, by numeric id. utm_campaign is a name the
+# advertiser typed, and `Campaign` in apps.campaigns is our own row keyed on
+# that name; neither can address a campaign through the API. The gclid can be
+# resolved to a campaign, but only by asking Google, which needs the developer
+# token and a round trip per click.
+#
+# ValueTrack costs neither. The advertiser pastes a final-URL suffix once and
+# Google substitutes the real id on every click, so it arrives in the landing
+# URL the tracker already sends. Nothing new is collected and no API is called.
+#
+# `tnb_cid` is ours, so nothing else can collide with it. The rest are the
+# names people already have in their URLs from other tools — read opportunisti-
+# cally, because a customer who already tags campaigns should not have to redo
+# it to turn this on.
+CAMPAIGN_ID_PARAMS = ("tnb_cid", "campaignid", "campaign_id", "utm_campaign_id")
+
+# Ad platform click ids we can later resolve to a campaign through the platform
+# API, for customers who never add the suffix. Stored so that path stays open.
+CLICK_ID_PARAMS = ("tnb_gid", "gclid", "gbraid", "wbraid", "msclkid")
+
+
+def _first_param(params: dict, names) -> str:
+    for name in names:
+        for value in params.get(name, []):
+            value = (value or "").strip()
+            # ValueTrack leaves the literal braces in place when a parameter
+            # does not apply to the click ("{campaignid}" on a non-ad visit),
+            # and some setups ship the template to production by mistake.
+            # Storing that would put a fake campaign id on real traffic.
+            if value and "{" not in value and "}" not in value:
+                return value[:40]
+    return ""
+
+
+def campaign_ref(landing_url: str = "") -> tuple:
+    """(campaign_id, click_id) read from a landing URL. Both may be "".
+
+    Pure parsing, no network. The campaign id is what an exclusion has to be
+    addressed to; the click id is the fallback route for accounts that never
+    added the suffix.
+    """
+    params = _params(landing_url or "")
+    return _first_param(params, CAMPAIGN_ID_PARAMS), _first_param(params, CLICK_ID_PARAMS)
+
 
 def _params(url: str) -> dict:
     try:
