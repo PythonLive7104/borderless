@@ -40,13 +40,13 @@ class RentalStateFilter(admin.SimpleListFilter):
         # Most actionable first: this filter is opened to answer "what can I
         # put back on sale?", not to browse.
         return [(s, rentals.LABELS[s]) for s in
-                (rentals.RELEASABLE, rentals.GRACE, rentals.PAID,
-                 rentals.NO_TERM, rentals.UNOWNED)]
+                (rentals.IDLE_PLAN, rentals.RELEASABLE, rentals.GRACE,
+                 rentals.PAID, rentals.NO_TERM, rentals.UNOWNED)]
 
     def queryset(self, request, queryset):
         if not self.value():
             return queryset
-        return rentals.releasable_filter(queryset, self.value())
+        return rentals.filter_by_state(queryset, self.value())
 
 
 @admin.register(ShortDomain)
@@ -72,6 +72,14 @@ class ShortDomainAdmin(admin.ModelAdmin):
             return "—"
         if state == rentals.NO_TERM:
             return "⚠️ owned, no end date"
+        if state == rentals.IDLE_PLAN:
+            # Says the term too, because the term is what looks reassuring here
+            # and is the reason this domain was not already releasable: the
+            # October 2026 top-up gave every domain a free year, so a term into
+            # 2027 says nothing about whether the customer is still paying.
+            term = (f" (term to {obj.private_until:%Y-%m-%d})"
+                    if obj.private_until else "")
+            return f"🔁 subscription lapsed — idle, ready to release{term}"
         if state == rentals.PAID:
             return f"✅ paid to {obj.private_until:%Y-%m-%d}"
         if state == rentals.GRACE:
@@ -79,21 +87,27 @@ class ShortDomainAdmin(admin.ModelAdmin):
                     f"links work until {obj.private_grace_ends:%Y-%m-%d}")
         return f"🔁 lapsed {obj.private_until:%Y-%m-%d} — ready to release"
 
-    @admin.action(description="Release lapsed rental — back on sale, notifies the owner")
+    @admin.action(description="Release idle domain — back on sale, notifies the owner")
     def release_lapsed_rentals(self, request, queryset):
-        """Put an idle, unrenewed private domain back into purchasable stock.
+        """Put an idle private domain back into purchasable stock.
 
         This is what the nightly job does, on demand and for chosen rows — for
         when the job is not running yet, or an admin is looking at a specific
         domain and wants it on sale now rather than tomorrow.
 
-        Only domains whose grace period has already run out are touched.
-        Everything else is skipped and counted, because the two ways to get this
-        wrong are both unrecoverable for the customer: releasing a domain that
-        is still paid up kills live campaigns someone has paid for, and
-        releasing one still inside grace breaks links while the owner is still
-        being told they have time to renew. An admin who needs to take a domain
-        back regardless has "Reclaim from the workspace (abuse)" for that.
+        Idle means one of two things, and the second is the common one:
+        the rental term ran out and its grace period is over, OR the workspace's
+        subscription lapsed more than a grace period ago, which stops their
+        links serving at all and leaves the domain reserved against a customer
+        who has left. The term alone is not trusted, because the October 2026
+        top-up extended every domain by a free year regardless of who was still
+        paying.
+
+        Anything else is skipped and counted. Releasing a domain whose owner is
+        still paying kills live campaigns, and releasing one inside grace breaks
+        links while the owner is still being told they have time to renew;
+        neither is recoverable by the customer. An admin who needs to take a
+        domain back regardless has "Reclaim from the workspace (abuse)".
         """
         released = withdrawn = 0
         skipped = {}
@@ -101,10 +115,10 @@ class ShortDomainAdmin(admin.ModelAdmin):
 
         for d in queryset:
             state = rentals.rental_state(d)
-            if state != rentals.RELEASABLE:
+            if state not in rentals.IDLE_STATES:
                 skipped[state] = skipped.get(state, 0) + 1
                 continue
-            withdrawn += rentals.release_to_stock(d)
+            withdrawn += rentals.release_to_stock(d, reason=state)
             released += 1
             # Back in stock, but stock is only offered when the domain is live
             # and verified — so say so rather than let it sit unsold and

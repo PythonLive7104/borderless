@@ -1,16 +1,22 @@
-"""Releasing a lapsed private domain back onto the market.
+"""Releasing an idle private domain back onto the market.
 
-Two things are worth pinning here, and they are not the happy path.
+Three things are worth pinning here, and none of them is the happy path.
 
-The first is the refusals. Releasing a domain that is still paid up, or still
-inside its grace period, breaks links the owner is being actively told will keep
-working — and neither is recoverable by the person it happens to. So the gate is
-tested harder than the release.
+The first is that a term in the future does not mean anybody is paying. The
+October 2026 top-up extended every private domain by a free year, so a workspace
+that stopped subscribing months ago still shows a term running into 2027. The
+subscription is what decides, and these tests cover that case specifically
+because it is the one the obvious field gets wrong.
 
-The second is that rental_state() (one row, in Python) and releasable_filter()
-(a queryset, in SQL) agree. They are separate implementations of the same
-comparison, written so the admin can filter hundreds of rows without loading
-them, and nothing but a test stops them drifting apart.
+The second is the refusals. Releasing a domain whose owner is still paying, or
+one still inside its grace period, breaks links the owner is being actively told
+will keep working — and neither is recoverable by the person it happens to. So
+the gate is tested harder than the release.
+
+The third is that rental_state() (one row) and filter_by_state() (a queryset)
+agree. The term-only states are settled in SQL for the admin list and the rest
+row by row, so they are two implementations of one question and nothing but a
+test stops them drifting apart.
 """
 from datetime import timedelta
 from unittest.mock import patch
@@ -40,12 +46,24 @@ def _domain(host, org=None, until=None):
         verified_at=timezone.now(), private_until=until)
 
 
+def _lapse_plan(org, days_ago):
+    """Put this workspace's subscription out of its paid window."""
+    from apps.billing.models import Subscription
+    sub = Subscription.objects.get(organization=org)
+    sub.status = Subscription.Status.ACTIVE
+    sub.period_end = timezone.now() - timedelta(days=days_ago)
+    sub.save(update_fields=["status", "period_end"])
+    return sub
+
+
 class RentalStateTest(TestCase):
     def setUp(self):
         self.now = timezone.now()
         self.org = _org()
 
-    def test_the_five_states(self):
+    def test_the_six_states(self):
+        lapsed_org = _org("gone@rentals.example")
+        _lapse_plan(lapsed_org, GRACE + 1)
         cases = [
             (_domain("unowned.cc"), rentals.UNOWNED),
             (_domain("noterm.cc", self.org), rentals.NO_TERM),
@@ -53,9 +71,42 @@ class RentalStateTest(TestCase):
             (_domain("grace.cc", self.org, self.now - timedelta(days=1)), rentals.GRACE),
             (_domain("done.cc", self.org, self.now - timedelta(days=GRACE + 1)),
              rentals.RELEASABLE),
+            # The case the term gets wrong: a year left on the clock, nobody paying.
+            (_domain("idle.cc", lapsed_org, self.now + timedelta(days=330)),
+             rentals.IDLE_PLAN),
         ]
         for d, want in cases:
             self.assertEqual(rentals.rental_state(d, self.now), want, d.host)
+
+    def test_a_long_term_does_not_protect_a_workspace_that_stopped_paying(self):
+        """The whole point. The October 2026 top-up handed every domain a free
+        year, so 'paid to 2027' is what a lapsed customer's domain looks like."""
+        gone = _org("lapsed@rentals.example")
+        _lapse_plan(gone, GRACE + 30)
+        d = _domain("stale.cc", gone, self.now + timedelta(days=343))
+        self.assertEqual(rentals.rental_state(d, self.now), rentals.IDLE_PLAN)
+
+    def test_a_subscription_that_just_lapsed_is_still_protected(self):
+        """Someone who renews a few days late must not find their domain sold."""
+        gone = _org("late@rentals.example")
+        _lapse_plan(gone, 1)
+        d = _domain("recent.cc", gone, self.now + timedelta(days=300))
+        self.assertEqual(rentals.rental_state(d, self.now), rentals.PAID)
+
+    def test_a_workspace_with_no_subscription_row_is_left_alone(self):
+        """Billing does not lock a half-created org, and nor do we — selling its
+        domain on the strength of a missing row would be the worst kind of bug."""
+        from apps.billing.models import Subscription
+        bare = _org("bare@rentals.example")
+        Subscription.objects.filter(organization=bare).delete()
+        d = _domain("bare.cc", bare, self.now + timedelta(days=10))
+        self.assertEqual(rentals.rental_state(d, self.now), rentals.PAID)
+
+    def test_a_lapsed_plan_with_no_term_is_idle_too(self):
+        gone = _org("noterm@rentals.example")
+        _lapse_plan(gone, GRACE + 2)
+        d = _domain("noterm-idle.cc", gone, None)
+        self.assertEqual(rentals.rental_state(d, self.now), rentals.IDLE_PLAN)
 
     def test_the_last_day_of_grace_is_still_grace(self):
         """Off by one here breaks links a day early, while the owner is still
@@ -68,16 +119,23 @@ class RentalStateTest(TestCase):
         self.assertEqual(rentals.rental_state(d, self.now), rentals.PAID)
 
     def test_python_and_sql_agree_on_every_state(self):
-        """The guard against the two implementations drifting apart."""
+        """The guard against the two implementations drifting apart.
+
+        Includes the idle-plan row deliberately: a naive "paid" filter is just
+        `private_until >= now`, which would scoop that row up and quietly hand a
+        lapsed customer's domain back to the protected pile."""
         _domain("a-unowned.cc")
         _domain("b-noterm.cc", self.org)
         _domain("c-paid.cc", self.org, self.now + timedelta(days=3))
         _domain("d-grace.cc", self.org, self.now - timedelta(hours=2))
         _domain("e-done.cc", self.org, self.now - timedelta(days=GRACE + 2))
+        gone = _org("sqlgone@rentals.example")
+        _lapse_plan(gone, GRACE + 5)
+        _domain("f-idle.cc", gone, self.now + timedelta(days=200))
 
         for state in (rentals.UNOWNED, rentals.NO_TERM, rentals.PAID,
-                      rentals.GRACE, rentals.RELEASABLE):
-            by_sql = set(rentals.releasable_filter(
+                      rentals.GRACE, rentals.RELEASABLE, rentals.IDLE_PLAN):
+            by_sql = set(rentals.filter_by_state(
                 ShortDomain.objects.all(), state, self.now
             ).values_list("host", flat=True))
             by_python = {d.host for d in ShortDomain.objects.all()
@@ -190,6 +248,26 @@ class AdminActionTest(TestCase):
         self.assertIsNotNone(ShortDomain.objects.get(host="paid.cc").organization_id)
         self.assertIsNotNone(ShortDomain.objects.get(host="grace.cc").organization_id)
 
+    def test_a_domain_held_by_a_lapsed_subscriber_is_released(self):
+        """The case that sent an admin looking for this button: the term says
+        2027 because of the free top-up, but nobody has paid for months."""
+        gone = _org("adminidle@rentals.example")
+        _lapse_plan(gone, GRACE + 10)
+        _domain("idleplan.cc", gone, self.now + timedelta(days=330))
+        out = self._run("idleplan.cc")
+        self.assertIn("1 domain(s) released", out)
+        released = ShortDomain.objects.get(host="idleplan.cc")
+        self.assertIsNone(released.organization_id)
+        self.assertIn(released, ShortDomain.private_stock())
+
+    def test_a_recently_lapsed_subscriber_is_still_protected(self):
+        gone = _org("adminlate@rentals.example")
+        _lapse_plan(gone, 2)
+        _domain("latesub.cc", gone, self.now + timedelta(days=330))
+        out = self._run("latesub.cc")
+        self.assertIn("Nothing released", out)
+        self.assertIsNotNone(ShortDomain.objects.get(host="latesub.cc").organization_id)
+
     def test_it_warns_when_the_released_domain_will_not_be_offered(self):
         """Back in stock is not the same as on sale: private_stock() only
         offers domains that are active and verified."""
@@ -198,6 +276,61 @@ class AdminActionTest(TestCase):
         out = self._run("idle.cc")
         self.assertIn("Not yet offered", out)
         self.assertIn("idle.cc", out)
+
+
+class NightlyJobTest(TestCase):
+    """The policy change: a domain must not stay locked to a workspace that
+    stopped paying. Previously the job reclaimed only on a lapsed TERM, so a
+    customer who cancelled kept the name indefinitely — and after the free
+    year-long top-up, indefinitely meant well into 2027."""
+
+    def setUp(self):
+        self.now = timezone.now()
+
+    def _run(self, **kw):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        with patch("apps.links.sync.publish_link"):
+            call_command("enforce_private_domains", stdout=out, stderr=StringIO(), **kw)
+        return out.getvalue()
+
+    def test_a_lapsed_subscription_releases_the_domain(self):
+        gone = _org("cron@rentals.example")
+        _lapse_plan(gone, GRACE + 3)
+        _domain("croneidle.cc", gone, self.now + timedelta(days=300))
+        self._run()
+        d = ShortDomain.objects.get(host="croneidle.cc")
+        self.assertIsNone(d.organization_id)
+        self.assertFalse(d.is_shared)       # on sale, not in the shared pool
+        self.assertIn(d, ShortDomain.private_stock())
+
+    def test_it_warns_before_it_takes_it(self):
+        """Losing a domain with no notice is how a lapsed customer becomes an
+        angry one — the grace period exists to be used."""
+        from django.core import mail
+        gone = _org("cronwarn@rentals.example")
+        _lapse_plan(gone, 2)
+        _domain("cronwarn.cc", gone, self.now + timedelta(days=300))
+        self._run()
+        self.assertIsNotNone(ShortDomain.objects.get(host="cronwarn.cc").organization_id)
+        self.assertTrue(any("about to be released" in m.subject for m in mail.outbox),
+                        [m.subject for m in mail.outbox])
+
+    def test_a_paying_workspace_is_untouched(self):
+        org = _org("cronpaid@rentals.example")
+        _domain("cronpaid.cc", org, self.now + timedelta(days=300))
+        self._run()
+        self.assertIsNotNone(ShortDomain.objects.get(host="cronpaid.cc").organization_id)
+
+    def test_dry_run_changes_nothing(self):
+        gone = _org("crondry@rentals.example")
+        _lapse_plan(gone, GRACE + 3)
+        _domain("crondry.cc", gone, self.now + timedelta(days=300))
+        out = self._run(dry_run=True)
+        self.assertIn("would reclaim", out)
+        self.assertIn("subscription lapsed", out)
+        self.assertIsNotNone(ShortDomain.objects.get(host="crondry.cc").organization_id)
 
 
 class RentalColumnTest(TestCase):
@@ -229,11 +362,17 @@ class RentalColumnTest(TestCase):
         d = _domain("stale.cc", None, self.now - timedelta(days=400))
         self.assertEqual(self.admin.rental(d), "—")
 
-    def test_the_filter_offers_the_actionable_state_first(self):
+    def test_the_filter_offers_the_actionable_states_first(self):
+        """The filter is opened to answer "what can I put back on sale?", so the
+        two releasable states lead. Idle-subscription first of those: after the
+        free year-long top-up it is the one most idle domains fall into."""
         lookups = self.admin.get_list_filter(RequestFactory().get("/"))
         self.assertIn(RentalStateFilter, lookups)
         f = RentalStateFilter(RequestFactory().get("/"), {}, ShortDomain, self.admin)
-        self.assertEqual(f.lookups(None, self.admin)[0][0], rentals.RELEASABLE)
+        offered = [value for value, _label in f.lookups(None, self.admin)]
+        self.assertEqual(offered[:2], [rentals.IDLE_PLAN, rentals.RELEASABLE])
+        # Every state is reachable, or some domains can never be found.
+        self.assertEqual(set(offered), set(rentals.LABELS))
 
 
 class _Messages:

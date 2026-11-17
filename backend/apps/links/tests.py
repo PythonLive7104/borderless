@@ -1006,7 +1006,10 @@ class PrivateDomainNeedsActivePlanTest(TestCase):
 
 class LapsedPlanSuspendsPrivateLinksTest(TestCase):
     """A weekly plan running out stops the redirects — even on a domain the
-    workspace is still renting. The rental buys exclusivity, not access."""
+    workspace is still renting. The rental buys exclusivity, not access.
+
+    And once the grace period is up it stops buying exclusivity too: the domain
+    goes back on sale rather than sitting reserved against someone who left."""
 
     def setUp(self):
         self.org = _workspace("weekly@priv.example")
@@ -1038,14 +1041,37 @@ class LapsedPlanSuspendsPrivateLinksTest(TestCase):
         # enforce_access binds the name at import; assert through the command's view
         self.assertTrue(workspace_locked(self.org.id))
 
-    def test_the_domain_stays_theirs_while_the_rental_is_paid(self):
+    def test_the_domain_is_held_through_the_grace_period(self):
+        """A plan that lapsed an hour ago does not cost them the domain.
+
+        This used to assert something stronger and no longer true — that the
+        domain stayed theirs indefinitely as long as the RENTAL was paid. It
+        does not: a workspace that stops subscribing loses the domain once the
+        grace period is up, because a private domain runs alongside a live plan
+        rather than instead of one, and leaving it reserved against a departed
+        customer is what made idle domains unsellable (see
+        apps.links.rentals). What survives from the original intent is this:
+        nobody is pulled the moment a payment is late.
+        """
         from apps.billing.models import Subscription
         sub = Subscription.objects.get(organization=self.org)
         sub.period_end = timezone.now() - timedelta(hours=1)
         sub.save()
         call_command("enforce_private_domains", verbosity=0)
         self.domain.refresh_from_db()
-        self.assertEqual(self.domain.organization, self.org)   # not reclaimed
+        self.assertEqual(self.domain.organization, self.org)   # still in grace
+
+    def test_but_it_is_released_once_the_grace_period_is_over(self):
+        """The policy change, from the other side of the line."""
+        from apps.billing.models import Subscription
+        sub = Subscription.objects.get(organization=self.org)
+        sub.period_end = timezone.now() - timedelta(
+            days=ShortDomain.PRIVATE_GRACE_DAYS + 1)
+        sub.save()
+        call_command("enforce_private_domains", verbosity=0)
+        self.domain.refresh_from_db()
+        self.assertIsNone(self.domain.organization_id)
+        self.assertIn(self.domain, ShortDomain.private_stock())
 
 
 class DomainPoolSplitTest(TestCase):
