@@ -12,6 +12,7 @@ import { trackPurchase } from "../../lib/analytics";
 import { INTERVAL_DAYS, INTERVAL_MONTHS, INTERVAL_NOUN, capFor, priceFor, savingBadges } from "../../lib/billing";
 import { referralApi } from "../../lib/api";
 import { feeNote, methodPhrase, usePaymentMethods } from "../../lib/usePaymentMethods";
+import BtcPayPanel from "../../components/dashboard/BtcPayPanel";
 
 const statusTone: Record<string, string> = {
   trialing: "bg-brand/10 text-brand", active: "bg-success/10 text-emerald-700", canceled: "bg-danger/10 text-red-600",
@@ -272,6 +273,11 @@ export default function Billing() {
           );
         })}
       </div>
+
+      {current && sub && (
+        <BtcPayPanel orgId={current.id} plan={sub.plan.slug} interval={interval}
+          enabled={!!payMethods?.methods.includes("bitcoin")} canManage={canManage} />
+      )}
 
       {/* Plan-switch / renew confirmation */}
       <Modal open={!!target} onClose={() => !busy && setTarget(null)} title={target && isCurrentPlan(target) ? `Renew ${target.name}` : "Choose a plan"}>

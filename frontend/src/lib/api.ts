@@ -691,7 +691,7 @@ export const telegramApi = {
 };
 
 export interface PaymentMethods {
-  methods: ("card" | "crypto")[]; card: boolean; crypto: boolean;
+  methods: ("card" | "crypto" | "bitcoin")[]; card: boolean; crypto: boolean;
   /** Processing fee added on top at checkout: percentage component... */
   fee_pct: number;
   /** ...plus this fixed amount in USD. Both 0 = nothing to disclose. */
@@ -711,7 +711,24 @@ export const billingApi = {
     http.post<{ activated: boolean } & Subscription>("/billing/checkout/verify/", { organization: orgId }),
   cancel: (orgId: number) => http.post<Subscription>("/billing/subscription/cancel/", { organization: orgId }),
   usage: (orgId: number) => http.get<Usage>(`/billing/usage/?organization=${orgId}`),
+  btcStart: (orgId: number, plan: string, interval: BillingInterval = "weekly") =>
+    http.post<BtcPayment>("/billing/btc/start/", { organization: orgId, plan, interval }),
+  btcStatus: (orgId: number) =>
+    http.get<{ payment: BtcPayment | null }>(`/billing/btc/status/?organization=${orgId}`),
 };
+
+export interface BtcPayment {
+  id: number;
+  plan_slug: string;
+  plan_name: string;
+  interval: BillingInterval;
+  amount_usd: string;
+  address: string;
+  status: "pending" | "confirmed" | "rejected";
+  tx_reference: string;
+  created_at: string;
+  reviewed_at: string | null;
+}
 
 
 // ---- staff admin ----

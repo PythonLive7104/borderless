@@ -32,6 +32,11 @@ def available():
     # Bachs is the crypto processor. With no API key, dev stubs checkout out and
     # activates instantly — crypto is still the method being offered.
     methods.append("crypto")
+    # Direct Bitcoin to our own wallet, settled by an admin confirming receipt.
+    # Offered only when a wallet address is configured; see billing.btcpay.
+    from . import btcpay
+    if btcpay.is_enabled():
+        methods.append("bitcoin")
     return methods
 
 

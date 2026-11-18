@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Plan, Subscription
+from .models import BtcPayment, Plan, Subscription
 
 
 class PlanSerializer(serializers.ModelSerializer):
@@ -27,3 +27,14 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def get_access(self, obj):
         return obj.access_state()
+
+
+class BtcPaymentSerializer(serializers.ModelSerializer):
+    plan_slug = serializers.CharField(source="plan.slug", read_only=True)
+    plan_name = serializers.CharField(source="plan.name", read_only=True)
+
+    class Meta:
+        model = BtcPayment
+        fields = ["id", "plan_slug", "plan_name", "interval", "amount_usd",
+                  "address", "status", "tx_reference", "created_at", "reviewed_at"]
+        read_only_fields = fields

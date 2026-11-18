@@ -301,6 +301,12 @@ SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")
 # Google Safe Browsing remains an independent, higher-confidence signal.
 THREATSCAN_VT_MIN_DETECTIONS = int(os.getenv("THREATSCAN_VT_MIN_DETECTIONS", "5"))
 
+# Direct Bitcoin payment. A customer pays this address and an admin confirms
+# receipt, which activates the plan. Entirely optional: with no address set the
+# method is not offered and the endpoints 404 — nothing references a wallet that
+# isn't configured. Set BTC_PAYMENT_ADDRESS to turn it on.
+BTC_PAYMENT_ADDRESS = os.getenv("BTC_PAYMENT_ADDRESS", "")
+
 # Google Ads — campaign IP-exclusion push. Entirely optional and inert when
 # unset: the connect flow 404s, no OAuth URL is built, nothing calls Google, and
 # the feature is invisible in the UI. Access level now attaches to the Cloud

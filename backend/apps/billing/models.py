@@ -1,5 +1,6 @@
 import math
 from datetime import timedelta
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from apps.organizations.models import Organization
@@ -310,3 +311,57 @@ def campaign_limit(organization_id) -> int:
     if not sub or sub.status == Subscription.Status.TRIALING:
         return TRIAL_MAX_CAMPAIGNS
     return sub.plan.max_campaigns
+
+
+class BtcPayment(models.Model):
+    """A direct-Bitcoin payment a customer says they've made, awaiting an admin's
+    confirmation of receipt.
+
+    This is the manual-settlement path for a wallet Bachs doesn't handle. It is
+    deliberately NOT self-activating: creating one records an intent and shows
+    the customer the address and amount, and nothing about the plan changes
+    until an admin confirms the coins actually arrived. Confirmation then runs
+    the exact same activation the card/crypto paths use (_activate), so a
+    BTC-paid plan is indistinguishable afterwards — same rollover, same engine
+    restore, same referral payout keyed on this payment's id.
+
+    The amount is stored in USD, as quoted at request time, because that is the
+    figure the admin reconciles against the received coins. Storing a BTC amount
+    would pin a price that has moved by the time anyone looks.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Awaiting confirmation"
+        CONFIRMED = "confirmed", "Confirmed — plan activated"
+        REJECTED = "rejected", "Rejected"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE,
+                                     related_name="btc_payments")
+    # Snapshotted by slug + interval, not a plan FK alone: a plan's price or
+    # availability can change between request and confirmation, and the admin is
+    # confirming what the customer was quoted, not today's catalogue.
+    plan = models.ForeignKey("billing.Plan", on_delete=models.PROTECT,
+                             related_name="btc_payments")
+    interval = models.CharField(max_length=10, default=WEEKLY)
+    amount_usd = models.DecimalField(max_digits=10, decimal_places=2)
+    # The address shown to this customer, captured so the record is self-contained
+    # even if BTC_PAYMENT_ADDRESS is later rotated.
+    address = models.CharField(max_length=120)
+    status = models.CharField(max_length=10, choices=Status.choices,
+                              default=Status.PENDING, db_index=True)
+    # Optional reference the customer can supply (a txid) and the admin checks.
+    tx_reference = models.CharField(max_length=200, blank=True)
+    admin_note = models.CharField(max_length=300, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["organization", "status"])]
+
+    def __str__(self):
+        return f"BTC ${self.amount_usd} {self.plan_id} ({self.status})"

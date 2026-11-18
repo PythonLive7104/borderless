@@ -2,8 +2,12 @@ from django.urls import path
 from .views import (PaymentMethodsView, PlanListView, SubscriptionView, ChangePlanView, CancelView,
                     UsageView, CheckoutView, VerifyCheckoutView, BachsWebhookView,
                     RedeemCreditView)
+from .btc_views import BtcInfoView, BtcStartView, BtcStatusView
 
 urlpatterns = [
+    path("btc/", BtcInfoView.as_view(), name="btc-info"),
+    path("btc/start/", BtcStartView.as_view(), name="btc-start"),
+    path("btc/status/", BtcStatusView.as_view(), name="btc-status"),
     path("plans/", PlanListView.as_view(), name="plans"),
     path("payment-methods/", PaymentMethodsView.as_view(), name="payment-methods"),
     path("subscription/", SubscriptionView.as_view(), name="subscription"),
