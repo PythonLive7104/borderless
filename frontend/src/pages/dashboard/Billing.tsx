@@ -275,7 +275,8 @@ export default function Billing() {
       </div>
 
       {current && sub && (
-        <BtcPayPanel orgId={current.id} plan={sub.plan.slug} interval={interval}
+        <BtcPayPanel orgId={current.id} plans={plans} methods={payMethods}
+          defaultPlan={sub.plan.slug} defaultInterval={interval}
           enabled={!!payMethods?.methods.includes("bitcoin")} canManage={canManage} />
       )}
 
