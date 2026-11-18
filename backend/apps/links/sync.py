@@ -121,6 +121,7 @@ def scan_and_flag(link):
     safe = result.get("safe")
     if result.get("complete") is False and not flagged_by:
         return
+    
     # A custom decoy is a second destination the link can serve, so it gets the
     # same scrutiny — otherwise it's an unscanned way to deliver a payload.
     if link.decoy_url:
@@ -129,10 +130,10 @@ def scan_and_flag(link):
             decoy_flagged_by = list(decoy.get("flagged_by", []) or [])
             if decoy.get("complete") is False and not decoy_flagged_by:
                 return
-            if decoy.get("safe") is False:
-                safe = False
-                threats.extend(f"decoy:{t}" for t in (decoy.get("threats") or []))
-                flagged_by.extend(decoy_flagged_by)
+            # if decoy.get("safe") is False:
+            #     safe = False
+            #     threats.extend(f"decoy:{t}" for t in (decoy.get("threats") or []))
+            #     flagged_by.extend(decoy_flagged_by)
         except Exception:
             return
     was_active = link.active

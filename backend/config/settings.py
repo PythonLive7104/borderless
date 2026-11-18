@@ -301,6 +301,21 @@ SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")
 # Google Safe Browsing remains an independent, higher-confidence signal.
 THREATSCAN_VT_MIN_DETECTIONS = int(os.getenv("THREATSCAN_VT_MIN_DETECTIONS", "5"))
 
+# Google Ads — campaign IP-exclusion push. Entirely optional and inert when
+# unset: the connect flow 404s, no OAuth URL is built, nothing calls Google, and
+# the feature is invisible in the UI. Access level now attaches to the Cloud
+# project (the developer token was sunset in Sept 2026), so the token is optional
+# and only set if a client library wants it present.
+GOOGLE_ADS_CLIENT_ID = os.getenv("GOOGLE_ADS_CLIENT_ID", "")
+GOOGLE_ADS_CLIENT_SECRET = os.getenv("GOOGLE_ADS_CLIENT_SECRET", "")
+GOOGLE_ADS_REDIRECT_URI = os.getenv("GOOGLE_ADS_REDIRECT_URI", "")
+GOOGLE_ADS_DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN", "")
+GOOGLE_ADS_LOGIN_CUSTOMER_ID = os.getenv("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
+# Hard off-switch for the LIVE mutate. Even with credentials present, the push
+# stays dry-run until this is explicitly turned on AND tested against a real
+# account — so an untested integration can never alter a customer's ad account.
+GOOGLE_ADS_LIVE_PUSH = os.getenv("GOOGLE_ADS_LIVE_PUSH", "0").strip().lower() in ("1", "true", "yes", "on")
+
 # Abuse handling for the short domain. ABUSE_EMAIL is published on the report
 # page and belongs in the domain's WHOIS record; being reachable and fast is
 # what stops a complainant escalating to the registrar (which suspends the whole

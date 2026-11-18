@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import PageNote from "../../components/dashboard/PageNote";
 import AdTrackingSuffix from "../../components/dashboard/AdTrackingSuffix";
+import GoogleAdsConnect from "../../components/dashboard/GoogleAdsConnect";
+import { useWorkspace } from "../../context/WorkspaceContext";
 
 const CARDS = [
   { title: "JavaScript Tracker", desc: "The snippet you paste into your website to start collecting traffic.", to: "/dashboard/websites", cta: "Manage websites", status: "Set up per website" },
@@ -9,6 +11,8 @@ const CARDS = [
 ];
 
 export default function Integrations() {
+  const { current } = useWorkspace();
+  const canManage = current?.role === "owner" || current?.role === "admin";
   return (
     <div>
       <PageNote id="integrations">
@@ -29,6 +33,8 @@ export default function Integrations() {
       </div>
 
       <AdTrackingSuffix />
+
+      {current && <GoogleAdsConnect orgId={current.id} canManage={canManage} />}
     </div>
   );
 }

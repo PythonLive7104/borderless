@@ -265,6 +265,24 @@ export interface ActivationState {
   has_link: boolean;
 }
 
+export interface GoogleAdsStatus {
+  enabled: boolean;
+  live_push: boolean;
+  connected: boolean;
+  customer_id: string;
+  status: string;
+  connected_at: string | null;
+}
+
+export const googleAdsApi = {
+  status: (orgId: number, signal?: AbortSignal) =>
+    http.get<GoogleAdsStatus>(`/integrations/google-ads/status/?organization=${orgId}`, signal),
+  connectUrl: (orgId: number, signal?: AbortSignal) =>
+    http.get<{ authorize_url: string }>(`/integrations/google-ads/connect/?organization=${orgId}`, signal),
+  disconnect: (orgId: number, signal?: AbortSignal) =>
+    http.post(`/integrations/google-ads/disconnect/`, { organization: orgId }, true, signal),
+};
+
 export const orgApi = {
   list: (signal?: AbortSignal) => http.get<{ results: Organization[] } | Organization[]>("/organizations/", signal),
   create: (name: string, signal?: AbortSignal) => http.post<Organization>("/organizations/", { name }, true, signal),
