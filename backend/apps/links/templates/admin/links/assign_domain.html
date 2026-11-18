@@ -1,0 +1,53 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<form method="post">{% csrf_token %}
+
+  <p>Allocate {{ domains|length }} domain(s) as a private domain owned by a workspace.
+     This is the admin equivalent of a paid purchase — the domain becomes theirs,
+     for the term below.</p>
+
+  <ul>
+    {% for d in domains %}
+      <li>
+        <strong>{{ d.host }}</strong>
+        {% if d.sale_blocker %}<span style="color:#b91c1c">— {{ d.sale_blocker }}</span>{% endif %}
+        {% if d.organization_id %}<em>— currently owned by {{ d.organization }}</em>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+
+  {% for id in selected %}<input type="hidden" name="_selected_action" value="{{ id }}">{% endfor %}
+  <input type="hidden" name="action" value="assign_to_workspace">
+
+  <fieldset class="module aligned" style="max-width:640px">
+    <div class="form-row">
+      <label for="id_organization"><b>Workspace</b></label>
+      <select name="organization" id="id_organization" required>
+        <option value="">— choose a workspace —</option>
+        {% for org in organizations %}
+          <option value="{{ org.id }}">{{ org.name }} ({{ org.slug }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="id_days">Term in days</label>
+      <input type="number" name="days" id="id_days" min="1" placeholder="standard term">
+      <p class="help">Leave blank for the standard paid term.</p>
+    </div>
+    <div class="form-row">
+      <label><input type="checkbox" name="make_default"> Make it their default domain</label>
+    </div>
+    <div class="form-row">
+      <label><input type="checkbox" name="notify" checked> Email / notify the workspace</label>
+    </div>
+    <div class="form-row">
+      <label><input type="checkbox" name="force"> Force (allocate even if inactive / unverified / flagged)</label>
+    </div>
+  </fieldset>
+
+  <div class="submit-row">
+    <input type="submit" name="apply" value="Allocate" class="default">
+    <a href="../" class="button cancel-link">Cancel</a>
+  </div>
+</form>
+{% endblock %}

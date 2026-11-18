@@ -225,3 +225,84 @@ def tell_former_owner(org, host: str, link_count: int, reason: str = RELEASABLE)
         notify_workspace(org, subject, body)
     except Exception:  # pragma: no cover - defensive
         pass
+
+
+def grant_period_days() -> int:
+    """Term length for a direct admin grant — the same as a paid purchase buys,
+    read at call time so configuration (and tests) can change it."""
+    from .purchases import period_days
+    return period_days()
+
+
+def grant_to_org(domain, organization, days=None, *, is_default=False, notify=True):
+    """Make `domain` a private domain owned by `organization`, for `days`.
+
+    The admin counterpart to a paid purchase: it does exactly what
+    purchases.assign_domain does to the ShortDomain row (clear shared, set the
+    owner, set the paid-through date), so a granted domain is indistinguishable
+    from a bought one and every downstream check — for_org, private_for, the
+    rental state, the nightly enforcement — treats it the same.
+
+    If the domain was owned by someone else, their links on it are withdrawn:
+    publish_link re-evaluates entitlement against the NEW owner, and a link
+    whose workspace no longer matches the domain stops resolving. That is the
+    safe behaviour — a domain handed to a new owner must not keep serving the
+    previous owner's redirects.
+    """
+    from datetime import timedelta
+    from django.utils import timezone as tz
+    from .sync import publish_link
+
+    days = grant_period_days() if days is None else int(days)
+    prev_owner = (domain.organization
+                  if domain.organization_id and domain.organization_id != organization.id
+                  else None)
+    links = list(domain.links.all())
+
+    domain.organization = organization
+    domain.is_shared = False
+    domain.byod = False
+    domain.is_default = is_default
+    domain.private_until = tz.now() + timedelta(days=days)
+    domain.save(update_fields=["organization", "is_shared", "byod", "is_default",
+                               "private_until"])
+
+    # Re-publish every link on the domain so entitlement is re-evaluated. The
+    # new owner has none yet; any that belonged to a prior owner are withdrawn.
+    for link in links:
+        publish_link(link)
+
+    if notify:
+        tell_new_owner(organization, domain.host, domain.private_until)
+        if prev_owner is not None:
+            lost = sum(1 for lk in links if lk.organization_id == prev_owner.id)
+            tell_former_owner(prev_owner, domain.host, lost, reason="withdrawn")
+    return domain
+
+
+def tell_new_owner(org, host: str, until):
+    """Tell the workspace it now has a private domain. Never raises."""
+    from django.conf import settings
+
+    front = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+    when = until.date().isoformat() if until else ""
+    body = (
+        f"{host} is now your private domain. Create short links on it from the "
+        f"Redirection page — it is yours alone, and its reputation is entirely "
+        f"your own.\n\n"
+        + (f"It is paid through {when}.\n\n" if when else "")
+        + (f"{front}/dashboard/links" if front else "")
+    )
+    try:
+        from django.core.mail import send_mail
+        email = getattr(getattr(org, "owner", None), "email", "")
+        if email:
+            send_mail(f"{host} is now your private domain", body,
+                      settings.DEFAULT_FROM_EMAIL, [email], fail_silently=True)
+    except Exception:  # pragma: no cover - defensive
+        pass
+    try:
+        from apps.notifications.system import notify_workspace
+        notify_workspace(org, f"{host} is now yours", body)
+    except Exception:  # pragma: no cover - defensive
+        pass

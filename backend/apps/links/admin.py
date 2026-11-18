@@ -57,8 +57,65 @@ class ShortDomainAdmin(admin.ModelAdmin):
     # opened to answer, and scanning a status column beats opening each row.
     list_filter = ("health", RentalStateFilter, "active", "is_shared", "is_default")
     readonly_fields = ("health", "health_detail", "health_checked_at")
-    actions = ("release_lapsed_rentals", "reclaim_for_abuse", "hold_as_private_stock",
-               "return_to_shared_pool", "check_health")
+    actions = ("assign_to_workspace", "release_lapsed_rentals", "reclaim_for_abuse",
+               "hold_as_private_stock", "return_to_shared_pool", "check_health")
+
+    @admin.action(description="Allocate to a workspace — make it their private domain")
+    def assign_to_workspace(self, request, queryset):
+        """Hand a domain to a workspace directly, without a purchase.
+
+        For money that came in outside checkout — a BTC payment, an offline
+        deal, a comp. It does the same thing a paid purchase does to the row, so
+        the result is a normal private domain in every downstream check.
+
+        Two steps: pick the rows, then this renders a small form to choose the
+        workspace and term. Nothing changes until that form is submitted.
+        """
+        from django.contrib import messages
+        from django.http import HttpResponseRedirect
+        from django.template.response import TemplateResponse
+        from apps.organizations.models import Organization
+
+        ids = request.POST.getlist("_selected_action") or list(
+            queryset.values_list("pk", flat=True))
+        domains = ShortDomain.objects.filter(pk__in=ids)
+
+        if "apply" in request.POST:
+            org_id = (request.POST.get("organization") or "").strip()
+            org = Organization.objects.filter(pk=org_id).first() if org_id.isdigit() else None
+            if not org:
+                self.message_user(request, "Choose a workspace.", level=messages.ERROR)
+                return HttpResponseRedirect(request.get_full_path())
+            days = request.POST.get("days") or None
+            make_default = bool(request.POST.get("make_default"))
+            notify = bool(request.POST.get("notify"))
+            granted, held = 0, []
+            for d in domains:
+                if d.sale_blocker and not request.POST.get("force"):
+                    held.append(f"{d.host} ({d.sale_blocker})")
+                    continue
+                rentals.grant_to_org(d, org, days=int(days) if days else None,
+                                     is_default=make_default, notify=notify)
+                granted += 1
+            msg = f"{granted} domain(s) allocated to {org.name}."
+            if held:
+                msg += (" Skipped (won't serve until fixed; use Force to override): "
+                        + ", ".join(held) + ".")
+            self.message_user(request, msg,
+                              level=messages.WARNING if held else messages.SUCCESS)
+            return HttpResponseRedirect(request.get_full_path())
+
+        # First step: render the picker.
+        ctx = {
+            **self.admin_site.each_context(request),
+            "title": "Allocate private domain to a workspace",
+            "domains": domains,
+            "organizations": Organization.objects.order_by("name"),
+            "action_name": "assign_to_workspace",
+            "selected": ids,
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(request, "admin/links/assign_domain.html", ctx)
 
     def get_queryset(self, request):
         # organization is rendered for every row by both the rental column and
