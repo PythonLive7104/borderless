@@ -86,8 +86,21 @@ export default function BtcPayPanel({ orgId, plans, enabled, canManage, methods,
   return (
     <div className="card shadow-soft mt-5 border-amber-500/30 bg-amber-500/5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">₿</span>
+        <div className="flex items-center gap-3">
+          {/* Bitcoin mark: big, brand-orange, with an animated glow behind a
+              crisp badge (the blur layer pulses; the badge stays sharp). */}
+          <span className="relative grid h-12 w-12 shrink-0 place-items-center">
+            <span aria-hidden
+              className="absolute inset-0 rounded-full bg-[#F7931A] opacity-60 blur-lg animate-pulse" />
+            <span aria-hidden
+              className="relative grid h-12 w-12 place-items-center rounded-full text-3xl font-black leading-none text-white"
+              style={{
+                background: "linear-gradient(135deg,#F7931A,#FBB03B)",
+                boxShadow: "0 0 16px 3px rgba(247,147,26,0.65), inset 0 0 0 1px rgba(255,255,255,0.25)",
+              }}>
+              ₿
+            </span>
+          </span>
           <div>
             <h3 className="text-sm font-bold">Pay with Bitcoin</h3>
             <p className="text-xs text-fg-muted">Choose a plan and duration, send Bitcoin, we confirm it.</p>
