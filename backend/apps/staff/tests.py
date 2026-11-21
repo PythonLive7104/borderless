@@ -60,6 +60,20 @@ class AdminEmailTest(TestCase):
                         {"subject": "Offer", "body_html": "<p>Hi</p>", "mode": "leads"}, format="json")
         self.assertEqual(r.data["recipients"], 1)  # only the unconverted lead
 
+    def test_leads_mode_excludes_unsubscribed_leads(self):
+        """A promotional blast must never re-mail someone who opted out — that
+        re-send is the actual compliance offence, and leads is exactly where it
+        would happen."""
+        from django.utils import timezone
+        from apps.intelligence.models import BotCheckLead
+        BotCheckLead.objects.create(email="keep@x.com", url="https://x.com")
+        BotCheckLead.objects.create(email="gone@x.com", url="https://y.com",
+                                    unsubscribed_at=timezone.now())
+        r = self.c.post("/api/admin/email/send/",
+                        {"subject": "Offer", "body_html": "<p>Hi</p>", "mode": "leads"}, format="json")
+        self.assertEqual(r.data["recipients"], 1)
+        self.assertEqual(r.data["sent"], 1)
+
     def test_empty_audience_and_missing_fields_are_rejected(self):
         r = self.c.post("/api/admin/email/send/",
                         {"subject": "", "body_html": "", "mode": "test"}, format="json")

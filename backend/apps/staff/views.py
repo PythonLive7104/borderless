@@ -174,7 +174,12 @@ class AdminEmailSendView(views.APIView):
                               .values_list("email", flat=True))
         elif mode == "leads":
             from apps.intelligence.models import BotCheckLead
-            recipients = list(BotCheckLead.objects.filter(converted=False)
+            # Exclude anyone who opted out. Re-mailing an unsubscribed address is
+            # the actual offence under CAN-SPAM / CASL — not the first send — and
+            # a promotional blast is exactly where it would happen, so it is
+            # filtered here rather than trusted to the composer.
+            recipients = list(BotCheckLead.objects
+                              .filter(converted=False, unsubscribed_at__isnull=True)
                               .values_list("email", flat=True).distinct())
         elif mode == "custom":
             import re as _re

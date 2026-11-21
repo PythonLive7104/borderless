@@ -1,7 +1,18 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { adminApi } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import { useDialog } from "../../context/DialogContext";
+
+// Email-safe snippets (inline styles — email clients ignore <style> and classes).
+// A styled anchor is the reliable way to get a "button" that renders in Gmail,
+// Outlook and Apple Mail alike.
+const LINK_SNIPPET = `<a href="https://trynobot.com/OFFER">your link text</a>`;
+const BUTTON_SNIPPET = `<p style="text-align:center;margin:28px 0;">
+  <a href="https://trynobot.com/dashboard/billing"
+     style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 30px;border-radius:10px;">
+    Get the offer
+  </a>
+</p>`;
 
 const AUDIENCES: { value: string; label: string; hint: string }[] = [
   { value: "test", label: "Just me (test)", hint: "Send only to your own address to check it." },
@@ -14,6 +25,22 @@ const STARTER = `<p>Hi there,</p>
 <p>Write your message here. You can use simple HTML — <b>bold</b>, <a href="https://trynobot.com">links</a>, and paragraphs.</p>
 <p>— The TryNoBot team</p>`;
 
+const OFFER_TEMPLATE = `<p>Hi there,</p>
+<p>For a limited time, <b>save on TryNoBot</b> — keep more of your ad budget by blocking the bots and fake clicks draining your campaigns.</p>
+<p style="text-align:center;margin:28px 0;">
+  <a href="https://trynobot.com/dashboard/billing"
+     style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 30px;border-radius:10px;">
+    Claim this offer
+  </a>
+</p>
+<p>Questions? Just reply to this email.</p>
+<p>— The TryNoBot team</p>`;
+
+const TEMPLATES: { label: string; body: string }[] = [
+  { label: "Blank", body: STARTER },
+  { label: "Promotion / offer", body: OFFER_TEMPLATE },
+];
+
 export default function AdminEmail() {
   const { confirm, notify } = useDialog();
   const [subject, setSubject] = useState("");
@@ -22,6 +49,24 @@ export default function AdminEmail() {
   const [emails, setEmails] = useState("");
   const [preview, setPreview] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  // Insert a snippet at the cursor (or append), so the admin never hand-types
+  // the fiddly inline-styled button HTML.
+  function insert(snippet: string) {
+    const el = bodyRef.current;
+    if (!el) { setBody((b) => b + "\n" + snippet); return; }
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + snippet + body.slice(end);
+    setBody(next);
+    // Put the cursor just after what we inserted.
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + snippet.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   async function refreshPreview() {
     try {
@@ -66,10 +111,24 @@ export default function AdminEmail() {
               className="mt-1 w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
           </div>
           <div>
-            <label className="text-sm font-semibold">Body (HTML)</label>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-semibold">Body (HTML)</label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <select onChange={(e) => { const t = TEMPLATES[Number(e.target.value)]; if (t) setBody(t.body); e.currentTarget.selectedIndex = 0; }}
+                  defaultValue=""
+                  className="rounded-lg border border-line bg-white px-2 py-1 text-xs">
+                  <option value="" disabled>Template…</option>
+                  {TEMPLATES.map((t, i) => <option key={t.label} value={i}>{t.label}</option>)}
+                </select>
+                <button type="button" onClick={() => insert(LINK_SNIPPET)}
+                  className="rounded-lg border border-line px-2 py-1 text-xs font-semibold hover:border-brand/50">+ Link</button>
+                <button type="button" onClick={() => insert(BUTTON_SNIPPET)}
+                  className="rounded-lg border border-line px-2 py-1 text-xs font-semibold hover:border-brand/50">+ Offer button</button>
+              </div>
+            </div>
+            <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} rows={12}
               className="mt-1 w-full rounded-xl border border-line bg-white px-4 py-3 font-mono text-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-            <p className="mt-1 text-xs text-fg-dim">Simple HTML only: paragraphs, bold/italic, links. The header, footer and styling are added automatically.</p>
+            <p className="mt-1 text-xs text-fg-dim">Simple HTML: paragraphs, bold/italic, links. Use <b>+ Offer button</b> for a tappable call-to-action, then change its link and label. The header, footer and styling are added automatically.</p>
           </div>
           <div>
             <label className="text-sm font-semibold">Audience</label>
