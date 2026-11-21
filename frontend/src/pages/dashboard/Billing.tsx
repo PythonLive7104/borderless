@@ -55,9 +55,13 @@ export default function Billing() {
   const { current } = useWorkspace();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
-  // Which interval the buy buttons purchase. Defaults to what they're already
-  // on, so "Renew" renews like-for-like instead of silently switching them.
-  const [interval, setBillingInterval] = useState<BillingInterval>("weekly");
+  // Which interval the buy buttons purchase. Defaults to MONTHLY for everyone -
+  // it's the standard way buyers think about SaaS pricing and the anchor we
+  // want shown first. Anyone can switch with the Weekly/Monthly/Yearly toggle,
+  // and the renew/upgrade modal states the chosen interval and price in full
+  // ("$199/month ... for 30 days") before any charge, so a weekly subscriber
+  // is never silently moved to a monthly bill.
+  const [interval, setBillingInterval] = useState<BillingInterval>("monthly");
   const noun = INTERVAL_NOUN[interval];
   const days = INTERVAL_DAYS[interval];
   const priceOf = (p: Plan) => priceFor(p, interval);
@@ -86,7 +90,8 @@ export default function Billing() {
     setLoading(true);
     try {
       const [s, p] = await Promise.all([billingApi.subscription(current.id), billingApi.plans()]);
-      if (s.interval) setBillingInterval(s.interval);
+      // Deliberately NOT snapping the toggle to the subscriber's own interval:
+      // the page always opens on Monthly, the anchor we want everyone to see.
       setSub(s); setPlans(p);
       // Referral credit is a nice-to-have on this page: if it fails to load,
       // the buy buttons must still work, so it is fetched separately.
