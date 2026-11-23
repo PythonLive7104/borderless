@@ -581,9 +581,23 @@ export interface SourceRow { key: string; events: number; human: number; quality
 const qs = (o: Record<string, any>) =>
   Object.entries(o).filter(([, v]) => v !== "" && v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 
+export interface Savings {
+  days: number;
+  paid_clicks: number;
+  invalid_paid_clicks: number;
+  blocked_paid_clicks: number;
+  invalid_rate: number;
+  avg_cpc: number | null;
+  estimated_savings: number | null;
+  basis: string;
+  has_cpc: boolean;
+}
+
 export const analyticsApi = {
   overview: (orgId: number, range = "7d", website = "") =>
     http.get<Overview>(`/analytics/overview/?${qs({ organization: orgId, range, website })}`),
+  savings: (orgId: number, range = "30d", website = "") =>
+    http.get<Savings>(`/analytics/savings/?${qs({ organization: orgId, range, website })}`),
   visitors: (orgId: number, params: Record<string, any> = {}) =>
     http.get<{ count: number; results: VisitorRow[] }>(`/analytics/visitors/?${qs({ organization: orgId, ...params })}`),
   visitor: (id: number) => http.get<{ visitor: VisitorRow; sessions: number; events: EventRow[] }>(`/analytics/visitors/${id}/`),

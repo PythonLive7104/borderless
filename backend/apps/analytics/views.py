@@ -376,3 +376,20 @@ def compute_funnel(base_qs, days):
                               sorted(by_class.items(), key=lambda x: -x[1])],
         "reasons": reasons,
     }
+
+
+class SavingsView(views.APIView):
+    """Estimated ad spend protected for a workspace — the retention headline.
+
+    Read-only and member-level: any member may see what the product is saving
+    them. Scopes to a single website when ?website= is passed, matching the rest
+    of the dashboard.
+    """
+    def get(self, request):
+        from apps.analytics.savings import savings_for
+        org_id = request.query_params.get("organization")
+        if not org_id or int(org_id) not in set(_org_ids(request.user)):
+            return Response({"detail": "Not a member."}, status=403)
+        data = savings_for(org_id, days=_days(request.query_params),
+                           website_id=request.query_params.get("website"))
+        return Response(data)

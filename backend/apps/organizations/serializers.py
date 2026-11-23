@@ -8,8 +8,14 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Organization
-        fields = ["id", "name", "slug", "role", "member_count", "link_scan_optout", "created_at"]
+        fields = ["id", "name", "slug", "role", "member_count", "link_scan_optout",
+                  "avg_cpc", "created_at"]
         read_only_fields = ["slug", "link_scan_optout", "created_at"]
+
+    def validate_avg_cpc(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Average CPC can't be negative.")
+        return value
 
     def get_role(self, obj):
         m = getattr(obj, "_member", None)

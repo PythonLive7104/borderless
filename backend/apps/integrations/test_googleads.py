@@ -266,12 +266,28 @@ class PushSafetyTest(TestCase):
         self.assertIn("turned off", out["reason"].lower())
 
     @override_settings(**ENABLED, GOOGLE_ADS_LIVE_PUSH=True)
-    def test_with_live_on_it_reaches_the_unimplemented_mutate(self):
-        """Proves the gate opens only under the flag — and that the live path is
-        still the explicitly-unimplemented one, so nothing half-built can run
-        against a real account by surprise."""
+    def test_with_live_on_it_reaches_the_real_mutate(self):
+        """Proves the gate opens ONLY under the flag: with it on, apply() calls
+        the real _mutate (not a preview). The mutate itself needs live
+        credentials, so here it's patched to confirm it is reached and its
+        result is surfaced — the no-gate state is what this guards against."""
         acct = GoogleAdsAccount(refresh_token="rt", status=GoogleAdsAccount.Status.CONNECTED)
-        out = googleads_push.apply(acct, "C1", self._plan(), dry_run=False)
+        with patch("apps.integrations.googleads_push._mutate",
+                   return_value={"customer_id": "123", "added": 1, "removed": 0}) as m:
+            out = googleads_push.apply(acct, "C1", self._plan(), dry_run=False)
+        m.assert_called_once()
+        self.assertTrue(out["applied"])
+        self.assertFalse(out["dry_run"])
+        self.assertEqual(out["added"], 1)
+
+    @override_settings(**ENABLED, GOOGLE_ADS_LIVE_PUSH=True)
+    def test_a_mutate_error_is_reported_not_raised(self):
+        """A live API failure (wrong version, bad token, rejected op) must come
+        back as a readable error, never an unhandled 500 — the operator needs the
+        message to fix it."""
+        acct = GoogleAdsAccount(refresh_token="rt", status=GoogleAdsAccount.Status.CONNECTED)
+        with patch("apps.integrations.googleads_push._mutate",
+                   side_effect=RuntimeError("Google Ads API 400: bad field")):
+            out = googleads_push.apply(acct, "C1", self._plan(), dry_run=False)
         self.assertFalse(out["applied"])
-        self.assertIn("error", out)
-        self.assertIn("not implemented", out["error"].lower())
+        self.assertIn("bad field", out["error"])

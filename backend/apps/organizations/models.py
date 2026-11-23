@@ -22,6 +22,13 @@ class Organization(models.Model):
     # Deprecated compatibility field; scan findings now require a verified
     # destination-domain fresh recheck and are not bypassed by this setting.
     link_scan_optout = models.BooleanField(default=False)
+    # The workspace's average cost per ad click, in USD. Entered by the customer
+    # (or, later, read from a connected Google Ads account). It's the one number
+    # the savings estimate needs that we cannot measure ourselves — a click's
+    # price lives in the ad platform, not in our traffic. Null until set, so the
+    # dashboard shows the count of invalid paid clicks and asks for the CPC
+    # rather than inventing a dollar figure.
+    avg_cpc = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

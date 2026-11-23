@@ -1,8 +1,10 @@
 from django.urls import path
-from .views import OverviewView, VisitorListView, VisitorDetailView, EventListView, SourcesView, ConversionsView, ReportView, FunnelView
+from .views import (OverviewView, VisitorListView, VisitorDetailView, EventListView,
+                    SourcesView, ConversionsView, ReportView, FunnelView, SavingsView)
 
 urlpatterns = [
     path("overview/", OverviewView.as_view(), name="overview"),
+    path("savings/", SavingsView.as_view(), name="savings"),
     path("visitors/", VisitorListView.as_view(), name="visitors"),
     path("visitors/<int:pk>/", VisitorDetailView.as_view(), name="visitor-detail"),
     path("events/", EventListView.as_view(), name="events"),

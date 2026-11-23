@@ -8,6 +8,7 @@ import {
 import PageNote from "../../components/dashboard/PageNote";
 import GetStarted from "../../components/dashboard/GetStarted";
 import ActivationChecklist from "../../components/dashboard/ActivationChecklist";
+import SavingsCard from "../../components/dashboard/SavingsCard";
 import WhatsNew from "../../components/dashboard/WhatsNew";
 import TestimonialPrompt from "../../components/dashboard/TestimonialPrompt";
 import FunnelReport from "../../components/dashboard/FunnelReport";
@@ -54,6 +55,7 @@ export default function Overview() {
     <div>
       {current && <GetStarted orgId={current.id} />}
       {current && <ActivationChecklist orgId={current.id} />}
+      {current && hasData && <SavingsCard orgId={current.id} />}
       <WhatsNew />
       <TestimonialPrompt />
       <PageNote id="overview">This is your <b>control center</b>. It shows how many people visit your sites and how many are real vs. bots. A higher <b>Traffic quality</b> is better — it means most visitors are genuine. Use the date buttons on the right to change the time period.</PageNote>
