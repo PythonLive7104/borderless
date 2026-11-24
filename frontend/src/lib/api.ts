@@ -206,7 +206,14 @@ export interface AdminTestimonial extends MyTestimonial {
 export type TestimonialDraft = Pick<MyTestimonial,
   "quote" | "author_name" | "author_role" | "author_company" | "country" | "rating" | "consent">;
 
+export interface PublicTestimonial {
+  quote: string; name: string; role: string; company: string; rating: number;
+}
+
 export const testimonialApi = {
+  /** Public: featured, approved testimonials for the marketing site. */
+  published: (signal?: AbortSignal) =>
+    http.get<PublicTestimonial[]>("/testimonials/", signal),
   mine: (orgId: number, signal?: AbortSignal) =>
     http.get<{ testimonial: MyTestimonial | null }>(`/testimonials/mine/?organization=${orgId}`, signal),
   submit: (orgId: number, body: TestimonialDraft, signal?: AbortSignal) =>

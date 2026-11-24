@@ -63,3 +63,22 @@ class TestimonialAdminSerializer(serializers.ModelSerializer):
                   "organization_name", "author_email", "created_at"]
         read_only_fields = ["id", "consent", "consent_text", "consent_at",
                             "organization_name", "author_email", "created_at", "reviewed_at"]
+
+
+class TestimonialPublicSerializer(serializers.ModelSerializer):
+    """The public, crawler-/visitor-safe shape for the marketing site.
+
+    Only the fields that are consented to be shown — the quote and the name,
+    role and company the author agreed to publish. No ids, no author FK, no
+    consent record. Maps the model's author_* fields to the names the frontend
+    data file uses, so the live fetch and the build-time export produce the same
+    shape.
+    """
+    name = serializers.CharField(source="author_name")
+    role = serializers.CharField(source="author_role")
+    company = serializers.CharField(source="author_company")
+
+    class Meta:
+        model = Testimonial
+        fields = ["quote", "name", "role", "company", "rating"]
+        read_only_fields = fields

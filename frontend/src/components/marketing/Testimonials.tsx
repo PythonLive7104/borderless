@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Section, SectionHead } from "../ui/Section";
-import { TESTIMONIALS, HAS_TESTIMONIALS } from "../../data/testimonials";
+import { TESTIMONIALS, type Testimonial } from "../../data/testimonials";
+import { testimonialApi } from "../../lib/api";
 
-/** Customer testimonials, from the generated data file.
+/** Customer testimonials.
  *
- *  Renders nothing at all when there are none. That is deliberate: an empty
- *  carousel, a "testimonials coming soon" placeholder, or invented quotes are
- *  each worse than the section simply not existing yet. The first real one
- *  publishes the section; until then the page is honest by omission.
+ *  Two layers, on purpose. The STATIC list (from the generated data file) is
+ *  what the page is pre-rendered with, so crawlers and no-JS visitors see the
+ *  published testimonials and the Review markup in the served HTML. After
+ *  hydration it fetches the LIVE featured set and swaps it in — so the moment an
+ *  admin approves and features a testimonial it appears on the site, without
+ *  waiting for the next deploy's export. The static layer is the SEO/first-paint
+ *  base; the fetch is the freshness layer.
+ *
+ *  Renders nothing at all when there are none — an empty carousel or invented
+ *  quotes are each worse than the section simply not existing yet.
  */
 function Stars({ n }: { n: number }) {
   return (
@@ -24,11 +31,31 @@ function Stars({ n }: { n: number }) {
 
 export default function Testimonials() {
   const [i, setI] = useState(0);
-  if (!HAS_TESTIMONIALS) return null;
+  // Start with the pre-rendered set (SEO + first paint), then upgrade to the
+  // live featured set once it loads. A failed fetch just keeps the static set.
+  const [items, setItems] = useState<Testimonial[]>(TESTIMONIALS);
 
-  const t = TESTIMONIALS[i];
-  const many = TESTIMONIALS.length > 1;
-  const go = (d: number) => setI((n) => (n + d + TESTIMONIALS.length) % TESTIMONIALS.length);
+  useEffect(() => {
+    const ac = new AbortController();
+    testimonialApi.published(ac.signal)
+      .then((list) => {
+        if (Array.isArray(list) && list.length) {
+          setItems(list.map((x) => ({
+            quote: x.quote, name: x.name, role: x.role,
+            company: x.company, country: "", rating: x.rating,
+          })));
+          setI(0);
+        }
+      })
+      .catch(() => { /* keep the static set */ });
+    return () => ac.abort();
+  }, []);
+
+  if (!items.length) return null;
+
+  const t = items[i % items.length];
+  const many = items.length > 1;
+  const go = (d: number) => setI((n) => (n + d + items.length) % items.length);
 
   return (
     <Section className="bg-bg-soft rounded-none">
@@ -66,7 +93,7 @@ export default function Testimonials() {
 
       {many && (
         <div className="mt-6 flex justify-center gap-2">
-          {TESTIMONIALS.map((_, n) => (
+          {items.map((_, n) => (
             <button key={n} type="button" onClick={() => setI(n)}
               aria-label={`Testimonial ${n + 1}`} aria-current={n === i}
               className={`h-2 rounded-full transition-all ${n === i ? "w-6 bg-brand" : "w-2 bg-line hover:bg-fg-dim"}`} />

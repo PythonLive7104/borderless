@@ -16,7 +16,10 @@ const findTone: Record<string, { ring: string; icon: string }> = {
 
 export default function BotCheck() {
   const cta = useCta();
-  useSeo("Free bot exposure check", "Scan any website in 10 seconds and see how exposed it is to bots — free, no signup.");
+  // The free tool is the one asset competitors can't easily copy and a strong
+  // link magnet, so its title carries the keywords people actually search for.
+  useSeo("Free Click Fraud & Bot Traffic Checker",
+    "Check any website for click-fraud and bot-traffic exposure in 10 seconds - free, no signup. See how exposed your site is to invalid traffic and automated bots.");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<BotCheckResult | null>(null);

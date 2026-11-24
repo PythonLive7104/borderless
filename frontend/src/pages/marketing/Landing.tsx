@@ -9,7 +9,7 @@ import LogoStrip from "../../components/marketing/LogoStrip";
 import Testimonials from "../../components/marketing/Testimonials";
 import ReferralBand from "../../components/marketing/ReferralBand";
 import JsonLd from "../../components/marketing/JsonLd";
-import { graph, reviews } from "../../lib/schema";
+import { graph, reviews, organization, website, softwareApplication } from "../../lib/schema";
 import { AVERAGE_RATING, TESTIMONIALS } from "../../data/testimonials";
 
 // Review markup, and only when there are real reviews to mark up. reviews()
@@ -19,7 +19,23 @@ const REVIEW_NODES = reviews(
   TESTIMONIALS.map((t) => ({ quote: t.quote, name: t.name, rating: t.rating })),
   AVERAGE_RATING,
 );
-const LANDING_JSONLD = REVIEW_NODES.length ? graph(...REVIEW_NODES) : "";
+
+// The homepage now carries the brand + product schema, not just reviews. This
+// is what tells Google (and answer engines) that "TryNoBot" is a click-fraud
+// protection product with these prices — the category association a crowded
+// brand name can't earn on its own. Prices are the published monthly list
+// prices; applicationSubCategory ("Click fraud protection") lives in the helper.
+const OFFERS = [
+  { name: "Basic", price: 69, duration: "P1M", description: "Full detection engine, 10,000 ad clicks, 10 sites" },
+  { name: "Plus", price: 119, duration: "P1M", description: "50,000 ad clicks, 20 sites, longer retention" },
+  { name: "Pro", price: 199, duration: "P1M", description: "150,000 ad clicks, 40 sites, own domain, private domains" },
+];
+const LANDING_JSONLD = graph(
+  organization(),
+  website(),
+  softwareApplication(OFFERS),
+  ...REVIEW_NODES,
+);
 import DashboardPreview from "../../components/marketing/DashboardPreview";
 import DemoVideo from "../../components/marketing/DemoVideo";
 import HeroCarousel, { type Slide } from "../../components/marketing/HeroCarousel";
@@ -113,7 +129,14 @@ const SLIDES: Slide[] = [
 
 export default function Landing() {
   const cta = useCta();
-  useSeo("Stop paying for bot clicks on your ads", "Protect your Google and Microsoft Ads budget: every visitor scored 0-100 in real time, bots and click fraud blocked before they cost you, with the exact signals behind every decision.");
+  // Title leads with the category keyword ("click fraud protection"), not only
+  // the benefit line: a brand called "...NoBot" is lost among unrelated NoBots
+  // in search, so the page has to rank on what it DOES. The benefit still
+  // follows, and the description names the category and the obvious comparison
+  // so the "ClickCease alternative" intent has somewhere to land.
+  useSeo(
+    "Click Fraud Protection for Google Ads — Stop Paying for Bot Clicks",
+    "TryNoBot is click fraud protection for Google, Microsoft and Meta Ads: every visitor scored 0-100 in real time, bots and invalid clicks blocked before they waste your budget, with the exact signals behind every decision. A transparent alternative to ClickCease and Fraud Blocker.");
   useReveal();
   return (
     <>
