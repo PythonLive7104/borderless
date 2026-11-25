@@ -1,6 +1,12 @@
+from django import forms
 from django.contrib import admin
 from .models import BtcPayment, Plan, Subscription
 from . import btcpay
+
+
+class OrganizationEmailChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.name} ({obj.owner.email})"
 
 
 @admin.register(Plan)
@@ -12,6 +18,14 @@ class PlanAdmin(admin.ModelAdmin):
 class SubscriptionAdmin(admin.ModelAdmin):
     list_display = ("organization", "plan", "status", "period_start")
     list_filter = ("status",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "organization":
+            kwargs["form_class"] = OrganizationEmailChoiceField
+        formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "organization" and formfield:
+            formfield.queryset = formfield.queryset.select_related("owner")
+        return formfield
 
 
 @admin.register(BtcPayment)
