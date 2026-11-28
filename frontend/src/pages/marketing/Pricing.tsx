@@ -3,7 +3,7 @@ import { useSeo } from "../../lib/seo";
 import { trackPricingView } from "../../lib/analytics";
 import { useCta } from "../../lib/useCta";
 import IntervalToggle from "../../components/ui/IntervalToggle";
-import type { BillingInterval } from "../../lib/api";
+import { billingApi, type BillingInterval, type PromoInfo } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { Section, SectionHead } from "../../components/ui/Section";
@@ -188,6 +188,15 @@ export default function Pricing() {
   // is the current setting — see PAYMENT_FEE_PCT in settings.
   const payMethods = usePaymentMethods();
   const fee = feeNote(payMethods);
+  // The live Black Friday promo, from the public endpoint. Display-only here —
+  // the code is entered and validated at checkout (dashboard Billing). A failed
+  // fetch is harmless: the page simply shows no offer and buying still works.
+  const [promo, setPromo] = useState<PromoInfo | null>(null);
+  useEffect(() => { billingApi.promoInfo().then(setPromo).catch(() => {}); }, []);
+  const promoOn = !!promo?.active;
+  const promoMult = promo?.multiplier ?? 1;
+  // The offer targets one plan (Pro). promo.plan is a slug; match the card name.
+  const promoAppliesTo = (p: Plan) => promoOn && p.name.toLowerCase() === (promo?.plan ?? "pro");
   return (
     <>
       <JsonLd data={PRICING_JSONLD} />
@@ -277,6 +286,28 @@ export default function Pricing() {
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Antibot sites</span><span className="font-semibold">{t.domains}</span></div>
                 <div className="mt-1 flex justify-between"><span className="text-fg-dim">Access</span><span className="font-semibold capitalize">{interval}</span></div>
               </div>
+              {/* Black Friday: a display-only offer banner on the Pro card.
+                  The code is entered at checkout on the dashboard, so there's
+                  no input here — just the code, the multiplier and the end
+                  date. promoAppliesTo gates it to the promo's plan, and the
+                  copy follows the selected interval (week/month/year). */}
+              {promoAppliesTo(p) && (
+                <div className="mt-5 overflow-hidden rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-rose-500/10 p-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base leading-none">🎁</span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wide text-amber-600">Black Friday</span>
+                    {promo?.ends && (
+                      <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        Ends {new Date(`${promo.ends}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-xs leading-snug text-fg-muted">
+                    Code <b className="font-mono font-bold text-amber-700">{promo?.code}</b> gets you{" "}
+                    <b>{promoMult}× the period</b> — {promoMult} {t.noun}s for the price of one. Enter it at checkout.
+                  </p>
+                </div>
+              )}
               <Button to={cta.pricingHref} variant={p.highlight ? "primary" : "outline"} className="mt-5 w-full"><Cart /> {cta.authed ? "Manage plan" : p.cta}</Button>
             </div>
             );
