@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import PromoBanner from "../PromoBanner";
 import { trackPageView } from "../../lib/analytics";
 import JsonLd from "./JsonLd";
 import { graph, organization, website } from "../../lib/schema";
@@ -24,6 +25,7 @@ export default function MarketingLayout() {
     <div className="flex min-h-screen flex-col bg-bg">
       <JsonLd data={SITE_JSONLD} />
       <Navbar />
+      <PromoBanner />
       <main className="flex-1"><Outlet /></main>
       <Footer />
     </div>

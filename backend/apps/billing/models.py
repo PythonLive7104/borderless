@@ -161,6 +161,11 @@ class Subscription(models.Model):
     # ways, and so switching interval doesn't need a different plan row.
     interval = models.CharField(max_length=10, choices=Interval.choices, default=Interval.WEEKLY)
     pending_interval = models.CharField(max_length=10, blank=True, default="")
+    # A validated promo code carried from checkout to activation, because the
+    # payment confirms out of band (Bachs webhook / settle poll) long after the
+    # code was entered. Set only when it validated at checkout; read once at
+    # activation to stretch the period, then cleared by start_period.
+    pending_promo = models.CharField(max_length=40, blank=True, default="")
 
     def _deadline(self):
         """End of the current access window: the trial end while trialing,
@@ -200,21 +205,28 @@ class Subscription(models.Model):
         end = self.period_end or (start + timedelta(days=self.period_days))
         return start, end
 
-    def start_period(self, plan, interval: str | None = None):
+    def start_period(self, plan, interval: str | None = None, period_multiplier: int = 1):
         """Apply a purchase / renewal / tier change with day-rollover: any unused
         days on the current window carry into the new period, so renewing early,
         switching tier or moving weekly<->monthly never loses time. Marks the
-        sub ACTIVE. `interval` defaults to whatever they're already on."""
+        sub ACTIVE. `interval` defaults to whatever they're already on.
+
+        period_multiplier stretches the new period — 2 for the Black Friday
+        "double period" promo. It multiplies only the freshly bought time, never
+        the rolled-over remainder (that was already paid for at 1x), so a promo
+        can't be farmed by renewing early over and over."""
         now = timezone.now()
         deadline = self._deadline()
         remaining = (deadline - now) if (deadline and deadline > now) else timedelta(0)
+        mult = max(1, int(period_multiplier or 1))
         self.plan = plan
         self.interval = interval or self.interval or Interval.WEEKLY
         self.status = self.Status.ACTIVE
         self.period_start = now
-        self.period_end = now + timedelta(days=self.period_days) + remaining
+        self.period_end = now + timedelta(days=self.period_days * mult) + remaining
         self.pending_plan_slug = ""
         self.pending_interval = ""
+        self.pending_promo = ""
 
 
 # Trial caps: while a workspace is on the free trial it may protect only a

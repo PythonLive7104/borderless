@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { type BillingInterval, billingApi, type Plan, type Subscription } from "../../lib/api";
+import { type BillingInterval, billingApi, type Plan, type PromoInfo, type Subscription } from "../../lib/api";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import IntervalToggle from "../../components/ui/IntervalToggle";
@@ -55,6 +55,11 @@ export default function Billing() {
   const { current } = useWorkspace();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
+  // The live Black Friday promo, and the code the buyer types on the Pro card.
+  // The server is authoritative — this only previews "2x applied" and carries
+  // the code into checkout; validate() on the server re-checks before charging.
+  const [promo, setPromo] = useState<PromoInfo | null>(null);
+  const [promoCode, setPromoCode] = useState("");
   // Which interval the buy buttons purchase. Defaults to MONTHLY for everyone -
   // it's the standard way buyers think about SaaS pricing and the anchor we
   // want shown first. Anyone can switch with the Weekly/Monthly/Yearly toggle,
@@ -74,6 +79,17 @@ export default function Billing() {
   // scaled by the period. 0 stays 0 — unlimited on every interval.
   const adClicksOf = (p: Plan) =>
     !p.monthly_ad_clicks ? 0 : Math.ceil(p.monthly_ad_clicks * INTERVAL_MONTHS[interval]);
+  // Black Friday helpers. The offer applies to one plan (Pro) only; the typed
+  // code is matched case/space-insensitively here purely for the inline preview.
+  const promoOn = !!promo?.active;
+  const promoPlanSlug = promo?.plan ?? "pro";
+  const promoMult = promo?.multiplier ?? 1;
+  const typedCode = promoCode.trim();
+  const codeValid = promoOn && typedCode.toLowerCase() === (promo?.code ?? "").toLowerCase();
+  const promoAppliesTo = (p: Plan) => promoOn && p.slug === promoPlanSlug;
+  // Only ever send the code for the plan the promo is for — the server rejects a
+  // code on any other plan with a 400, which would block an ordinary purchase.
+  const codeFor = (p: Plan) => (p.slug === promoPlanSlug ? typedCode : "");
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Plan | null>(null); // plan being confirmed
   // Referral credit, so the confirm dialog can offer to pay with it.
@@ -96,6 +112,9 @@ export default function Billing() {
       // Referral credit is a nice-to-have on this page: if it fails to load,
       // the buy buttons must still work, so it is fetched separately.
       referralApi.me().then((r) => setCreditCents(r.balance_cents)).catch(() => {});
+      // Promo is also non-critical: if it fails to load the page just shows no
+      // Black Friday offer, and buying still works.
+      billingApi.promoInfo().then(setPromo).catch(() => {});
     } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [current?.id]);
@@ -140,7 +159,7 @@ export default function Billing() {
     if (!target) return;
     setBusy(true); setErr("");
     try {
-      const res = await billingApi.checkout(current!.id, target.slug, interval);
+      const res = await billingApi.checkout(current!.id, target.slug, interval, codeFor(target));
       if (res.checkout_url) {
         window.location.href = res.checkout_url;  // redirect to Bachs hosted checkout
         return;
@@ -260,6 +279,44 @@ export default function Billing() {
                 ))}
               </ul>
 
+              {/* Black Friday: the promo banner + code box live on the Pro card
+                  only (promoAppliesTo gates it to the promo plan while the
+                  campaign is live). The code typed here is carried into
+                  checkout; the server re-validates before charging. */}
+              {promoAppliesTo(p) && (
+                <div className="mt-4 overflow-hidden rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-rose-500/10 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base leading-none">🎁</span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wide text-amber-600">Black Friday</span>
+                    {promo?.ends && (
+                      <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        Ends {new Date(`${promo.ends}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-xs text-fg-muted">
+                    Code <b className="font-mono font-bold text-amber-700">{promo?.code}</b> gets you{" "}
+                    <b>{promoMult}× the period</b> — {promoMult} {noun}s for the price of one.
+                  </p>
+                  <input
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    placeholder="Enter promo code"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    aria-label="Black Friday promo code"
+                    className="mt-2 w-full rounded-lg border border-amber-400/40 bg-bg px-3 py-1.5 text-sm outline-none focus:border-amber-500"
+                  />
+                  {typedCode && (
+                    <p className={`mt-1 text-[11px] font-semibold ${codeValid ? "text-emerald-600" : "text-amber-600"}`}>
+                      {codeValid
+                        ? `✓ ${promoMult}× applied — ${days * promoMult} days of access for $${priceOf(p).toLocaleString()}`
+                        : "That code isn't recognised."}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {isCurrent ? (
                 <div className="mt-5">
                   {canManage ? (
@@ -298,6 +355,17 @@ export default function Billing() {
               {feeNote(payMethods) && <>, plus {feeNote(payMethods)}</>}. Access starts as
               soon as payment succeeds, for {days} days. Any days you have left are added on top, so you never lose time.
             </p>
+            {/* Black Friday confirmation: only when a valid code is in the box
+                and this is the Pro plan, so the buyer sees the doubled period
+                before they pay. */}
+            {promoAppliesTo(target) && codeValid && (
+              <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2.5 text-sm">
+                <b className="text-amber-700">🎁 Black Friday applied — {promoMult}× period</b>
+                <div className="mt-0.5 text-xs text-fg-muted">
+                  Code <b className="font-mono">{promo?.code}</b> gives you <b>{days * promoMult} days</b> of access instead of {days}, for the same ${priceOf(target).toLocaleString()}.
+                </div>
+              </div>
+            )}
             {/* Referral credit, offered only when it covers the whole price.
                 Partial payment isn't supported: splitting a charge between
                 credit and a hosted checkout session means reconciling two

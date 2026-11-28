@@ -3,8 +3,10 @@ from .views import (PaymentMethodsView, PlanListView, SubscriptionView, ChangePl
                     UsageView, CheckoutView, VerifyCheckoutView, BachsWebhookView,
                     RedeemCreditView)
 from .btc_views import BtcInfoView, BtcStartView, BtcStatusView
+from .views import PromoInfoView
 
 urlpatterns = [
+    path("promo/", PromoInfoView.as_view(), name="promo-info"),
     path("btc/", BtcInfoView.as_view(), name="btc-info"),
     path("btc/start/", BtcStartView.as_view(), name="btc-start"),
     path("btc/status/", BtcStatusView.as_view(), name="btc-status"),

@@ -301,6 +301,22 @@ SHORTLINK_BASE = os.getenv("SHORTLINK_BASE", "")
 # Google Safe Browsing remains an independent, higher-confidence signal.
 THREATSCAN_VT_MIN_DETECTIONS = int(os.getenv("THREATSCAN_VT_MIN_DETECTIONS", "5"))
 
+# Promo code that DOUBLES the subscription period on the Pro plan (Black Friday).
+# A customer who enters BLACKFRIDAY_CODE at Pro checkout gets 2x the time for the
+# same price — 2 weeks / 2 months / 2 years instead of 1. Empty = no promo
+# running, and any entered code is then rejected. The multiplier is configurable
+# so the same mechanism can run a "3x" or a different campaign later.
+BLACKFRIDAY_CODE = os.getenv("BLACKFRIDAY_CODE", "")
+try:
+    BLACKFRIDAY_MULTIPLIER = max(1, int(os.getenv("BLACKFRIDAY_MULTIPLIER", "2")))
+except (TypeError, ValueError):
+    BLACKFRIDAY_MULTIPLIER = 2
+# Optional campaign end date, YYYY-MM-DD. The promo stays valid through this day
+# and switches off by itself the day after — so a code left in the .env can't
+# keep doubling once the sale is over. Empty = open-ended (off only when the
+# code is cleared). This date is also what the pricing banner counts down to.
+BLACKFRIDAY_ENDS = os.getenv("BLACKFRIDAY_ENDS", "")
+
 # Direct Bitcoin payment. A customer pays this address and an admin confirms
 # receipt, which activates the plan. Entirely optional: with no address set the
 # method is not offered and the endpoints 404 — nothing references a wallet that

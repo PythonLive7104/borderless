@@ -7,6 +7,7 @@ import ThemeToggle from "../ui/ThemeToggle";
 import HelpChat from "./HelpChat";
 import AccessGate from "./AccessGate";
 import CommandPalette from "./CommandPalette";
+import PromoBanner from "../PromoBanner";
 import VerifyEmailGate from "./VerifyEmailGate";
 import { TourProvider } from "../../context/TourContext";
 import { useAuth } from "../../context/AuthContext";
@@ -147,6 +148,7 @@ export default function DashboardLayout() {
             </div>
           </div>
         </header>
+        <PromoBanner ctaHref="/dashboard/billing" />
         <main className="mx-auto max-w-6xl px-5 py-8"><AccessGate><Outlet /></AccessGate></main>
       </div>
       <HelpChat />

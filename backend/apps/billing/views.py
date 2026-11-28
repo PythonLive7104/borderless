@@ -191,7 +191,7 @@ def _notify_activation(sub, plan):
     )
 
 
-def _activate(sub, plan, interval=None, paid_ref: str = ""):
+def _activate(sub, plan, interval=None, paid_ref: str = "", promo: str = ""):
     """Apply a plan to a subscription.
 
     `paid_ref` is set ONLY by the paths where real money changed hands — the
@@ -200,10 +200,18 @@ def _activate(sub, plan, interval=None, paid_ref: str = ""):
     they can never trigger a referral payout. Referral credit that could be
     minted by a $0 activation would be free money, which is exactly the kind of
     thing a fraud-detection company should not ship.
+
+    `promo` is the code captured at checkout (passed through from the caller, or
+    read from sub.pending_promo). The period multiplier is computed here, server
+    side, from the code and the plan — never trusted from the client — so a
+    valid Black Friday code doubles the period and anything else is a 1x no-op.
     """
-    sub.start_period(plan, interval)  # plan + interval, rolling unused days over
+    from apps.billing import promo as promo_mod
+    code = promo or sub.pending_promo
+    mult = promo_mod.period_multiplier(code, plan.slug)
+    sub.start_period(plan, interval, period_multiplier=mult)  # rolls unused days over
     sub.save(update_fields=["plan", "status", "interval", "period_start", "period_end",
-                            "pending_plan_slug", "pending_interval"])
+                            "pending_plan_slug", "pending_interval", "pending_promo"])
     # Put the engine keys back immediately — a renewal shouldn't wait for the
     # hourly enforce_access run to start protecting traffic again.
     restore_org(sub.organization_id)
@@ -354,12 +362,23 @@ class CheckoutView(views.APIView):
         if not plan.offers(interval):
             return Response({"detail": f"{plan.name} isn't available on {interval} billing."}, status=400)
 
+        # Promo code (Black Friday "double period"). Validated server-side before
+        # anything is charged: a code that was entered but doesn't apply is a hard
+        # error, so a customer is never quietly charged full price having thought
+        # the promo applied. An empty code just means no promo.
+        from apps.billing import promo as promo_mod
+        promo_code = (request.data.get("promo_code") or "").strip()
+        if promo_code:
+            v = promo_mod.validate(promo_code, plan.slug)
+            if not v["valid"]:
+                return Response({"detail": v["message"] or "That code isn't valid."}, status=400)
+
         sub = _get_subscription(org_id)
         product_id = plan.product_for(interval)
 
         # A genuinely free plan needs no payment.
         if plan.price_for(interval) == 0:
-            _activate(sub, plan, interval)
+            _activate(sub, plan, interval, promo=promo_code)
             return Response({"activated": True, **SubscriptionSerializer(sub).data})
 
         # A PRICED plan must never activate without payment. This used to fall
@@ -373,7 +392,7 @@ class CheckoutView(views.APIView):
                 "checkout blocked: plan=%s interval=%s price=%s bachs_enabled=%s product_id=%r",
                 plan.slug, interval, plan.price_for(interval), bachs.is_enabled(), product_id)
             if settings.DEBUG:
-                _activate(sub, plan, interval)   # local development only
+                _activate(sub, plan, interval, promo=promo_code)   # local development only
                 return Response({"activated": True, **SubscriptionSerializer(sub).data})
             return Response(
                 {"detail": f"{plan.name} isn't available on {interval} billing yet. "
@@ -407,7 +426,12 @@ class CheckoutView(views.APIView):
         sub.bachs_session_id = session_id
         sub.pending_plan_slug = plan.slug
         sub.pending_interval = interval
-        sub.save(update_fields=["bachs_session_id", "pending_plan_slug", "pending_interval"])
+        # Carry the validated promo to activation — the webhook/settle poll run
+        # out of band, after this request is long gone. Only a code that passed
+        # validation above reaches here.
+        sub.pending_promo = promo_code
+        sub.save(update_fields=["bachs_session_id", "pending_plan_slug",
+                                "pending_interval", "pending_promo"])
         if not checkout_url:
             return Response({"detail": "Bachs did not return a checkout URL.", "raw": data}, status=502)
         return Response({"checkout_url": checkout_url})
@@ -565,3 +589,24 @@ class BachsWebhookView(views.APIView):
             log.warning("bachs webhook: could NOT activate — type=%s sub_found=%s plan_slug=%r session=%r",
                         etype, bool(sub), plan_slug, session_id)
         return Response({"received": True})
+
+
+class PromoInfoView(views.APIView):
+    """Public: the running promo, for the banner and the checkout to display.
+
+    Returns the code itself because a promo code is meant to be advertised — the
+    whole point is for people to use it. Off (active=False) when no code is
+    configured, so the banner disappears the moment the campaign ends.
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        from apps.billing import promo as promo_mod
+        return Response({
+            "active": promo_mod.is_enabled(),
+            "code": promo_mod.configured_code(),
+            "multiplier": promo_mod.multiplier(),
+            "plan": promo_mod.PROMO_PLAN,
+            "ends": promo_mod.ends_iso(),
+        })

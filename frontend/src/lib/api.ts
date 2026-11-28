@@ -719,15 +719,30 @@ export interface PaymentMethods {
   fee_fixed: number;
 }
 
+/** The running promo campaign (Black Friday "double period" on the Pro plan),
+ *  as told to the pricing UI. Public — the pricing page asks before login. When
+ *  `active` is false the promo is off and the other fields should be ignored.
+ *  `ends` is the ISO date it stops (valid through that day), or "" open-ended. */
+export interface PromoInfo {
+  active: boolean;
+  code: string;
+  multiplier: number;
+  plan: string;
+  ends: string;
+}
+
 export const billingApi = {
   plans: () => http.get<Plan[]>("/billing/plans/"),
   // Public — the marketing pricing page asks before anyone has logged in.
   paymentMethods: () => http.get<PaymentMethods>("/billing/payment-methods/"),
+  /** Public: the live promo, for the banner and the Pro checkout to display. */
+  promoInfo: () => http.get<PromoInfo>("/billing/promo/"),
   subscription: (orgId: number) => http.get<Subscription>(`/billing/subscription/?organization=${orgId}`),
   changePlan: (orgId: number, plan: string, interval?: BillingInterval) =>
     http.post<Subscription>("/billing/subscription/change/", { organization: orgId, plan, interval }),
-  checkout: (orgId: number, plan: string, interval: BillingInterval = "weekly") =>
-    http.post<{ checkout_url?: string; activated?: boolean } & Partial<Subscription>>("/billing/checkout/", { organization: orgId, plan, interval }),
+  checkout: (orgId: number, plan: string, interval: BillingInterval = "weekly", promoCode = "") =>
+    http.post<{ checkout_url?: string; activated?: boolean } & Partial<Subscription>>(
+      "/billing/checkout/", { organization: orgId, plan, interval, promo_code: promoCode }),
   verifyCheckout: (orgId: number) =>
     http.post<{ activated: boolean } & Subscription>("/billing/checkout/verify/", { organization: orgId }),
   cancel: (orgId: number) => http.post<Subscription>("/billing/subscription/cancel/", { organization: orgId }),
